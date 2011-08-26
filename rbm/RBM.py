@@ -79,6 +79,8 @@ class RBM(object):
         return self._W
 
     def setW(self, val):
+        assert (val.shape[0] == self._sizeH + 1)
+        assert (val.shape[1] == self._sizeV + 1)
         self._W = val
         self._W[0,0] = 0
 
@@ -93,13 +95,13 @@ class RBM(object):
 
 
     def energy(self):
-        '''Compute energy of the network given the visible states vv,
-        hidden states hh, and extended weight matrix WW.
+        '''Compute energy of the network given the visible states,
+        hidden states, and current extended weight matrix.
 
-        vv and hh must be column vectors.
+        #vv and hh must be column vectors.
 
-        To account for biases, vv[0,0] and hh[0,0] must be 1, and WW[0,0]
-        must be 0.'''
+        #To account for biases, vv[0,0] and hh[0,0] must be 1, and WW[0,0]
+        #must be 0.'''
 
         assert (self._v[0,0] == 1)
         assert (self._h[0,0] == 1)
@@ -107,11 +109,13 @@ class RBM(object):
 
         return -dot(dot(self._W, self._v).T, self._h)
 
+
     def v2h(self):
         '''Do a visible to hidden step.'''
         self._h = dot(self._W, self._v)
         self._h = (logistic(self._h) > random.uniform(0, 1, self._h.shape)) + 0
         self._h[0,0] = 1    # Bias term
+
 
     def h2v(self, activation = 'logisticBinary', param = 1, returnNoisefree = False):
         '''Do a hidden to visible step.'''
@@ -124,6 +128,7 @@ class RBM(object):
                 ret = copy.copy(self._v)
             self._v += param * random.normal(0, 1, self._v.shape)
         else:
+            self._v[0,0] = 1    # Bias term
             raise Exception('Unknown activation: %s' % activation)
         self._v[0,0] = 1    # Bias term
 
@@ -136,19 +141,26 @@ class RBM(object):
         self.v = vv
         self.v2h()
         vihjData  = dot(self._h, self._v.T)
-        noisefreeV = self.h2v(activation = activationH2V,
-                              param      = param,
-                              returnNoisefree = True)
-        #self._reconErrorNorms = hstack((self._reconErrorNorms,
-        #                                linalg.norm(self._v[1:].squeeze() - vv)))
-        self._reconErrorNorms = hstack((self._reconErrorNorms,
-                                        linalg.norm(noisefreeV[1:].squeeze() - vv)))
+        if activationH2V == 'gaussianReal':
+            noisefreeV = self.h2v(activation = activationH2V,
+                                  param      = param,
+                                  returnNoisefree = True)
+            self._reconErrorNorms = hstack((self._reconErrorNorms,
+                                            linalg.norm(noisefreeV[1:].squeeze() - vv)))
+        else:
+            self.h2v(activation = activationH2V,
+                     param      = param)
+            self._reconErrorNorms = hstack((self._reconErrorNorms,
+                                            linalg.norm(self._v[1:].squeeze() - vv)))
         self.v2h()
         vihjRecon = dot(self._h, self._v.T)
         self._W += epsilon * (vihjData - vihjRecon)
+
+        #print 'self._W[0,0] was', self._W[0,0]
+        self._W[0,0] = 0
         
 
-    def reconErrorVec(self, vv, activationH2V = 'gaussianReal'):
+    def reconErrorVec(self, vv, activationH2V = 'logisticBinary'):
         '''Performs a V2H step, an H2V step, and then reports the
         reconstruction error as a vector of differences.'''
 
@@ -158,7 +170,7 @@ class RBM(object):
         return self._v[1:].squeeze() - vv
 
 
-    def reconErrorNorm(self, vv, activationH2V = 'gaussianReal'):
+    def reconErrorNorm(self, vv, activationH2V = 'logisticBinary'):
         '''2 Norm of the reconErrorVec for vector vv.'''
 
         return linalg.norm(self.reconErrorVec(vv, activationH2V))

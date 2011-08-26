@@ -27,8 +27,12 @@ def generateSimpleLRData(size):
 
 
 def randomSimpleLR(N, size = 2):
-    for ii in xrange(N):
-        yield generateSimpleLRData(size)
+    if N < 0:
+        while True:
+            yield generateSimpleLRData(size)
+    else:
+        for ii in xrange(N):
+            yield generateSimpleLRData(size)
 
 
 
