@@ -78,10 +78,10 @@ def main():
     trainFilter = ['image-2534', 'image-2535']
     testFilter  = ['image-2545']
 
-    #saveToFile('../data/upson_rovio_1_edge_thresh/train_10_50.pkl.gz',    randomSampleMatrix(trainFilter, Nw = 10, Nsamples = 50))
-    #saveToFile('../data/upson_rovio_1_edge_thresh/test_10_50.pkl.gz',     randomSampleMatrix(testFilter,  Nw = 10, Nsamples = 50))
-    #saveToFile('../data/upson_rovio_1_edge_thresh/train_10_50000.pkl.gz', randomSampleMatrix(trainFilter, Nw = 10, Nsamples = 50000))
-    #saveToFile('../data/upson_rovio_1_edge_thresh/test_10_50000.pkl.gz',  randomSampleMatrix(testFilter,  Nw = 10, Nsamples = 50000))
+    saveToFile('../data/upson_rovio_1_edge_thresh/train_10_50.pkl.gz',    randomSampleMatrix(trainFilter, Nw = 10, Nsamples = 50))
+    saveToFile('../data/upson_rovio_1_edge_thresh/test_10_50.pkl.gz',     randomSampleMatrix(testFilter,  Nw = 10, Nsamples = 50))
+    saveToFile('../data/upson_rovio_1_edge_thresh/train_10_50000.pkl.gz', randomSampleMatrix(trainFilter, Nw = 10, Nsamples = 50000))
+    saveToFile('../data/upson_rovio_1_edge_thresh/test_10_50000.pkl.gz',  randomSampleMatrix(testFilter,  Nw = 10, Nsamples = 50000))
 
     saveToFile('../data/upson_rovio_1_edge_thresh/train_28_50.pkl.gz',    randomSampleMatrix(trainFilter, Nw = 28, Nsamples = 50))
     saveToFile('../data/upson_rovio_1_edge_thresh/test_28_50.pkl.gz',     randomSampleMatrix(testFilter,  Nw = 28, Nsamples = 50))
