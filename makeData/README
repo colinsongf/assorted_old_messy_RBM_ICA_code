@@ -1,0 +1,8 @@
+Order to run:
+
+makeUpsonRovio1.sh
+makeUpsonRovio1.py     # might not work now with subdir
+
+makeUpsonRovio1EdgeThresh.sh
+makeUpsonRovio1EdgeThresh.py
+
