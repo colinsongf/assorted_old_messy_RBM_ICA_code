@@ -1,45 +1,28 @@
 #! /usr/bin/env ipython --pylab
+#! /usr/bin/env ipython --pylab=osx
+#! /usr/bin/env ipython --pylab=wx
 
 from numpy import *
+import matplotlib
 import pylab as pl
 from time import sleep
 import pdb
 
+from helper import *
+
+
 
 def main():
-    pts = array([[0, 0, 0],
-                 [0, 0, 1],
-                 [0, 1, 1],
-                 [1, 1, 1],
-                 ])
-    
-    R = array([
-        [1, 1, 0],
-        [0, 0, 1],
-        ], dtype=float)
+    dim = 3
+    corners, (edges0, edges1) = hypercubeCornersEdges(dim)
 
-    for ii in range(R.shape[0]):
-        R[ii,:] /= linalg.norm(R[ii,:])
+    rot = eye(3)
+    w = array([[1, 1, 1]])
+    rot[0,:] = w
+    gramSchmidt(rot)
+    print 'rot is', rot
 
-    plotXY = dot(pts, R.T)
-
-    print plotXY
-
-    #curSubplot = 1
-    #
-    #ax = pl.subplot(3,1,curSubplot)
-    #curSubplot += 1
-    ##pl.imshow(self._h.T, cmap='gray', interpolation='nearest', vmin=0, vmax=1)
-    #ax.set_yticklabels([])
-    #ax.set_xticklabels([])
-    #pl.xticks([])
-    #pl.yticks([])
-    #pl.axvline(.5, color=[1,.4,.4,1], linewidth=2)
-    #
-    #pl.show()
-    #raw_input('Enter to exit.')
-
-
+    raw_input('Enter to exit.')
 
 
 
