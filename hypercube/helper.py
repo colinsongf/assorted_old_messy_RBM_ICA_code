@@ -7,6 +7,14 @@ from time import sleep
 
 
 
+def looser(ax):
+    '''Returns a loosened version of the axies specified in ax'''
+
+    return (1.05 * ax[0] - .05 * ax[1], 1.05 * ax[1] - .05 * ax[0],
+            1.05 * ax[2] - .05 * ax[3], 1.05 * ax[3] - .05 * ax[2])
+
+
+
 def uniq(seq):
     '''Returns a list with duplicates removed. Order is preserved.
     From: http://stackoverflow.com/questions/480214/how-do-you-remove-duplicates-from-a-list-in-python-whilst-preserving-order'''
