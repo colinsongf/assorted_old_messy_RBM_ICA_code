@@ -7,11 +7,14 @@ from time import sleep
 
 
 
-def looser(ax):
+def looser(ax, frac = .05):
     '''Returns a loosened version of the axies specified in ax'''
 
-    return (1.05 * ax[0] - .05 * ax[1], 1.05 * ax[1] - .05 * ax[0],
-            1.05 * ax[2] - .05 * ax[3], 1.05 * ax[3] - .05 * ax[2])
+    print 'ax was', ax
+    ret = ((1+frac) * ax[0] - frac * ax[1], (1+frac) * ax[1] - frac * ax[0],
+            (1+frac) * ax[2] - frac * ax[3], (1+frac) * ax[3] - frac * ax[2])
+    print 'ax is ', ret
+    return ret
 
 
 
@@ -97,8 +100,42 @@ def hypercubeCornersEdges(dim = 3):
 
 
 
+def rotationMatrix(dim, angles=None, randStd = .1, skipFirst = False):
+    '''Returns a rotation matrix in dim dimensions with the given
+    angles. angles should be len(dim choose 2). If angles is not
+    provided, it is generated randomly.'''
+
+    nAngles = dim * (dim-1) / 2
+    if angles is None:
+        angles = random.normal(0, randStd, nAngles)
+    if len(angles) != nAngles:
+        raise Exception('angles is wrong length')
+
+    ret = eye(dim)
+    ii = 0
+    first = 1 if skipFirst else 0
+    for ii1 in range(first, dim):
+        for ii2 in range(ii1+1, dim):
+            temp = eye(dim)
+            cc = cos(angles[ii])
+            ss = sin(angles[ii])
+            temp[ii1,ii1] = cc
+            temp[ii2,ii2] = cc
+            temp[ii1,ii2] = -ss
+            temp[ii2,ii1] = ss
+            ii += 1
+            ret = dot(ret, temp)
+    print 'rotation matrix:\n', ret
+    print 'det', linalg.det(ret)
+    det = linalg.det(ret)
+    if abs(det - 1) > 1e-6:
+        raise Exception('Bad rotation determinant (%s)' % repr(det))
+    return ret
+
+
+
 def main():
-    N = 5
+    N = 4
     mat = random.random((N, N))
     print 'matrix M is:'
     print mat
