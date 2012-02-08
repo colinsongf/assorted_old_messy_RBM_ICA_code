@@ -64,7 +64,7 @@ def hypercubeSucessor(node):
 
 def hypercubeCornersEdges(dim = 3):
     '''Returns a list of corners and edges for the unit hypercube of the given dimension'''
-    if dim > 15:
+    if dim > 16:
         raise Exception('dimension is probably too high')
     rDimRange = range(dim)
     rDimRange.reverse()

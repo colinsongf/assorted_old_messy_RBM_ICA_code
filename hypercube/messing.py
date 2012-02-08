@@ -5,6 +5,9 @@
 
 from numpy import *
 import matplotlib
+
+matplotlib.use("Agg")
+
 import pylab as pl
 from time import sleep
 import pdb
@@ -14,7 +17,7 @@ from helper import *
 
 
 def main():
-    dim = 5
+    dim = 16
     corners, (edges0, edges1) = hypercubeCornersEdges(dim)
 
     baseRot = eye(dim)
@@ -29,10 +32,10 @@ def main():
 
     baseRot = baseRot.T
     #baseRot = eye(dim)
-    deltaRot = rotationMatrix(dim, None, .03, skipFirst = True)
+    deltaRot = rotationMatrix(dim, None, .01, skipFirst = True)
 
     rot = copy(baseRot)
-    for iteration in xrange(10000):
+    for iteration in xrange(2000):
         rot = dot(rot, deltaRot)
         cornersRot  = dot(corners, rot)
         edges0Rot   = dot(edges0, rot)
@@ -56,7 +59,7 @@ def main():
             axlim = looser(pl.axis(), .3)
         pl.axis(axlim)
         pl.draw()
-        pl.savefig('rot_%d_%d.png' % (dim, iteration))
+        pl.savefig('rot_%02d_%05d.png' % (dim, iteration))
         sleep(.001)
 
     raw_input('Enter to exit.')
