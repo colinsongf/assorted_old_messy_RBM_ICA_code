@@ -78,15 +78,30 @@ def main():
     trainFilter = ['image-2534', 'image-2535']
     testFilter  = ['image-2545']
 
+    saveToFile('../data/upson_rovio_1/train_02_50.pkl.gz',    randomSampleMatrix(trainFilter, Nw = 02, Nsamples = 50))
+    saveToFile('../data/upson_rovio_1/test_02_50.pkl.gz',     randomSampleMatrix(testFilter,  Nw = 02, Nsamples = 50))
+    saveToFile('../data/upson_rovio_1/train_02_50000.pkl.gz', randomSampleMatrix(trainFilter, Nw = 02, Nsamples = 50000))
+    saveToFile('../data/upson_rovio_1/test_02_50000.pkl.gz',  randomSampleMatrix(testFilter,  Nw = 02, Nsamples = 50000))
+
+    saveToFile('../data/upson_rovio_1/train_04_50.pkl.gz',    randomSampleMatrix(trainFilter, Nw = 04, Nsamples = 50))
+    saveToFile('../data/upson_rovio_1/test_04_50.pkl.gz',     randomSampleMatrix(testFilter,  Nw = 04, Nsamples = 50))
+    saveToFile('../data/upson_rovio_1/train_04_50000.pkl.gz', randomSampleMatrix(trainFilter, Nw = 04, Nsamples = 50000))
+    saveToFile('../data/upson_rovio_1/test_04_50000.pkl.gz',  randomSampleMatrix(testFilter,  Nw = 04, Nsamples = 50000))
+
     #saveToFile('../data/upson_rovio_1/train_10_50.pkl.gz',    randomSampleMatrix(trainFilter, Nw = 10, Nsamples = 50))
     #saveToFile('../data/upson_rovio_1/test_10_50.pkl.gz',     randomSampleMatrix(testFilter,  Nw = 10, Nsamples = 50))
     #saveToFile('../data/upson_rovio_1/train_10_50000.pkl.gz', randomSampleMatrix(trainFilter, Nw = 10, Nsamples = 50000))
     #saveToFile('../data/upson_rovio_1/test_10_50000.pkl.gz',  randomSampleMatrix(testFilter,  Nw = 10, Nsamples = 50000))
 
-    saveToFile('../data/upson_rovio_1/train_28_50.pkl.gz',    randomSampleMatrix(trainFilter, Nw = 28, Nsamples = 50))
-    saveToFile('../data/upson_rovio_1/test_28_50.pkl.gz',     randomSampleMatrix(testFilter,  Nw = 28, Nsamples = 50))
-    saveToFile('../data/upson_rovio_1/train_28_50000.pkl.gz', randomSampleMatrix(trainFilter, Nw = 28, Nsamples = 50000))
-    saveToFile('../data/upson_rovio_1/test_28_50000.pkl.gz',  randomSampleMatrix(testFilter,  Nw = 28, Nsamples = 50000))
+    saveToFile('../data/upson_rovio_1/train_15_50.pkl.gz',    randomSampleMatrix(trainFilter, Nw = 15, Nsamples = 50))
+    saveToFile('../data/upson_rovio_1/test_15_50.pkl.gz',     randomSampleMatrix(testFilter,  Nw = 15, Nsamples = 50))
+    saveToFile('../data/upson_rovio_1/train_15_50000.pkl.gz', randomSampleMatrix(trainFilter, Nw = 15, Nsamples = 50000))
+    saveToFile('../data/upson_rovio_1/test_15_50000.pkl.gz',  randomSampleMatrix(testFilter,  Nw = 15, Nsamples = 50000))
+    
+    #saveToFile('../data/upson_rovio_1/train_28_50.pkl.gz',    randomSampleMatrix(trainFilter, Nw = 28, Nsamples = 50))
+    #saveToFile('../data/upson_rovio_1/test_28_50.pkl.gz',     randomSampleMatrix(testFilter,  Nw = 28, Nsamples = 50))
+    #saveToFile('../data/upson_rovio_1/train_28_50000.pkl.gz', randomSampleMatrix(trainFilter, Nw = 28, Nsamples = 50000))
+    #saveToFile('../data/upson_rovio_1/test_28_50000.pkl.gz',  randomSampleMatrix(testFilter,  Nw = 28, Nsamples = 50000))
 
 
 
