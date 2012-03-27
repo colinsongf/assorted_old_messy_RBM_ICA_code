@@ -12,7 +12,7 @@ from theano.tensor.shared_randomstreams import RandomStreams
 
 from logistic_sgd import LogisticRegression, load_data
 from mlp import HiddenLayer
-from newRbm import RBM
+from rbm import RBM
 
 
 

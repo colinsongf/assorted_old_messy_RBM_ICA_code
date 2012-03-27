@@ -418,7 +418,6 @@ David Andrzejewski (david.andrzej@gmail.com)
 From: https://gist.github.com/940072
 """
 import numpy
-from matplotlib import pyplot
 import matplotlib.ticker as MT
 import matplotlib.cm as CM
 
@@ -433,6 +432,10 @@ def imagesc(W, pixwidth=1, ax=None, grayscale=True):
 
     Rely on caller to .show()
     """
+
+    # import at last minute to allow user to change settings via previous matplotlib.use()
+    from matplotlib import pyplot
+
     # N = rows, M = column
     (N, M) = W.shape 
     # Need to create a new Axes?
@@ -455,6 +458,9 @@ def imagesc(W, pixwidth=1, ax=None, grayscale=True):
     return ax
 
 def imagescDemo():
+    # import at last minute to allow user to change settings via previous matplotlib.use()
+    from matplotlib import pyplot
+
     # Define a synthetic test dataset
     testweights = numpy.array([[0.25, 0.50, 0.25, 0.00],
                             [0.00, 0.50, 0.00, 0.00],

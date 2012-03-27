@@ -6,14 +6,13 @@ Research code
 Jason Yosinski
 '''
 
-import PIL, Image, pdb
+import PIL, Image, pdb, sys
 import copy, os, numpy, time
 from numpy import *
 
 import matplotlib
 matplotlib.use('Agg') # plot with no display
 from matplotlib import pyplot
-import pylab as p
 
 from matplotlib import rc
 rc('font',**{'family':'sans-serif','sans-serif':['Helvetica'],'size':8})
@@ -21,11 +20,10 @@ rc('font',**{'family':'sans-serif','sans-serif':['Helvetica'],'size':8})
 #rc('font',**{'family':'serif','serif':['Palatino']))
 rc('text', usetex=True)
 
-
 import theano
 from theano.tensor.shared_randomstreams import RandomStreams
 
-from utils import tile_raster_images, resman
+from utils import tile_raster_images, resman, imagesc
 from logistic_sgd import load_data
 
 
@@ -47,11 +45,14 @@ def logistic(xx):
 
 class RBM(object):
     '''
-    Implements a Restricted Boltzmann Machine
+    Implements a Restricted Boltzmann Machine. Can be with a binary or real visible layer
     '''
 
-    def __init__(self, nVisible, nHidden, numpyRng, theanoRng):
-        '''Construct an RBM'''
+    def __init__(self, nVisible, nHidden, numpyRng, theanoRng, initWfactor = 1.0, visibleModel='binary'):
+        '''Construct an RBM
+
+        visibleModel = 'binary' or 'real'
+        '''
 
         self.nVisible  = nVisible
         self.nHidden   = nHidden
@@ -59,6 +60,12 @@ class RBM(object):
         self.theanoRng = theanoRng
 
         self.trainIter = -1
+
+        if visibleModel not in ('real', 'binary'):
+            raise Exception('unrecognized visibleModel: %s' % repr(visibleModel))
+        print 'RBM visibleModel = %s' % visibleModel
+
+        self.realValuedVisible = (visibleModel == 'real')
 
         #self.v = (random.randint(0, 2, (self._sizeV, 1)) > .5) + 0
         #self.h = (random.randint(0, 2, (self._sizeH, 1)) > .5) + 0
@@ -70,8 +77,8 @@ class RBM(object):
         #self._reconErrorNorms = array([])
 
         # initialized same as RBM.py from theano
-        self.W = numpy.asarray(self.numpyRng.uniform(low = -4*numpy.sqrt(6./(self.nHidden+self.nVisible)),
-                                                     high = 4*numpy.sqrt(6./(self.nHidden+self.nVisible)),
+        self.W = numpy.asarray(self.numpyRng.uniform(low = -4*numpy.sqrt(6./(self.nHidden+self.nVisible)) * initWfactor,
+                                                     high = 4*numpy.sqrt(6./(self.nHidden+self.nVisible)) * initWfactor,
                                                      size = (self.nVisible, self.nHidden)),
                                dtype = numpy.float32)
         self.hbias = numpy.zeros(self.nHidden,  dtype = numpy.float32)
@@ -215,47 +222,47 @@ class RBM(object):
 
         curSubplot = 1
         if not skipH:
-            ax = p.subplot(nSubplots,1,curSubplot)
+            ax = pylab.subplot(nSubplots,1,curSubplot)
             curSubplot += 1
-            p.imshow(self._h.T, cmap='gray', interpolation='nearest', vmin=0, vmax=1)
+            pylab.imshow(self._h.T, cmap='gray', interpolation='nearest', vmin=0, vmax=1)
             ax.set_yticklabels([])
             ax.set_xticklabels([])
             if self._sizeH < 25:
-                p.xticks(arange(self._h.shape[0])-.5)
-                p.yticks(arange(self._h.shape[1])-.5)
+                pylab.xticks(arange(self._h.shape[0])-.5)
+                pylab.yticks(arange(self._h.shape[1])-.5)
             else:
-                p.xticks([])
-                p.yticks([])
-            p.axvline(.5, color=lclr, linewidth=2)
+                pylab.xticks([])
+                pylab.yticks([])
+            pylab.axvline(.5, color=lclr, linewidth=2)
 
         if not skipW:
-            ax = p.subplot(nSubplots,1,curSubplot)
+            ax = pylab.subplot(nSubplots,1,curSubplot)
             curSubplot += 1
-            p.imshow(self._W, cmap='gray', interpolation='nearest', vmin=-2, vmax=2)
+            pylab.imshow(self._W, cmap='gray', interpolation='nearest', vmin=-2, vmax=2)
             ax.set_yticklabels([])
             ax.set_xticklabels([])
             if self._sizeH < 25 and self._sizeV < 25:
-                p.xticks(arange(self._W.shape[1])-.5)
-                p.yticks(arange(self._W.shape[0])-.5)
+                pylab.xticks(arange(self._W.shape[1])-.5)
+                pylab.yticks(arange(self._W.shape[0])-.5)
             else:
-                p.xticks([])
-                p.yticks([])
-            p.axvline(.5, color=lclr, linewidth=2)
-            p.axhline(.5, color=lclr, linewidth=2)
+                pylab.xticks([])
+                pylab.yticks([])
+            pylab.axvline(.5, color=lclr, linewidth=2)
+            pylab.axhline(.5, color=lclr, linewidth=2)
 
         if not skipV:
-            ax = p.subplot(nSubplots,1,curSubplot)
+            ax = pylab.subplot(nSubplots,1,curSubplot)
             curSubplot += 1
-            p.imshow(self._v.T, cmap='gray', interpolation='nearest', vmin=0, vmax=1)
+            pylab.imshow(self._v.T, cmap='gray', interpolation='nearest', vmin=0, vmax=1)
             ax.set_yticklabels([])
             ax.set_xticklabels([])
             if self._sizeV < 25:
-                p.xticks(arange(self._v.shape[0])-.5)
-                p.yticks(arange(self._v.shape[1])-.5)
+                pylab.xticks(arange(self._v.shape[0])-.5)
+                pylab.yticks(arange(self._v.shape[1])-.5)
             else:
-                p.xticks([])
-                p.yticks([])
-            p.axvline(.5, color=lclr, linewidth=2)
+                pylab.xticks([])
+                pylab.yticks([])
+            pylab.axvline(.5, color=lclr, linewidth=2)
 
 
 
@@ -310,22 +317,29 @@ class RBM(object):
         this symbolic variable will be needed to write down a more
         stable computational graph (see details in the reconstruction cost function)
         '''
-        pre_sigmoid_activation = dot(hid, self.W.T) + self.vbias
-        return [pre_sigmoid_activation, sigmoid(pre_sigmoid_activation)]
+        if self.realValuedVisible:
+            activation = dot(hid, self.W.T) + self.vbias
+            return activation
+        else:
+            pre_sigmoid_activation = dot(hid, self.W.T) + self.vbias
+            return [pre_sigmoid_activation, sigmoid(pre_sigmoid_activation)]
 
-    def sample_v_given_h(self, h0_sample):
-        ''' This function infers state of visible units given hidden units '''
-        # compute the activation of the visible given the hidden sample
-        pre_sigmoid_v1, v1_mean = self.propdown(h0_sample)
-        # get a sample of the visible given their activation
-        # Note that theanoRng.binomial returns a symbolic sample of dtype
-        # int64 by default. If we want to keep our computations in floatX
-        # for the GPU we need to specify to return the dtype floatX
-        #v1_sample = self.theanoRng.binomial(size = v1_mean.shape,n = 1,p = v1_mean,
-        #        dtype = theano.config.floatX)
-        v1_sample = random.uniform(size=v1_mean.shape) < v1_mean
+    def sample_v_given_h(self, h0_sample, noiseSigma = 1):
+        ''' This function infers state of visible units given hidden units.'''
+        if self.realValuedVisible:
+            v1_mean = self.propdown(h0_sample)  # Real valued version
+            # get a sample of the visible given their activation
+            v1_sample = v1_mean + random.normal(loc=0, scale=noiseSigma, size=v1_mean.shape)  # Real valued version
 
-        return [pre_sigmoid_v1, v1_mean, v1_sample]
+            return [None, v1_mean, v1_sample]
+
+        else:
+            # compute the activation of the visible given the hidden sample
+            pre_sigmoid_v1, v1_mean = self.propdown(h0_sample)
+            # get a sample of the visible given their activation
+            v1_sample = random.uniform(size=v1_mean.shape) < v1_mean
+
+            return [pre_sigmoid_v1, v1_mean, v1_sample]
 
     def gibbs_hvh(self, h0_sample):
         ''' This function implements one step of Gibbs sampling,
@@ -534,7 +548,11 @@ class RBM(object):
         # -log1p(exp(705))  = -705.0
         # -log1p(exp(710))  = -inf
 
-        cross_entropy = mean(sum(-train_x*numpy.log1p(exp(-pv_pre_sigmoid)) - (1-train_x)*numpy.log1p(exp(pv_pre_sigmoid)), 1))
+        if self.realValuedVisible:
+            # Skip this for real-valued neurons until a new metric is implemented
+            cross_entropy = 0.0
+        else:
+            cross_entropy = mean(sum(-train_x*numpy.log1p(exp(-pv_pre_sigmoid)) - (1-train_x)*numpy.log1p(exp(pv_pre_sigmoid)), 1))
 
         recon_err = mean((train_x - pv_mean)**2)
 
@@ -548,7 +566,7 @@ def oldmain():
     
     rbm = RBM(Nv, Nh)
 
-    #p.figure(1)
+    #pylab.figure(1)
 
     energies = array([[]])
     for ii in range(100):
@@ -557,11 +575,11 @@ def oldmain():
         energies = hstack((energies, ee))
 
         if mod(ii, 5) == 0:
-            p.clf()
+            pylab.clf()
             rbm.plot(nSubplots = 4)
-            ax = p.subplot(4,1,4)
-            p.plot(energies[0])
-            p.show()
+            ax = pylab.subplot(4,1,4)
+            pylab.plot(energies[0])
+            pylab.show()
             time.sleep(.1)
 
         rbm.v2h()
@@ -572,11 +590,11 @@ def oldmain():
         energies = hstack((energies, ee))
         
         if mod(ii, 5) == 999:
-            p.clf()
+            pylab.clf()
             rbm.plot(nSubplots = 4)
-            ax = p.subplot(4,1,4)
-            p.plot(energies[0])
-            p.show()
+            ax = pylab.subplot(4,1,4)
+            pylab.plot(energies[0])
+            pylab.show()
             time.sleep(.1)
 
         rbm.h2v()
@@ -590,7 +608,8 @@ def oldmain():
 def test_rbm(learning_rate=0.1, training_epochs = 15,
              datasets = None, batch_size = 20,
              n_chains = 20, n_samples = 14, output_folder = 'rbm_plots',
-             img_dim = 28, n_input = None, n_hidden = 500, quickHack = False):
+             img_dim = 28, n_input = None, n_hidden = 500, quickHack = False,
+             visibleModel = 'binary'):
     '''
     Demonstrate how to train an RBM.
 
@@ -644,7 +663,7 @@ def test_rbm(learning_rate=0.1, training_epochs = 15,
 
     # construct the RBM class
     rbm = RBM(nVisible=n_input, \
-              nHidden = n_hidden, numpyRng = rng, theanoRng = theanoRng)
+              nHidden = n_hidden, numpyRng = rng, theanoRng = theanoRng, visibleModel = visibleModel)
 
 
 
@@ -736,6 +755,12 @@ def test_rbm(learning_rate=0.1, training_epochs = 15,
         plotting_stop = time.clock()
         plotting_time += (plotting_stop - plotting_start)
 
+    # MERGE: this might fail?? (later: not sure why)
+    plotting_start = time.clock()
+    pyplot.plot(metrics)
+    pyplot.savefig(os.path.join(output_folder, 'reconErr.png'))
+    plotting_time += (time.clock() - plotting_start)
+    
     end_time = time.clock()
 
     pretraining_time = (end_time - start_time) - plotting_time
