@@ -16,7 +16,7 @@ from utils import resman
 
 
 if __name__ == '__main__':
-    resman.start('junk', diary = False)
+    resman.start('mergetest', diary = False)
     datasets = loadUpsonData('../data/upson_rovio_1/train_15_50000.pkl.gz',
                              '../data/upson_rovio_1/test_15_50000.pkl.gz')
 
@@ -34,5 +34,6 @@ if __name__ == '__main__':
              learning_rate = float(sys.argv[2]),
              output_folder = resman.rundir,
              quickHack = False,
-             visibleModel = 'real')
+             visibleModel = 'real',
+             initWfactor = .01)
     resman.stop()

@@ -609,7 +609,7 @@ def test_rbm(learning_rate=0.1, training_epochs = 15,
              datasets = None, batch_size = 20,
              n_chains = 20, n_samples = 14, output_folder = 'rbm_plots',
              img_dim = 28, n_input = None, n_hidden = 500, quickHack = False,
-             visibleModel = 'binary'):
+             visibleModel = 'binary', initWfactor = 1.0):
     '''
     Demonstrate how to train an RBM.
 
@@ -663,7 +663,8 @@ def test_rbm(learning_rate=0.1, training_epochs = 15,
 
     # construct the RBM class
     rbm = RBM(nVisible=n_input, \
-              nHidden = n_hidden, numpyRng = rng, theanoRng = theanoRng, visibleModel = visibleModel)
+              nHidden = n_hidden, numpyRng = rng, theanoRng = theanoRng,
+              visibleModel = visibleModel, initWfactor = initWfactor)
 
 
 
@@ -843,11 +844,11 @@ def test_rbm(learning_rate=0.1, training_epochs = 15,
 
 
 if __name__ == '__main__':
-    resman.start('junk', diary = True)
+    resman.start('mergetest', diary = True)
     datasets = load_data('../data/mnist.pkl.gz', shared = False)
     print 'done loading.'
     test_rbm(datasets = datasets,
-             training_epochs = 1,
+             training_epochs = 10,
              n_hidden = 500,
              learning_rate = .002,
              output_folder = resman.rundir,
