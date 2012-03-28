@@ -20,9 +20,6 @@ rc('font',**{'family':'sans-serif','sans-serif':['Helvetica'],'size':8})
 #rc('font',**{'family':'serif','serif':['Palatino']))
 rc('text', usetex=True)
 
-import theano
-from theano.tensor.shared_randomstreams import RandomStreams
-
 from utils import tile_raster_images, resman, imagesc, load_mnist_data
 
 
@@ -241,6 +238,7 @@ class RBM(object):
         '''Stochastic approximation to the pseudo-likelihood'''
         raise Exception('probably do not call this')
 
+        import theano
         # index of bit i in expression p(x_i | x_{\i})
         bit_i_idx = theano.shared(value=0, name = 'bit_i_idx')
 

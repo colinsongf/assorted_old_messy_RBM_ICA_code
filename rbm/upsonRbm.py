@@ -10,10 +10,6 @@ import numpy, time, gzip, PIL.Image, os, pdb
 import pickle
 from numpy import *
 
-import theano
-import theano.tensor as T
-from theano.tensor.shared_randomstreams import RandomStreams
-
 from utils import resman
 from rbm import RBM, test_rbm
 
