@@ -372,6 +372,7 @@ class ResultsManager(object):
         print '        Command run:', ' '.join(sys.argv)
         print '  Working directory:', os.getcwd()
         if not self.diary:
+            print '<diary not saved>'
             # just log these three lines
             with open(os.path.join(self.rundir, 'diary'), 'w') as ff:
                 print >>ff, '  Logging directory:', self.rundir
@@ -388,17 +389,17 @@ class ResultsManager(object):
 
     def stop(self):
         # TODO: output timing info?
+        if not self.diary:
+            # just log these couple lines before resetting our name
+            with open(os.path.join(self.rundir, 'diary'), 'a') as ff:
+                print >>ff, '       Wall time: ', fmtSeconds(time.time() - self.startWall)
+                print >>ff, '  Processor time: ', fmtSeconds(time.clock() - self.startProc)
         self._name = None
         print '       Wall time: ', fmtSeconds(time.time() - self.startWall)
         print '  Processor time: ', fmtSeconds(time.clock() - self.startProc)
         if self.diary:
             self._outLogger.finishCapture()
             self._outLogger = None
-        else:
-            # just log these couple lines
-            with open(os.path.join(self.rundir, 'diary'), 'a') as ff:
-                print >>ff, '       Wall time: ', fmtSeconds(time.time() - self.startWall)
-                print >>ff, '  Processor time: ', fmtSeconds(time.clock() - self.startProc)
 
 
     @property
