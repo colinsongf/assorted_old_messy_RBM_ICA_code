@@ -220,8 +220,6 @@ class OutputLogger(object):
         if self.started:
             raise Exception('ERROR: OutputLogger capture was already started.')
         self.started = True
-        self.startWall = time.time()
-        self.startProc = time.clock()
         sys.stdout = self.stdOutHandler
         sys.stderr = self.stdErrHandler
 
@@ -229,9 +227,6 @@ class OutputLogger(object):
         if not self.started:
             raise Exception('ERROR: OutputLogger capture was not started.')
         self.started = False
-        self.flush()
-        print '       Wall time: ', fmtSeconds(time.time() - self.startWall)
-        print '  Processor time: ', fmtSeconds(time.clock() - self.startProc)
         self.flush()
         sys.stdout = self.stdout
         sys.stderr = self.stderr
@@ -369,6 +364,9 @@ class ResultsManager(object):
             self._outLogger = OutputLogger(os.path.join(self.rundir, 'diary'))
             self._outLogger.startCapture()
 
+        self.startWall = time.time()
+        self.startProc = time.clock()
+
         # print the command that was executed
         print '  Logging directory:', self.rundir
         print '        Command run:', ' '.join(sys.argv)
@@ -391,9 +389,17 @@ class ResultsManager(object):
     def stop(self):
         # TODO: output timing info?
         self._name = None
+        print '       Wall time: ', fmtSeconds(time.time() - self.startWall)
+        print '  Processor time: ', fmtSeconds(time.clock() - self.startProc)
         if self.diary:
             self._outLogger.finishCapture()
             self._outLogger = None
+        else:
+            # just log these couple lines
+            with open(os.path.join(self.rundir, 'diary'), 'a') as ff:
+                print >>ff, '       Wall time: ', fmtSeconds(time.time() - self.startWall)
+                print >>ff, '  Processor time: ', fmtSeconds(time.clock() - self.startProc)
+
 
     @property
     def rundir(self):
