@@ -419,7 +419,6 @@ def test_rbm(learning_rate=0.1, training_epochs = 15,
         plotting_stop = time.clock()
         plotting_time += (plotting_stop - plotting_start)
 
-    # MERGE: this might fail?? (later: not sure why)
     plotting_start = time.clock()
     pyplot.plot(metrics)
     pyplot.savefig(os.path.join(output_dir, 'reconErr.png'))
