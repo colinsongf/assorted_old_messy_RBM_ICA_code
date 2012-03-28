@@ -16,7 +16,7 @@ from utils import resman
 
 
 if __name__ == '__main__':
-    resman.start('mergetest', diary = False)
+    resman.start('junk', diary = True)
     datasets = loadUpsonData('../data/upson_rovio_1/train_15_50000.pkl.gz',
                              '../data/upson_rovio_1/test_15_50000.pkl.gz')
 
@@ -28,11 +28,11 @@ if __name__ == '__main__':
     print 'done loading.'
     
     test_rbm(datasets = datasets,
-             training_epochs = 10,
+             training_epochs = 1,
              img_dim = 15,
              n_hidden = int(sys.argv[1]),
              learning_rate = float(sys.argv[2]),
-             output_folder = resman.rundir,
+             output_dir = resman.rundir,
              quickHack = False,
              visibleModel = 'real',
              initWfactor = .01)
