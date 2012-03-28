@@ -375,8 +375,11 @@ def gitStatus():
 
 
 
-def gitDiff():
-    return runCmd(('git', 'diff'))[0].strip()
+def gitDiff(color = False):
+    if color:
+        return runCmd(('git', 'diff', '--color'))[0].strip()
+    else:
+        return runCmd(('git', 'diff'))[0].strip()
 
 
 
@@ -444,6 +447,8 @@ class ResultsManager(object):
             ff.write(gitStatus() + '\n')
         with open(os.path.join(self.rundir, 'gitdiff'), 'w') as ff:
             ff.write(gitDiff() + '\n')
+        with open(os.path.join(self.rundir, 'gitcolordiff'), 'w') as ff:
+            ff.write(gitDiff(color=True) + '\n')
 
     def stop(self):
         # TODO: output timing info?

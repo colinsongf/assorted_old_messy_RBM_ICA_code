@@ -29,11 +29,12 @@ if __name__ == '__main__':
     
     test_rbm(datasets = datasets,
              training_epochs = 1,
-             img_dim = 15,
+             img_dim = 15,   # must match actual size of training data
              n_hidden = int(sys.argv[1]),
              learning_rate = float(sys.argv[2]),
              output_dir = resman.rundir,
              quickHack = False,
              visibleModel = 'real',
-             initWfactor = .01)
+             initWfactor = .01,
+             pcaDims = None)
     resman.stop()

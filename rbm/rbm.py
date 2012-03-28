@@ -21,6 +21,7 @@ rc('font',**{'family':'sans-serif','sans-serif':['Helvetica'],'size':8})
 rc('text', usetex=True)
 
 from utils import tile_raster_images, resman, imagesc, load_mnist_data
+from pca import PCA
 
 
 
@@ -296,7 +297,8 @@ def test_rbm(learning_rate=0.1, training_epochs = 15,
              datasets = None, batch_size = 20,
              n_chains = 20, n_samples = 14, output_dir = 'rbm_plots',
              img_dim = 28, n_input = None, n_hidden = 500, quickHack = False,
-             visibleModel = 'binary', initWfactor = 1.0):
+             visibleModel = 'binary', initWfactor = 1.0,
+             pcaDims = None):
     '''
     Demonstrate how to train an RBM.
 
@@ -314,22 +316,45 @@ def test_rbm(learning_rate=0.1, training_epochs = 15,
 
     :param n_samples: number of samples to plot for each chain
 
+
+    :param visibleModel: 'real' or 'binary'
+
+    :param initWfactor: Typicaly 1 for binary or .01 for real
+
+    :param pcaDims: None to skip PCA or >0 to use PCA to reduce dimensionality of data first.
+
     '''
 
-    train_set_x, train_set_y = datasets[0]
-    valid_set_x, valid_set_y = datasets[1]
-    test_set_x,  test_set_y  = datasets[2]
+    train_set_x_data, train_set_y = datasets[0]
+    valid_set_x_data, valid_set_y = datasets[1]
+    test_set_x_data,  test_set_y  = datasets[2]
 
     if quickHack:
-        train_set_x = train_set_x[:2500,:]
+        train_set_x_data = train_set_x_data[:2500,:]
         if train_set_y is not None:
             train_set_y = train_set_y[:2500]
 
-    if n_input == None:
-        n_input = img_dim ** 2
-
     print ('(%d, %d, %d) %d dimensional examples in (train, valid, test)' % 
-           (train_set_x.shape[0], valid_set_x.shape[0], test_set_x.shape[0], train_set_x.shape[1]))
+           (train_set_x_data.shape[0], valid_set_x_data.shape[0], test_set_x_data.shape[0], train_set_x_data.shape[1]))
+
+    # Reduce by PCA if desired
+    pca = None
+    if pcaDims is None:
+        train_set_x = train_set_x_data
+        valid_set_x = valid_set_x_data
+        test_set_x  = test_set_x_data
+        if n_input == None:
+            n_input = img_dim ** 2
+    else:
+        pca = PCA(train_set_x_data)
+        train_set_x = pca.toPC(train_set_x_data, pcaDims)
+        valid_set_x = pca.toPC(valid_set_x_data, pcaDims) if len(valid_set_x_data) > 0 else array([])
+        test_set_x  = pca.toPC(test_set_x_data,  pcaDims)
+        print 'reduced by PCA to'
+        print ('(%d, %d, %d) %d dimensional examples in (train, valid, test)' % 
+               (train_set_x.shape[0], valid_set_x.shape[0], test_set_x.shape[0], train_set_x.shape[1]))
+        assert(n_input == pcaDims or n_input is None)
+        n_input = pcaDims
 
     # compute number of minibatches for training, validation and testing
     n_train_batches = train_set_x.shape[0] / batch_size
@@ -338,8 +363,7 @@ def test_rbm(learning_rate=0.1, training_epochs = 15,
     rng        = numpy.random.RandomState(1)
 
     # construct the RBM class
-    rbm = RBM(nVisible=n_input, \
-              nHidden = n_hidden, numpyRng = rng,
+    rbm = RBM(nVisible=n_input, nHidden = n_hidden, numpyRng = rng,
               visibleModel = visibleModel, initWfactor = initWfactor)
 
 
@@ -355,6 +379,14 @@ def test_rbm(learning_rate=0.1, training_epochs = 15,
     plotting_time = 0.
     start_time = time.clock()
 
+    if pcaDims is not None:
+        # plot fractional stddev in PCA dimensions
+        plotting_start = time.clock()
+        pyplot.semilogy(pca.fracStd, 'bo-')
+        pyplot.axvline(pcaDims)
+        pyplot.savefig(os.path.join(output_dir, 'fracStd.png'))
+        pyplot.clf()
+        plotting_time += (time.clock() - plotting_start)
 
     # go through training epochs
     meanCosts = []
@@ -389,7 +421,7 @@ def test_rbm(learning_rate=0.1, training_epochs = 15,
                 plotting_start = time.clock()
                 # Construct image from the weight matrix
                 image = Image.fromarray(tile_raster_images(
-                         X = rbm.W.T,
+                         X = rbm.W.T if pcaDims is None else pca.fromPC(rbm.W.T),
                          img_shape = (img_dim,img_dim),tile_shape = (10,10),
                          tile_spacing=(1,1)))
                 image.save(os.path.join(output_dir, 'filters_at_epoch_batch_%03i_%05i.png' % (epoch, batch_index)))
@@ -412,7 +444,7 @@ def test_rbm(learning_rate=0.1, training_epochs = 15,
         plotting_start = time.clock()
         # Construct image from the weight matrix
         image = Image.fromarray(tile_raster_images(
-                 X = rbm.W.T,
+                 X = rbm.W.T if pcaDims is None else pca.fromPC(rbm.W.T),
                  img_shape = (img_dim,img_dim),tile_shape = (10,10),
                  tile_spacing=(1,1)))
         image.save(os.path.join(output_dir, 'filters_at_epoch_%03i.png' % epoch))
@@ -449,7 +481,7 @@ def test_rbm(learning_rate=0.1, training_epochs = 15,
         # generate `plot_every` intermediate samples that we discard, because successive samples in the chain are too correlated
         test_idx = rng.randint(number_of_test_samples)
         
-        samples = numpy.zeros((n_chains, img_dim*img_dim))
+        samples = numpy.zeros((n_chains, n_input))
 
         visMean = test_set_x[test_idx,:]
         visSample = visMean
@@ -462,7 +494,7 @@ def test_rbm(learning_rate=0.1, training_epochs = 15,
 
         print ' ... plotting sample ', ii
         image_data[1:-1,(img_dim+1)*ii:(img_dim+1)*ii+img_dim] = tile_raster_images(
-                X = samples,
+                X = samples if pcaDims is None else pca.fromPC(samples),
                 img_shape = (img_dim,img_dim),
                 tile_shape = (n_samples, 1),
                 tile_spacing = (1,1))
@@ -483,5 +515,5 @@ if __name__ == '__main__':
              n_hidden = 500,
              learning_rate = .002,
              output_dir = resman.rundir,
-             quickHack = True)
+             quickHack = False)
     resman.stop()
