@@ -1,17 +1,102 @@
-""" This file contains different utility functions that are not connected 
+#! /usr/bin/env python
+
+'''
+[JBY] Utilities for learning.
+Some stuff copied from https://github.com/lisa-lab/DeepLearningTutorials/blob/master/code/utils.py
+'''
+
+import os, sys, time, logging, subprocess, datetime, stat
+import gzip, cPickle
+
+import numpy
+import matplotlib.ticker as MT
+import matplotlib.cm as CM
+
+
+
+class DuckStruct(object):
+    '''Use to store anything!'''
+    
+    def __init__(self, **kwargs):
+        for k,v in kwargs.items():
+            setattr(self, k, v)
+
+    def __repr__(self):
+        rep = ['%s=%s' % (k, repr(v)) for k,v in self.__dict__.items()]
+        return 'DuckStruct(%s)' % ', '.join(rep)
+
+
+
+def load_mnist_data(dataset, shared = True):
+    ''' Loads the dataset
+
+    :type dataset: string
+    :param dataset: the path to the dataset (here MNIST)
+    '''
+
+    #############
+    # LOAD DATA #
+    #############
+
+    # Download the MNIST dataset if it is not present
+    data_dir, data_file = os.path.split(dataset)
+    if (not os.path.isfile(dataset)) and data_file == 'mnist.pkl.gz':
+        import urllib
+        origin = 'http://www.iro.umontreal.ca/~lisa/deep/data/mnist/mnist.pkl.gz'
+        print 'Downloading data from %s' % origin
+        urllib.urlretrieve(origin, dataset)
+
+    print '... loading data'
+
+    # Load the dataset 
+    f = gzip.open(dataset,'rb')
+    train_set, valid_set, test_set = cPickle.load(f)
+    f.close()
+
+    if not shared:
+        return train_set, valid_set, test_set
+
+    def shared_dataset(data_xy):
+        ''' Function that loads the dataset into shared variables
+        
+        The reason we store our dataset in shared variables is to allow 
+        Theano to copy it into the GPU memory (when code is run on GPU). 
+        Since copying data into the GPU is slow, copying a minibatch everytime
+        is needed (the default behaviour if the data is not in a shared 
+        variable) would lead to a large decrease in performance.
+        '''
+        import theano
+        data_x, data_y = data_xy
+        shared_x = theano.shared(numpy.asarray(data_x, dtype=theano.config.floatX))
+        shared_y = theano.shared(numpy.asarray(data_y, dtype=theano.config.floatX))
+        # When storing data on the GPU it has to be stored as floats
+        # therefore we will store the labels as ``floatX`` as well
+        # (``shared_y`` does exactly that). But during our computations
+        # we need them as ints (we use labels as index, and if they are 
+        # floats it doesn't make sense) therefore instead of returning 
+        # ``shared_y`` we will have to cast it to int. This little hack
+        # lets ous get around this issue
+        return shared_x, T.cast(shared_y, 'int32')
+
+    test_set_x,  test_set_y  = shared_dataset(test_set)
+    valid_set_x, valid_set_y = shared_dataset(valid_set)
+    train_set_x, train_set_y = shared_dataset(train_set)
+
+    rval = [(train_set_x, train_set_y), (valid_set_x,valid_set_y), (test_set_x, test_set_y)]
+    return rval
+
+
+
+''' This file contains different utility functions that are not connected 
 in anyway to the networks presented in the tutorials, but rather help in 
 processing the outputs into a more understandable way. 
 
 For example ``tile_raster_images`` helps in generating a easy to grasp 
 image from a set of samples or weights.
-"""
-
-
-import numpy, sys
-
+'''
 
 def scale_to_unit_interval(ndar,eps=1e-8):
-    """ Scales all values in the ndarray ndar to be between 0 and 1 """
+    ''' Scales all values in the ndarray ndar to be between 0 and 1 '''
     ndar = ndar.copy()
     ndar -= ndar.min()
     ndar *= 1.0 / (ndar.max()+eps)
@@ -20,7 +105,7 @@ def scale_to_unit_interval(ndar,eps=1e-8):
 
 def tile_raster_images(X, img_shape, tile_shape,tile_spacing = (0,0), 
               scale_rows_to_unit_interval = True, output_pixel_vals = True):
-    """
+    '''
     Transform an array with one flattened image per row, into an array in 
     which images are reshaped and layed out like tiles on a floor.
 
@@ -49,7 +134,7 @@ def tile_raster_images(X, img_shape, tile_shape,tile_spacing = (0,0),
     (See:`PIL.Image.fromarray`.)
     :rtype: a 2-d array with same dtype as X.
 
-    """
+    '''
  
     assert len(img_shape) == 2
     assert len(tile_shape) == 2
@@ -131,34 +216,6 @@ def tile_raster_images(X, img_shape, tile_shape,tile_spacing = (0,0),
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# [JBY]
-
-import os, sys, time, logging, subprocess, datetime, stat
-
-class DuckStruct(object):
-    '''Use to store anything!'''
-    
-    def __init__(self, **kwargs):
-        for k,v in kwargs.items():
-            setattr(self, k, v)
-
-
-
 def fmtSeconds(sec):
     sign = ''
     if sec < 0:
@@ -172,6 +229,7 @@ def fmtSeconds(sec):
         return sign + '%d:%02d' % (minutes, int(seconds)) + ('%.3f' % (seconds-int(seconds)))[1:]
     else:
         return sign + '%d' % int(seconds) + ('%.3f' % (seconds-int(seconds)))[1:]
+
 
 
 class OutstreamHandler(object):
@@ -411,25 +469,13 @@ class ResultsManager(object):
     def runname(self):
         return self._name
 
-
+# Instantiate a ResultsManager for others to use
 resman = ResultsManager()
 
 
 
-
-
-"""
-Simple matrix intensity plot, similar to MATLAB imagesc()
-
-David Andrzejewski (david.andrzej@gmail.com)
-From: https://gist.github.com/940072
-"""
-import numpy
-import matplotlib.ticker as MT
-import matplotlib.cm as CM
-
 def imagesc(W, pixwidth=1, ax=None, grayscale=True):
-    """
+    '''
     Do intensity plot, similar to MATLAB imagesc()
 
     W = intensity matrix to visualize
@@ -438,7 +484,12 @@ def imagesc(W, pixwidth=1, ax=None, grayscale=True):
     grayscale = use grayscale color map
 
     Rely on caller to .show()
-    """
+
+    Simple matrix intensity plot, similar to MATLAB imagesc()
+    
+    David Andrzejewski (david.andrzej@gmail.com)
+    From: https://gist.github.com/940072
+    '''
 
     # import at last minute to allow user to change settings via previous matplotlib.use()
     from matplotlib import pyplot
@@ -463,6 +514,8 @@ def imagesc(W, pixwidth=1, ax=None, grayscale=True):
     ax.xaxis.set_major_locator(MT.NullLocator())
     ax.yaxis.set_major_locator(MT.NullLocator())
     return ax
+
+
 
 def imagescDemo():
     # import at last minute to allow user to change settings via previous matplotlib.use()
@@ -499,5 +552,3 @@ if __name__ == '__main__':
     time.sleep(1)
     print 'this is being logged to the %s directory' % resman.rundir
     resman.stop()
-
-

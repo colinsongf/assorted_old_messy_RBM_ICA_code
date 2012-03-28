@@ -23,8 +23,7 @@ rc('text', usetex=True)
 import theano
 from theano.tensor.shared_randomstreams import RandomStreams
 
-from utils import tile_raster_images, resman, imagesc
-from logistic_sgd import load_data
+from utils import tile_raster_images, resman, imagesc, load_mnist_data
 
 
 
@@ -480,12 +479,12 @@ def test_rbm(learning_rate=0.1, training_epochs = 15,
 
 if __name__ == '__main__':
     resman.start('junk', diary = True)
-    datasets = load_data('../data/mnist.pkl.gz', shared = False)
+    datasets = load_mnist_data('../data/mnist.pkl.gz', shared = False)
     print 'done loading.'
     test_rbm(datasets = datasets,
              training_epochs = 1,
              n_hidden = 500,
              learning_rate = .002,
              output_dir = resman.rundir,
-             quickHack = False)
+             quickHack = True)
     resman.stop()
