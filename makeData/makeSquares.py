@@ -21,7 +21,8 @@ def paintSquare(img, startI, startJ, sizeI, sizeJ):
 
 
 def randomSquareSampleMatrix(Nw = 10, Nsamples = 10):
-    ret = zeros((Nsamples, Nw * Nw), dtype = float32)
+    retX = zeros((Nsamples, Nw * Nw), dtype = float32)
+    retY = zeros((Nsamples, 4), dtype = float32)
     
     for ii in xrange(Nsamples):
         # randomly pick coordinates of square
@@ -30,23 +31,29 @@ def randomSquareSampleMatrix(Nw = 10, Nsamples = 10):
         startI = random.randint(-sizeI + 1, Nw)
         startJ = random.randint(-sizeJ + 1, Nw)
 
-        thisImg = paintSquare(reshape(ret[ii,:], (Nw,Nw)), startI, startJ, sizeI, sizeJ)
+        thisImg = paintSquare(reshape(retX[ii,:], (Nw,Nw)), startI, startJ, sizeI, sizeJ)
 
-        ret[ii,:] = thisImg.flatten()
-        
-    return ret
+        retX[ii,:] = thisImg.flatten()
+        retY[ii,:] = [max(0, startI),
+                      max(0, startJ),
+                      min(Nw, startI + sizeI) - max(0, startI),
+                      min(Nw, startJ + sizeJ) - max(0, startJ)]
+    
+    return retX, retY
 
 
 
 def main(demo = True):
     if demo:
         random.seed(0)
-        foo = randomSquareSampleMatrix(Nw = 15, Nsamples = 25)
+        xx, yy = randomSquareSampleMatrix(Nw = 15, Nsamples = 25)
 
         pyplot.figure()
         for ii in range(25):
             ax = pyplot.subplot(5,5,ii)
-            imagesc(foo[ii,:].reshape((15,15)), ax=ax)
+            imagesc(xx[ii,:].reshape((15,15)), ax=ax)
+            #pyplot.title(repr(yy[ii,:]))
+            pyplot.title(' '.join(['%d' % val for val in yy[ii,:]]))
         pyplot.show()
 
     random.seed(0)
@@ -79,4 +86,5 @@ def main(demo = True):
 
 
 if __name__ == '__main__':
+    #main()
     main(demo = False)
