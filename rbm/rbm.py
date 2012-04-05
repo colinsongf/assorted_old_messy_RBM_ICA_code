@@ -20,7 +20,8 @@ rc('font',**{'family':'sans-serif','sans-serif':['Helvetica'],'size':8})
 #rc('font',**{'family':'serif','serif':['Palatino']))
 rc('text', usetex=True)
 
-from utils import tile_raster_images, resman, imagesc, load_mnist_data
+from utils import tile_raster_images, imagesc, load_mnist_data
+from ResultsManager import resman
 from pca import PCA
 
 

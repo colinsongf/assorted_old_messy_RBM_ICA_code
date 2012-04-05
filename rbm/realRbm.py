@@ -11,7 +11,7 @@ from numpy import *
 
 from upsonRbm import loadUpsonData
 from rbm import test_rbm
-from utils import resman
+from ResultsManager import resman
 
 
 

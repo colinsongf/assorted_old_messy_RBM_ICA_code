@@ -474,9 +474,6 @@ class ResultsManager(object):
     def runname(self):
         return self._name
 
-# Instantiate a ResultsManager for others to use
-resman = ResultsManager()
-
 
 
 def imagesc(W, pixwidth=1, ax=None, grayscale=True):
@@ -539,6 +536,8 @@ def imagescDemo():
 
 if __name__ == '__main__':
     import time
+    from ResultsManager import resman
+    
     logger = OutputLogger('filename.log')
     print 'not logged'
     logger.startCapture()

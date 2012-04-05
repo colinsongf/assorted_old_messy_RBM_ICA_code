@@ -10,7 +10,7 @@ import numpy, time, gzip, PIL.Image, os, pdb
 import pickle
 from numpy import *
 
-from utils import resman
+from ResultsManager import resman
 from rbm import RBM, test_rbm
 
 
