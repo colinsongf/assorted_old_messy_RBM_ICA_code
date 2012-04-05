@@ -512,7 +512,7 @@ if __name__ == '__main__':
     datasets = load_mnist_data('../data/mnist.pkl.gz', shared = False)
     print 'done loading.'
     test_rbm(datasets = datasets,
-             training_epochs = 1,
+             training_epochs = 45,
              n_hidden = 500,
              learning_rate = .002,
              output_dir = resman.rundir,

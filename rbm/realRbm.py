@@ -28,7 +28,7 @@ if __name__ == '__main__':
     print 'done loading.'
     
     test_rbm(datasets = datasets,
-             training_epochs = 1,
+             training_epochs = 45,
              img_dim = 15,   # must match actual size of training data
              n_hidden = int(sys.argv[1]),
              learning_rate = float(sys.argv[2]),
