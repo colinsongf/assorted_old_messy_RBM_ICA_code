@@ -103,7 +103,7 @@ def scale_to_unit_interval(ndar,eps=1e-8):
     return ndar
 
 
-def tile_raster_images(X, img_shape, tile_shape,tile_spacing = (0,0), 
+def tile_raster_images(X, img_shape, tile_shape, tile_spacing = (0,0), 
               scale_rows_to_unit_interval = True, output_pixel_vals = True):
     '''
     Transform an array with one flattened image per row, into an array in 
@@ -153,17 +153,19 @@ def tile_raster_images(X, img_shape, tile_shape,tile_spacing = (0,0),
 
     if isinstance(X, tuple):
         assert len(X) == 4
-        # Create an output numpy ndarray to store the image 
+        # Create an output numpy ndarray to store the image
         if output_pixel_vals:
-            out_array = numpy.zeros((out_shape[0], out_shape[1], 4), dtype='uint8')
+            #out_array = numpy.zeros((out_shape[0], out_shape[1], 4), dtype='uint8')
+            out_array = numpy.ones((out_shape[0], out_shape[1], 4), dtype='uint8') * 51
         else:
-            out_array = numpy.zeros((out_shape[0], out_shape[1], 4), dtype=X.dtype)
+            #out_array = numpy.zeros((out_shape[0], out_shape[1], 4), dtype=X.dtype)
+            out_array = numpy.ones((out_shape[0], out_shape[1], 4), dtype=X.dtype) * .2
 
         #colors default to 0, alpha defaults to 1 (opaque)
         if output_pixel_vals:
-            channel_defaults = [0,0,0,255]
+            channel_defaults = [51,51,51,255]
         else:
-            channel_defaults = [0.,0.,0.,1.]
+            channel_defaults = [.2,.2,.2,1.]
 
         for i in xrange(4):
             if X[i] is None:
@@ -172,8 +174,7 @@ def tile_raster_images(X, img_shape, tile_shape,tile_spacing = (0,0),
                 dt = out_array.dtype
                 if output_pixel_vals:
                     dt = 'uint8'
-                out_array[:,:,i] = numpy.zeros(out_shape,
-                        dtype=dt)+channel_defaults[i]
+                out_array[:,:,i] = numpy.zeros(out_shape, dtype=dt)+channel_defaults[i]
             else:
                 # use a recurrent call to compute the channel and store it 
                 # in the output
@@ -189,7 +190,10 @@ def tile_raster_images(X, img_shape, tile_shape,tile_spacing = (0,0),
         dt = X.dtype
         if output_pixel_vals:
             dt = 'uint8'
-        out_array = numpy.zeros(out_shape, dtype=dt)
+            #out_array = numpy.zeros(out_shape, dtype=dt)
+            out_array = numpy.ones(out_shape, dtype=dt) * 51
+        else:
+            out_array = numpy.ones(out_shape, dtype=dt) * .2
 
 
         for tile_row in xrange(tile_shape[0]):

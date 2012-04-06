@@ -477,7 +477,7 @@ def test_rbm(learning_rate=0.1, training_epochs = 15,
 
     # create a space to store the image for plotting ( we need to leave
     # room for the tile_spacing as well)
-    image_data = numpy.zeros(((img_dim+1)*n_samples+1,(img_dim+1)*n_chains-1), dtype='uint8')
+    image_data = numpy.ones(((img_dim+1)*n_samples-1,(img_dim+1)*n_chains-1), dtype='uint8') * 51  # dark gray
     for ii in xrange(n_chains):
         # generate `plot_every` intermediate samples that we discard, because successive samples in the chain are too correlated
         test_idx = rng.randint(number_of_test_samples)
@@ -494,7 +494,7 @@ def test_rbm(learning_rate=0.1, training_epochs = 15,
                 visMean, visSample = rbm.gibbs_vhv(visSample)[4:6]   # 4 for mean, 5 for sample
 
         print ' ... plotting sample ', ii
-        image_data[1:-1,(img_dim+1)*ii:(img_dim+1)*ii+img_dim] = tile_raster_images(
+        image_data[:,(img_dim+1)*ii:(img_dim+1)*ii+img_dim] = tile_raster_images(
                 X = samples if pcaDims is None else pca.fromPC(samples),
                 img_shape = (img_dim,img_dim),
                 tile_shape = (n_samples, 1),
