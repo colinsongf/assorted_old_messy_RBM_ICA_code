@@ -384,7 +384,8 @@ def test_rbm(learning_rate=0.1, training_epochs = 15,
         # plot fractional stddev in PCA dimensions
         plotting_start = time.clock()
         pyplot.semilogy(pca.fracStd, 'bo-')
-        pyplot.axvline(pcaDims)
+        if pcaDims is not None:
+            pyplot.axvline(pcaDims)
         pyplot.savefig(os.path.join(output_dir, 'fracStd.png'))
         pyplot.clf()
         plotting_time += (time.clock() - plotting_start)
