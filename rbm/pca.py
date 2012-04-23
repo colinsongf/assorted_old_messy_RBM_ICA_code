@@ -1,13 +1,16 @@
 #! /usr/bin/env python
 
 import pdb
-from numpy import array, dot, random, linalg, sqrt, asarray, cov
+from numpy import array, dot, random, linalg, sqrt, asarray, cov, eye, sum
+from numpy.linalg import norm
 
 
 
 class PCA_SVD:
     def __init__(self, xx):
         '''
+        PROBABLY DO NOT USE THIS VERSION
+        
         Inspired by PCA in matplotlib.mlab
 
         Compute the SVD of a dataset and stores the mean, dimsigma,
@@ -146,8 +149,10 @@ class PCA:
         self.centeredXX  = self.center(xx)
         self.sigma       = dot(self.centeredXX.T, self.centeredXX) / self.nn
 
-        # UU and VV are transpose of each other
-        self.UU, self.ss, VV = linalg.svd(self.sigma, full_matrices = False)
+        # Columns of UU are the eigenvectors of self.sigma, i.e. the
+        # principle components. UU and VV are transpose of each other;
+        # we don't use VV. ss is the diagonal of the true S matrix.
+        self.UU, self.ss, self.VV = linalg.svd(self.sigma, full_matrices = False)
 
         self.var = self.ss / float(self.nn)
         self.std = sqrt(self.var)
@@ -155,15 +160,16 @@ class PCA:
         self.fracStd = self.std / self.std.sum()
 
 
-    def pc(self):
-        return self.UU
+    def pc(self, numDims = None):
+        '''Return a matrix whose columnts are the ordered principle components.'''
+
+        if numDims is None:
+            numDims = self.UU.shape[1]
+
+        return self.UU[:,0:numDims]
 
 
-    def toWhitePC(self, xx, numDims = None, epsilon = 0):
-        return self.toPC(xx, numDims = numDims, whiten = True, epsilon = epsilon)
-    
-
-    def toPC(self, xx, numDims = None, whiten = False, epsilon = 0):
+    def toPC(self, xx, numDims = None, whiten = False, epsilon = 0, center = True):
         '''Center the xx and project it onto the principle components.
 
         Called \tilde{x} on UFLDL wiki page.'''
@@ -179,24 +185,22 @@ class PCA:
         if numDims is None:
             numDims = xx.shape[-1]
 
-        centered = self.center(xx)
-        #pc = dot(centered, self.UU[:,0:numDims]) / self.std[0:numDims]
+        if center:
+            xx = self.center(xx)
+
+        pc = dot(xx, self.UU[:,0:numDims])
 
         if whiten:
-            pc = dot(centered, self.UU[:,0:numDims]) / sqrt(self.ss[0:numDims] + epsilon)
-        else:
-            pc = dot(centered, self.UU[0:numDims,:].T)
-
-        #pdb.set_trace()
+            pc /= sqrt(self.ss[0:numDims] + epsilon)
 
         return pc
 
 
-    def fromWhitePC(self, pc):
-        return self.fromPC(pc, whiten = True)
+    def toWhitePC(self, xx, numDims = None, epsilon = 0):
+        return self.toPC(xx, numDims = numDims, whiten = True, epsilon = epsilon)
+    
 
-
-    def fromPC(self, pc, whiten = False):
+    def fromPC(self, pc, unwhiten = False, epsilon = 0, uncenter = True):
         '''Project the given principle components back to the original
         space and uncenter them.'''
 
@@ -204,22 +208,80 @@ class PCA:
 
         numDims = pc.shape[1]
 
-        if whiten:
-            # actually the same either way :)        HERE provide unwhiten version.
-            centered = dot(pc, self.UU[:,0:numDims].T)
-        else:
-            centered = dot(pc, self.UU[:,0:numDims].T)
+        if not unwhiten and epsilon != 0:
+            raise Exception('Probable misuse: epsilon != 0 but unwhitening is off.')
 
-        xx = self.uncenter(centered)
+        if unwhiten:
+            xx = dot(pc * sqrt(self.ss[0:numDims] + epsilon), self.UU[:,0:numDims].T)
+        else:
+            xx = dot(pc, self.UU[:,0:numDims].T)
+
+        if uncenter:
+            xx = self.uncenter(xx)
 
         return xx
 
 
-    def zca(self, xx, numDims, epsilon = 0):
+    def fromWhitePC(self, pc, epsilon = 0):
+        '''Reconstructs data from white PC.'''
+        
+        return self.fromPC(pc, unwhiten = True, epsilon = epsilon)
+
+
+    def pcaAndBack(self, xx, numDims = None, error = False):
+        '''Projects to first numDims of pca dimensions and back'''
+
+        #print 'U   * U   - I:', norm(dot(self.UU, self.UU)-eye(self.UU.shape[0]))
+        #print 'U   * U.T - I:', norm(dot(self.UU, self.UU.T)-eye(self.UU.shape[0]))
+        #print 'U.T * U.T - I:', norm(dot(self.UU.T, self.UU.T)-eye(self.UU.shape[0]))
+        #print 'U.T * U   - I:', norm(dot(self.UU.T, self.UU)-eye(self.UU.shape[0]))
+        #print 'V   * V   - I:', norm(dot(self.VV, self.VV)-eye(self.VV.shape[0]))
+        #print 'V   * V.T - I:', norm(dot(self.VV, self.VV.T)-eye(self.VV.shape[0]))
+        #print 'V.T * V.T - I:', norm(dot(self.VV.T, self.VV.T)-eye(self.VV.shape[0]))
+        #print 'V.T * V   - I:', norm(dot(self.VV.T, self.VV)-eye(self.VV.shape[0]))
+        #print 'U   * V   - I:', norm(dot(self.UU, self.VV)-eye(self.UU.shape[0]))
+        #print 'U   * V.T - I:', norm(dot(self.UU, self.VV.T)-eye(self.UU.shape[0]))
+        #print 'U.T * V.T - I:', norm(dot(self.UU.T, self.VV.T)-eye(self.UU.shape[0]))
+        #print 'U.T * V   - I:', norm(dot(self.UU.T, self.VV)-eye(self.UU.shape[0]))
+        #pdb.set_trace()
+        
+        pc = self.toPC(xx, numDims = numDims)
+        ret = self.fromPC(pc)
+        if error:
+            return ret, norm(xx - ret)
+        else:
+            return ret
+
+
+    def toZca(self, xx, numDims = None, epsilon = 0):
         '''Return Zero-phase whitening filter version.'''
 
         pc = self.toWhitePC(xx, numDims = numDims, epsilon = epsilon)
-        return self.fromWhitePC(pc)
+        return self.fromPC(pc, uncenter = False)
+
+
+    def fromZca(self, zc, numDims = None, epsilon = 0):
+        '''Return Zero-phase whitening filter version.'''
+
+        # Computes dot(dot(zca1, pca.UU) * sqrt(pca.ss + 0), pca.UU.T) + pca.mu
+        pc = self.toPC(zc, center = False) # already centered
+        return self.fromWhitePC(pc, epsilon = epsilon)
+
+
+    def zcaAndBack(self, xx, numDims = None, epsilon = 0, error = False):
+        '''Projects to first numDims of zca dimensions and back. Same
+        as pcaAndBack, save for some numerica instability introduced
+        by using epsilon > 0. Provided for consistency, but not really
+        recommended for use.'''
+
+        print 'You should probably use pcaAndBack instead.'
+
+        zc = self.toZca(xx, numDims = numDims, epsilon = epsilon)
+        ret = self.fromZca(zc, numDims = numDims, epsilon = epsilon)
+        if error:
+            return ret, norm(xx - ret)
+        else:
+            return ret
 
 
     def center(self, xx):
@@ -236,29 +298,32 @@ class PCA:
 
 
 
-
 def testPca():
     from matplotlib import pyplot
     random.seed(1)
     
     NN = 10
-    transform = array([[2, 3.5], [3.5, 8]])
+    #transform = array([[2, 3.5], [3.5, 8]])
+    transform = array([[5, 3.5, .3], [3.5, 8, 7], [4, 2, 9]])
     #transform = array([[2, 4.5], [2.5, 8]])
-    data1 = random.randn(NN,2)
+    data1 = random.randn(NN,3)
     data1 = dot(data1, transform)
     data1[:,0] += 4
     data1[:,1] += -2
-    data2 = random.randn(NN,2)
+    data1[:,2] += 1
+    data2 = random.randn(NN,3)
     data2 = dot(data2, transform)
     data2[:,0] += 4
     data2[:,1] += -2
+    data2[:,2] += 1
 
     print 'data1\n', data1
     print 'data2\n', data2
     print
 
-    print 'PCA_SVD'
-    testPcaHelper(data1, data2, usePcaSvd = True)
+    #print 'PCA_SVD'
+    #testPcaHelper(data1, data2, usePcaSvd = True)
+    
     print '\nPCA'
     testPcaHelper(data1, data2, usePcaSvd = False)
 
@@ -287,7 +352,7 @@ def testPcaHelper(data1, data2, usePcaSvd = False):
     print 'data1 toPC (1 dim)\n',   pca.toPC(data1, 1)
     print 'data1 fromPC (1 dim)\n', pca.fromPC(pca.toPC(data1, 1))
     if not usePcaSvd:
-        print 'data1 zca\n',    pca.zca(data1, 1)
+        print 'data1 zca\n',    pca.toZca(data1, 1)
 
     pc1 = pca.toPC(data1)
     if not usePcaSvd:
@@ -296,15 +361,40 @@ def testPcaHelper(data1, data2, usePcaSvd = False):
 
     pc2 = pca.toPC(data2)
     if not usePcaSvd:
-        pc2white = pca.toWhitePC(data1)
+        pc1white = pca.toWhitePC(data1)
+        pc1whiteRecon = pca.fromWhitePC(pc1white)
+        zca1Manual = pca.fromPC(pc1white, uncenter = False)
+        zca1 = pca.toZca(data1)
+        zca1Red = pca.toZca(data1, numDims = 5, epsilon = .1)
+
+        fromZca1      = pca.fromZca(zca1)
+        fromZca1Red   = pca.fromZca(zca1Red, numDims = 5, epsilon = .1)
+        fromZca1Redtf = pca.zcaAndBack(data1, numDims = 5, epsilon = .1)
+
+        pc2white = pca.toWhitePC(data2)
+        pc2whiteRecon = pca.fromWhitePC(pc2white)
+        zca2Manual = pca.fromPC(pc2white, uncenter = False)
+        zca2 = pca.toZca(data2)
+
+
     recon2 = pca.fromPC(pc2)
 
-    pc2_1dim = pca.toPC(data2, 1)
-    recon2_1dim = pca.fromPC(pc2_1dim)
+    recon2_1dim = pca.fromPC(pca.toPC(data2, 1))
+    recon2_2dim = pca.fromPC(pca.toPC(data2, 2))
+    recon2_3dim = pca.fromPC(pca.toPC(data2, 3))
 
-    print 'fromPC(toPC(data2, 1))\n', recon2_1dim
-
-    print 'reconstruction error:', ((recon2_1dim - data2)**2).sum()
+    print 'data 2 recon error, 1 dim', ((recon2_1dim - data2)**2).sum()
+    print 'data 2 recon error, 1 dim', ((pca.pcaAndBack(data2, 1) - data2)**2).sum()
+    print 'data 2 recon error, 1 dim', ((pca.zcaAndBack(data2, 1) - data2)**2).sum()
+    print 'data 2 recon error, 1 dim', ((pca.zcaAndBack(data2, 1, epsilon = 1) - data2)**2).sum()
+    print 'data 2 recon error, 2 dim', ((recon2_2dim - data2)**2).sum()
+    print 'data 2 recon error, 2 dim', ((pca.pcaAndBack(data2, 2) - data2)**2).sum()
+    print 'data 2 recon error, 2 dim', ((pca.zcaAndBack(data2, 2) - data2)**2).sum()
+    print 'data 2 recon error, 2 dim', ((pca.zcaAndBack(data2, 2, epsilon = 1) - data2)**2).sum()
+    print 'data 2 recon error, 3 dim', ((recon2_3dim - data2)**2).sum()
+    print 'data 2 recon error, 3 dim', ((pca.pcaAndBack(data2, 3) - data2)**2).sum()
+    print 'data 2 recon error, 3 dim', ((pca.zcaAndBack(data2, 3) - data2)**2).sum()
+    print 'data 2 recon error, 3 dim', ((pca.zcaAndBack(data2, 3, epsilon = 1) - data2)**2).sum()
 
     pyplot.figure()
 
@@ -317,10 +407,11 @@ def testPcaHelper(data1, data2, usePcaSvd = False):
     pyplot.plot(pc1[:,0], pc1[:,1], 'o')
     pyplot.title('pc1')
 
-    if not usePcaSvd:
-        pyplot.subplot(3,4,3)
-        pyplot.plot(pc1white[:,0], pc1white[:,1], 'o')
-        pyplot.title('pc1white')
+    pyplot.subplot(3,4,3)
+    dat,err = pca.pcaAndBack(data1, error = True)
+    print 'Error:', err
+    pyplot.plot(dat[:,0], dat[:,1], 'o')
+    pyplot.title('pcaAndBack')
 
     pyplot.subplot(3,4,4)
     pyplot.plot(recon1[:,0], recon1[:,1], 'o')
@@ -341,15 +432,18 @@ def testPcaHelper(data1, data2, usePcaSvd = False):
 
     pyplot.subplot(3,4,8)
     pyplot.plot(recon2[:,0], recon2[:,1], 'o')
-    pyplot.title('recon2')
+    pyplot.plot(pc2whiteRecon[:,0]+.2, pc2whiteRecon[:,1]+.2, 'ro')
+    pyplot.title('recon2 and pc2whiteRecon')
 
     pyplot.subplot(3,4,9)
-    pyplot.plot(data2[:,0], data2[:,1], 'o')
-    pyplot.title('data2')
+    pyplot.plot(zca1Manual[:,0], zca1Manual[:,1], 'o')
+    pyplot.plot(zca1[:,0]+.05, zca1[:,1]+.05, 'ro')
+    pyplot.title('zca1Manual and zca1')
 
     pyplot.subplot(3,4,10)
-    pyplot.plot(pc2_1dim[:,0], pc2_1dim[:,0] * 0, 'o')
-    pyplot.title('pc2[1 dim]')
+    pyplot.plot(zca2Manual[:,0], zca2Manual[:,1], 'o')
+    pyplot.plot(zca2[:,0]+.05, zca2[:,1]+.05, 'ro')
+    pyplot.title('zca2Manual and zca2')
 
     pyplot.subplot(3,4,11)
     pyplot.semilogy(pca.var, 'o-')
