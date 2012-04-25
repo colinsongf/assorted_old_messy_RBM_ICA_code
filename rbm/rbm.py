@@ -15,10 +15,12 @@ matplotlib.use('Agg') # plot with no display
 from matplotlib import pyplot
 
 from matplotlib import rc
-rc('font',**{'family':'sans-serif','sans-serif':['Helvetica'],'size':8})
-## for Palatino and other serif fonts use:
-#rc('font',**{'family':'serif','serif':['Palatino']))
-rc('text', usetex=True)
+rc('font',**{'size':8})
+
+# WARNING: The next two lines are *very slow*! Use only if necessary
+# for making very pretty plots.
+#rc('font',**{'family':'sans-serif','sans-serif':['Helvetica'],'size':8})
+#rc('text', usetex=True)
 
 from utils import tile_raster_images, imagesc, load_mnist_data
 from ResultsManager import resman
