@@ -347,6 +347,9 @@ def test_rbm(learning_rate=0.1, training_epochs = 15,
 
     rng        = numpy.random.RandomState(1)
 
+    if n_input is None:
+        n_input = train_set_x.shape[1]
+
     # construct the RBM class
     rbm = RBM(nVisible=n_input, nHidden = n_hidden, numpyRng = rng,
               visibleModel = visibleModel, initWfactor = initWfactor)
