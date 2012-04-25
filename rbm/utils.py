@@ -387,6 +387,11 @@ def gitDiff(color = False):
 
 
 
+def hostname():
+    return runCmd('hostname')
+
+
+
 RESULTS_SUBDIR = 'results'
 
 class ResultsManager(object):
@@ -435,6 +440,7 @@ class ResultsManager(object):
         # print the command that was executed
         print '  Logging directory:', self.rundir
         print '        Command run:', ' '.join(sys.argv)
+        print '           Hostname:', hostname()
         print '  Working directory:', os.getcwd()
         if not self.diary:
             print '<diary not saved>'
@@ -442,6 +448,7 @@ class ResultsManager(object):
             with open(os.path.join(self.rundir, 'diary'), 'w') as ff:
                 print >>ff, '  Logging directory:', self.rundir
                 print >>ff, '        Command run:', ' '.join(sys.argv)
+                print >>ff, '           Hostname:', hostname()
                 print >>ff, '  Working directory:', os.getcwd()
                 print >>ff, '<diary not saved>'
 
