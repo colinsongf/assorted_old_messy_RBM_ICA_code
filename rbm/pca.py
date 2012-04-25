@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 
 import pdb
-from numpy import array, dot, random, linalg, sqrt, asarray, cov, eye, sum
+from numpy import array, dot, random, linalg, sqrt, asarray, cov, eye, sum, hstack
 from numpy.linalg import norm
 
 
@@ -161,12 +161,19 @@ class PCA:
 
 
     def pc(self, numDims = None):
-        '''Return a matrix whose columnts are the ordered principle components.'''
+        '''Return a matrix whose columnts are the ordered principle
+        components.'''
 
         if numDims is None:
             numDims = self.UU.shape[1]
 
         return self.UU[:,0:numDims]
+
+
+    def meanAndPc(self, numDims = None):
+        '''Returns a matrix whose first column is the mean and
+        subsequent columns are the ordered principle components.'''
+        return hstack((array([self.mu]).T, self.pc(numDims = numDims)))
 
 
     def toPC(self, xx, numDims = None, whiten = False, epsilon = 0, center = True):

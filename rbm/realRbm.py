@@ -12,6 +12,7 @@ from numpy import *
 from upsonRbm import loadUpsonData
 from rbm import test_rbm
 from ResultsManager import resman
+from pca import PCA
 
 
 
@@ -20,11 +21,15 @@ if __name__ == '__main__':
     datasets = loadUpsonData('../data/upson_rovio_1/train_15_50000.pkl.gz',
                              '../data/upson_rovio_1/test_15_50000.pkl.gz')
 
-    meanTrain = mean(datasets[0][0])
-    stdTrain  = std(datasets[0][0])
-    datasets[0][0] = (datasets[0][0] - meanTrain) / stdTrain
-    datasets[2][0] = (datasets[2][0] - meanTrain) / stdTrain
-    
+    #meanTrain = mean(datasets[0][0])
+    #stdTrain  = std(datasets[0][0])
+    #datasets[0][0] = (datasets[0][0] - meanTrain) / stdTrain
+    #datasets[2][0] = (datasets[2][0] - meanTrain) / stdTrain
+
+    pca = PCA(datasets[0][0])
+    datasets[0][0] = pca.toZca(datasets[0][0], None, epsilon = .1)
+    datasets[2][0] = pca.toZca(datasets[2][0], None, epsilon = .1)
+
     print 'done loading.'
     
     test_rbm(datasets = datasets,
