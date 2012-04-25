@@ -388,7 +388,7 @@ def gitDiff(color = False):
 
 
 def hostname():
-    return runCmd('hostname')
+    return runCmd('hostname')[0].strip()
 
 
 
