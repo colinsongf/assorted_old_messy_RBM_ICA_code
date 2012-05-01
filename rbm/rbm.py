@@ -453,11 +453,13 @@ def test_rbm(learning_rate=0.1, training_epochs = 15,
 
     plot_every = 1
 
+    # if imgPlotFunction is defined, then also plot before function if
+    # the data is of the same dimension (e.g. for ZCA, but not for
+    # PCA).
+    plotRawAlso = (imgPlotFunction and X.shape[0] == img_dim * img_dim)
+        
     # create a space to store the image for plotting ( we need to leave
     # room for the tile_spacing as well)
-    
-    plotRawAlso = (X.shape[0] == img_dim * img_dim)
-        
     image_data = numpy.ones(((img_dim+1)*n_samples-1,(img_dim+1)*n_chains-1), dtype='uint8') * 51  # dark gray
     if plotRawAlso:
         image_data_raw = numpy.ones(((img_dim+1)*n_samples-1,(img_dim+1)*n_chains-1), dtype='uint8') * 51  # dark gray
