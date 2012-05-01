@@ -66,7 +66,7 @@ def randomSampleMatrix(filterNames, Nw = 10, Nsamples = 10):
 
 def saveToFile(filename, obj):
     ff = gzip.open(filename, 'wb')
-    pickle.dump(obj, ff)
+    pickle.dump(obj, ff, protocol = -1)
     print 'saved to', filename
     ff.close()
 
