@@ -455,7 +455,13 @@ def test_rbm(learning_rate=0.1, training_epochs = 15,
 
     # create a space to store the image for plotting ( we need to leave
     # room for the tile_spacing as well)
+    
+    plotRawAlso = (X.shape[0] == img_dim * img_dim)
+        
     image_data = numpy.ones(((img_dim+1)*n_samples-1,(img_dim+1)*n_chains-1), dtype='uint8') * 51  # dark gray
+    if plotRawAlso:
+        image_data_raw = numpy.ones(((img_dim+1)*n_samples-1,(img_dim+1)*n_chains-1), dtype='uint8') * 51  # dark gray
+    
     for ii in xrange(n_chains):
         # generate `plot_every` intermediate samples that we discard, because successive samples in the chain are too correlated
         test_idx = rng.randint(number_of_test_samples)
@@ -477,9 +483,19 @@ def test_rbm(learning_rate=0.1, training_epochs = 15,
                 img_shape = (img_dim,img_dim),
                 tile_shape = (n_samples, 1),
                 tile_spacing = (1,1))
+        if plotRawAlso:
+            image_data_raw[:,(img_dim+1)*ii:(img_dim+1)*ii+img_dim] = tile_raster_images(
+                    X = samples,
+                    img_shape = (img_dim,img_dim),
+                    tile_shape = (n_samples, 1),
+                    tile_spacing = (1,1))
 
     image = Image.fromarray(image_data)
     image.save(os.path.join(output_dir, 'samples.png'))
+    if plotRawAlso:
+        image = Image.fromarray(image_data)
+        image.save(os.path.join(output_dir, 'samplesRaw.png'))
+    
 
     return meanCosts
 
