@@ -6,7 +6,8 @@ Some stuff copied from https://github.com/lisa-lab/DeepLearningTutorials/blob/ma
 '''
 
 import os, sys, time, logging, subprocess, datetime, stat
-import gzip, cPickle
+import gzip
+import cPickle as pickle
 
 import numpy
 import matplotlib.ticker as MT
@@ -24,6 +25,15 @@ class DuckStruct(object):
     def __repr__(self):
         rep = ['%s=%s' % (k, repr(v)) for k,v in self.__dict__.items()]
         return 'DuckStruct(%s)' % ', '.join(rep)
+
+
+
+def saveToFile(filename, obj, quiet = False):
+    ff = gzip.open(filename, 'wb')
+    pickle.dump(obj, ff, protocol = -1)
+    if not quiet:
+        print 'saved to', filename
+    ff.close()
 
 
 
@@ -50,7 +60,7 @@ def load_mnist_data(dataset, shared = True):
 
     # Load the dataset 
     f = gzip.open(dataset,'rb')
-    train_set, valid_set, test_set = cPickle.load(f)
+    train_set, valid_set, test_set = pickle.load(f)
     f.close()
 
     if not shared:

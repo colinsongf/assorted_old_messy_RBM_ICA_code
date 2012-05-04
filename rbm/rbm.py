@@ -22,7 +22,7 @@ rc('font',**{'size':8})
 #rc('font',**{'family':'sans-serif','sans-serif':['Helvetica'],'size':8})
 #rc('text', usetex=True)
 
-from utils import tile_raster_images, imagesc, load_mnist_data
+from utils import tile_raster_images, imagesc, load_mnist_data, saveToFile
 from ResultsManager import resman
 from pca import PCA
 
@@ -498,8 +498,9 @@ def test_rbm(learning_rate=0.1, training_epochs = 15,
         image = Image.fromarray(image_data)
         image.save(os.path.join(output_dir, 'samplesRaw.png'))
     
-
-    return meanCosts
+    saveToFile(os.path.join(output_dir, 'rbm.pkl.gz'), rbm)
+    
+    return rbm, meanCosts
 
 
 
