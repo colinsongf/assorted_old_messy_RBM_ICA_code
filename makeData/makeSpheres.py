@@ -1,7 +1,7 @@
 #! /usr/local/bin/ipython --gui=wx
 
 
-import os, pdb, gzip
+import os, pdb, gzip, sys
 from PIL import Image
 from numpy import *
 import cPickle as pickle
@@ -55,13 +55,19 @@ def demo(smoothed = False):
                        [0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 1, 1, 0],
                        [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 1, 1, 1, 1]])
     cubeEdges *= Nw
-    plot3d(cubeEdges[0,:], cubeEdges[1,:], cubeEdges[2,:], color=(.5,.5,.5),
-           line_width = 0,
-           representation = 'wireframe',
-           opacity = 1)
 
-    mlab.view(57.15, 75.55, 50.35, (7.5, 7.5, 7.5)) # nice view
     for ii in range(10):
+        fig = mlab.gcf()
+        #fig.scene.disable_render = True
+
+        mlab.clf(fig)
+        #from tvtk.api import tvtk
+        #fig.scene.interactor.interactor_style = tvtk.InteractorStyleTerrain()
+        #mlab.clf()
+        plot3d(cubeEdges[0,:], cubeEdges[1,:], cubeEdges[2,:], color=(.5,.5,.5),
+               line_width = 0,
+               representation = 'wireframe',
+               opacity = 1)
         thisShape = xx[ii,:]
         if smoothed:
             contour3d(reshape(thisShape, (Nw,Nw,Nw)), contours=[.5], color=(1,1,1))
@@ -74,12 +80,13 @@ def demo(smoothed = False):
                      mode = 'cube',
                      scale_factor = 1.0)
 
-        fig = mlab.gcf()
-        from tvtk.api import tvtk
-        fig.scene.interactor.interactor_style = tvtk.InteractorStyleTerrain()
-        mlab.show()
-        #pdb.set_trace()
-        raw_input('enter to continue...')
+        mlab.view(57.15, 75.55, 50.35, (7.5, 7.5, 7.5)) # nice view
+
+        filename = 'test_%02d.png' % ii
+        mlab.savefig(filename)    #, size=(800,800))
+
+        if raw_input('Saved %s, enter to continue (q to quit)...' % filename) == 'q':
+            return
     
 
 def main():
@@ -114,5 +121,12 @@ def main():
 
 
 if __name__ == '__main__':
-    #demo()
-    main()
+    if len(sys.argv) == 1 or sys.argv[1] not in ('demo', 'data'):
+        print 'Usage: %s demo    # run a demo\n       %s data    # create and save spheres data.' % (sys.argv[0], sys.argv[0])
+        sys.exit(1)
+
+    if sys.argv[1] == 'demo':
+        demo()
+    else:
+        main()
+
