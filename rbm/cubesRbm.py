@@ -17,9 +17,7 @@ if __name__ == '__main__':
     if len(sys.argv) > 1 and sys.argv[1] == '--spheres':
         spheres = True
         del sys.argv[1]
-    spheres = True ########HACK!!!!!!!
 
-    
     print 'Using dataset:', 'spheres' if spheres else 'cubes'
 
     img_dim = 10    # 2, 4, 10, 15, 28
