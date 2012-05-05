@@ -37,6 +37,13 @@ def saveToFile(filename, obj, quiet = False):
 
 
 
+def loadFromFile(filename):
+    with gzip.open(filename, 'rb') as ff:
+        ret = pickle.load(ff)
+    return ret
+
+
+
 def load_mnist_data(dataset, shared = True):
     ''' Loads the dataset
 

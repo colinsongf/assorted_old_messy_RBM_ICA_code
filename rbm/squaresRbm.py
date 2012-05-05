@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 
-import numpy, time, gzip, PIL.Image, os, pdb
+import numpy, time, gzip, os, pdb
 import pickle, sys
 from numpy import *
 
@@ -10,19 +10,23 @@ from rbm import RBM, test_rbm
 
 
 
-def loadPickledData(trainFile, testFile):
+def loadPickledData(trainFile, testFile = None):
     ''' Loads the dataset and returns in the expected train,valid,test format.'''
 
     # Load the dataset
     ff = gzip.open(trainFile,'rb')
     train_set = pickle.load(ff)
     ff.close()
-    ff = gzip.open(testFile,'rb')
-    test_set = pickle.load(ff)
-    ff.close()
+    if testFile:
+        ff = gzip.open(testFile,'rb')
+        test_set = pickle.load(ff)
+        ff.close()
 
     # no validation set
-    return train_set, [array([]), None], test_set
+    if testFile:
+        return train_set, [array([]), None], test_set
+    else:
+        return train_set
 
 
 
