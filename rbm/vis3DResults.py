@@ -2,7 +2,7 @@
 
 import os, pdb, gzip, sys
 import argparse
-from numpy import mgrid, array, ones
+from numpy import mgrid, array, ones, linspace
 from tvtk.api import tvtk
 
 from utils import loadFromFile
@@ -10,59 +10,90 @@ from squaresRbm import loadPickledData
 
 
 
+cubeEdges = array([[0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 0, 0],
+                   [0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 1, 1, 0],
+                   [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 1, 1, 1, 1]])
+
+
+
 def main(dataFilename, rbmFilename, smoothed = False):
-    if dataFilename and rbmFilename:
-        mode = 'sample'
-    elif dataFilename:
-        mode = 'data'
-    else:
-        mode = 'filter'
-        
     from mayavi import mlab
     from mayavi.mlab import points3d, contour3d, plot3d
 
-
-    if mode == 'data':
+    if dataFilename:
+        mode = 'data'
         xx, yy = loadPickledData(dataFilename)
+        Nw = int(round(xx.shape[1]**.33333333))
 
+    if rbmFilename:
+        mode = 'filter'
+        rbm = loadFromFile(rbmFilename)
+        Nw = int(round(rbm.W.shape[0]**.33333333))
 
-        Nw = 10
-        indexX, indexY, indexZ = mgrid[0:Nw,0:Nw,0:Nw]
+    if dataFilename and rbmFilename:
+        mode = 'gibbs'   # override
+        
 
-        cubeEdges = array([[0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 0, 0],
-                           [0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 1, 1, 0],
-                           [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 1, 1, 1, 1]])
-        cubeEdges *= Nw
+    # Setup
+    indexX, indexY, indexZ = mgrid[0:Nw,0:Nw,0:Nw]
+    edges = cubeEdges * Nw
+    figSize = (300,300)
+    
+    # Main plotting loop
+    for ii in range(10):
+        fig = mlab.figure(0, size = figSize)
+        mlab.clf(fig)
+        fig.scene.interactor.interactor_style = tvtk.InteractorStyleTerrain()
+        plot3d(edges[0,:], edges[1,:], edges[2,:], color=(.5,.5,.5),
+               line_width = 0,
+               representation = 'wireframe',
+               opacity = 1)
 
-        for ii in range(10):
-            fig = mlab.figure(0, size=(600,600))
-            mlab.clf(fig)
-            fig.scene.interactor.interactor_style = tvtk.InteractorStyleTerrain()
-            plot3d(cubeEdges[0,:], cubeEdges[1,:], cubeEdges[2,:], color=(.5,.5,.5),
-                   line_width = 0,
-                   representation = 'wireframe',
-                   opacity = 1)
-            #thisShape = rbm.W[:,ii]
+        if mode == 'data':
             thisShape = xx[ii,:]
-            if smoothed:
-                contour3d(reshape(thisShape, (Nw,Nw,Nw)), contours=[.5], color=(1,1,1))
-            else:
-                points3d(indexX.flatten()[thisShape > 0],
-                         indexY.flatten()[thisShape > 0],
-                         indexZ.flatten()[thisShape > 0],
-                         ones(sum(thisShape > 0)) * .9,
-                         color = (1,1,1),
-                         mode = 'cube',
-                         scale_factor = 1.0)
+        elif mode == 'filter':
+            thisShape = rbm.W[:,ii]
+        else:
+            NOTDONEYET
 
-            #mlab.view(57.15, 75.55, 50.35, (7.5, 7.5, 7.5)) # nice view
-            mlab.view(24, 74, 33, (5, 5, 5))
-            
-            filename = 'test_%02d.png' % ii
-            mlab.savefig(filename)    #, size=(800,800))
+        if smoothed:
+            contour3d(reshape(thisShape, (Nw,Nw,Nw)), contours=[.5], color=(1,1,1))
+        else:
+            #pdb.set_trace()
+            mn = thisShape.min()
+            mx = thisShape.max()
+            idx = (thisShape > 0)
+            pts = points3d(indexX.flatten()[idx] + .5,
+                     indexY.flatten()[idx] + .5,
+                     indexZ.flatten()[idx] + .5,
+                     #ones(sum(idx)) * .9,
+                     ((thisShape-mn) / (mx-mn) * .9)[idx],
+                     colormap = 'bone',
+                     #color = (1,1,1),
+                     mode = 'cube',
+                     scale_factor = 1.0)
+            lut = pts.module_manager.scalar_lut_manager.lut.table.to_array()
+            tt = linspace(0, 255, 256)
+            lut[:, 0] = tt*0 + 255
+            lut[:, 1] = tt*0 + 255
+            lut[:, 2] = tt*0 + 255
+            lut[:, 3] = tt
+            pts.module_manager.scalar_lut_manager.lut.table = lut
+            mlab.draw()
 
-            if raw_input('Saved %s, enter to continue (q to quit)...' % filename) == 'q':
-                return
+        #mlab.view(57.15, 75.55, 50.35, (7.5, 7.5, 7.5)) # nice view
+        mlab.view(24, 74, 33, (5, 5, 5))
+
+        #pdb.set_trace()
+
+        if raw_input('(q to quit)...') == 'q':
+            return
+
+        filename = 'demo_%02d.png' % ii
+        mlab.savefig(filename)    #, size=(800,800))
+
+        if raw_input('Saved %s, enter to continue (q to quit)...' % filename) == 'q':
+            return
 
 
 
