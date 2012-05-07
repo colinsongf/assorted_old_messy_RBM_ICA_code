@@ -99,7 +99,7 @@ def main(dataFilename, rbmFilename,  rundir, smoothed = False, plotEvery = 1):
         
 
     # Setup
-    figSize = (300,300)
+    figSize = (800,800)
     
     # Main plotting loop
     for ii in range(10):
@@ -108,18 +108,20 @@ def main(dataFilename, rbmFilename,  rundir, smoothed = False, plotEvery = 1):
             thisShape = xx[ii,:]
             plot3DShape(thisShape, Nw,
                         os.path.join(rundir, 'data_%02d.png' % ii),
-                        smoothed = smoothed)
+                        smoothed = smoothed,
+                        figSize = figSize)
         elif mode == 'filter':
             thisShape = rbm.W[:,ii]
             plot3DShape(thisShape, Nw,
                         os.path.join(rundir, 'filter_%02d.png' % ii),
                         smoothed = smoothed,
-                        visSimple = False)
+                        visSimple = False,
+                        figSize = figSize)
         else:
             # gibbs
             idx = random.randint(0, xx.shape[1])
 
-            nSamples = 10
+            nSamples = 200
             samples = zeros((nSamples, Nw**3))
 
             visMean = xx[idx,:]
@@ -134,7 +136,8 @@ def main(dataFilename, rbmFilename,  rundir, smoothed = False, plotEvery = 1):
                 plot3DShape(samples[jj,:], Nw,
                             os.path.join(rundir, 'sample_%02d_%05d.png' % (ii, jj)),
                             smoothed = smoothed,
-                            plotThresh = .5)
+                            plotThresh = .5,
+                            figSize = figSize)
 
 
 
