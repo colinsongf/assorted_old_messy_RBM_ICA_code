@@ -102,18 +102,19 @@ def main(dataFilename, rbmFilename,  rundir, smoothed = False, plotEvery = 1):
     figSize = (800,800)
     
     # Main plotting loop
-    for ii in range(10):
+    nIter = 10 if mode == 'gibbs' else 200
+    for ii in range(nIter):
 
         if mode == 'data':
             thisShape = xx[ii,:]
             plot3DShape(thisShape, Nw,
-                        os.path.join(rundir, 'data_%02d.png' % ii),
+                        os.path.join(rundir, 'data_%03d.png' % ii),
                         smoothed = smoothed,
                         figSize = figSize)
         elif mode == 'filter':
             thisShape = rbm.W[:,ii]
             plot3DShape(thisShape, Nw,
-                        os.path.join(rundir, 'filter_%02d.png' % ii),
+                        os.path.join(rundir, 'filter_%03d.png' % ii),
                         smoothed = smoothed,
                         visSimple = False,
                         figSize = figSize)
