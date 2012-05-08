@@ -53,6 +53,9 @@ def main():
 
     # make different size datasets
     sizes = [10, 20, 40, 100, 200, 400, 1000, 2000, 4000, 10000, 20000, 40000]
+    #sizes = [10, 20, 40, 100, 200, 400, 1000, 2000, 4000, 10000]
+    #sizes = [20000]
+    #sizes = [40000]
     #sizes = [10, 20]
 
     sizedDatasetsX = {}
@@ -79,10 +82,11 @@ def main():
             rbm, meanCosts = test_rbm(datasets = thisDataset,
                                       training_epochs = 45,
                                       img_dim = img_dim,
-                                      n_hidden = 200, 
-                                      learning_rate = .1, 
+                                      n_hidden = 400, 
+                                      learning_rate = .002, 
                                       output_dir = thisDir,
                                       quickHack = False,
+                                      initWfactor = .02, 
                                       imgPlotFunction = lambda xx: xx[:,0:img_dim*img_dim],  # HACK: plot first slice
                                       )
 
