@@ -17,7 +17,7 @@ def paintSphere(img, indexX, indexY, indexZ, locX, locY, locZ, radius):
 
 
 
-def randomSphereSampleMatrix(Nw = 10, Nsamples = 10):
+def randomSphereSampleMatrix(Nw = 10, Nsamples = 10, minRadius = 1):
     retX = zeros((Nsamples, Nw * Nw * Nw), dtype = float32)
     retY = zeros((Nsamples, 4), dtype = float32)
 
@@ -29,7 +29,7 @@ def randomSphereSampleMatrix(Nw = 10, Nsamples = 10):
         locX   = random.randint(0, Nw)
         locY   = random.randint(0, Nw)
         locZ   = random.randint(0, Nw)
-        radius = random.uniform(1, float(Nw)/3)  # biggest sphere is 2/3 width of box
+        radius = random.uniform(minRadius, float(Nw)/3)  # biggest sphere is 2/3 width of box
 
         thisImg = paintSphere(reshape(retX[ii,:], (Nw,Nw,Nw)), indexX, indexY, indexZ, locX, locY, locZ, radius)
 
