@@ -34,7 +34,7 @@ def main(rbmFilenames, data0Filename, data1Filename, rundir):
         rbm = loadFromFile(rbmFilename)
         pred  = -1 * ones(testY.shape, dtype='uint8')
 
-        batchSize = 100
+        batchSize = 1000
         if len(pred) % batchSize != 0:
             raise Exception('must be a multiple of batchSize (%d)!' % batchSize)
 
@@ -86,7 +86,7 @@ if __name__ == '__main__':
                         help='Name of run for ResultsManager. Default: junk')
     args = parser.parse_args()
 
-    resman.start(args.name, diary = False)
+    resman.start(args.name, diary = True)
     
     main(args.rbm, args.data0, args.data1,
          rundir = resman.rundir)
