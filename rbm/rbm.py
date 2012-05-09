@@ -79,9 +79,9 @@ class RBM(object):
 
     def free_energy(self, v_sample):
         ''' Function to compute the free energy '''
-        wx_b = T.dot(v_sample, self.W) + self.hbias
-        vbias_term = T.dot(v_sample, self.vbias)
-        hidden_term = T.sum(T.log(1+T.exp(wx_b)),axis = 1)
+        wx_b = dot(v_sample, self.W) + self.hbias
+        vbias_term = dot(v_sample, self.vbias)
+        hidden_term = sum(log(1+exp(wx_b)), axis = -1)
         return -hidden_term - vbias_term
 
 
