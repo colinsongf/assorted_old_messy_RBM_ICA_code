@@ -1,4 +1,4 @@
-#! /usr/bin/env ipythonwx
+#! /usr/bin/env ipython --pylab
 
 from numpy import *
 from matplotlib import pyplot
@@ -15,8 +15,9 @@ def kurt(xx):
 
 
 def rotMat(theta):
-    return array([[cos(theta), -sin(theta)],
-                  [sin(theta), cos(theta)]])
+    tt = array(theta).flatten()[0]  # handle numbers or arrays passed as arguments
+    return array([[cos(tt), -sin(tt)],
+                  [sin(tt), cos(tt)]])
 
 
 
@@ -103,27 +104,38 @@ def main():
 
 
     # Compute kurtosis at different angles
-    thetas = linspace(0, pi, 100)
+    thetas = linspace(0, 2*pi, 100)
     kurt1 = 0 * thetas
-    kurt2 = 0 * thetas
     for ii, theta in enumerate(thetas):
-        kurt1[ii] = kurt(dot(W, rotMat(theta))[:,0])
-        kurt2[ii] = kurt(dot(W, rotMat(theta))[:,1])
+        kurt1[ii] = kurt(dot(rotMat(theta)[0,:], W.T).T)
+
+    minfn = lambda theta: -kurt(dot(rotMat(theta)[0,:], W.T).T)**2
 
     angle0 = 0
-    #xopt = fmin_bfgs(lambda aa : -sum(kurt(dot(W, rotMat(aa))) ** 2),
-    #                 angle0)
-    xopt = fmin_bfgs(lambda aa : -max(kurt(dot(W, rotMat(aa))) ** 2),
-                     angle0)
+    xopt = fmin_bfgs(minfn, angle0)
 
-    mnval = array([-max(kurt(dot(W, rotMat(aa))) ** 2) for aa in thetas])
+    mnval = array([minfn(aa) for aa in thetas])
 
     pyplot.figure(4)
     pyplot.title('kurtosis vs. angle')
-    pyplot.plot(thetas, kurt1, 'bo-', thetas, kurt2, 'ro-', thetas, kurt1 + kurt2, 'go-', thetas, mnval, 'k')
-    pyplot.hold(True)
-    pyplot.plot(xopt, -max(kurt(dot(W, rotMat(xopt))) ** 2), 'ko')
-    pyplot.plot(thetas, array([-max(kurt(dot(W, rotMat(aa))) ** 2) for aa in thetas]), 'co-')
+    pyplot.plot(thetas, kurt1, 'bo-', thetas, mnval, 'k', xopt, minfn(xopt), 'ko')
+
+    Ropt = rotMat(xopt)
+    Recon = dot(W, Ropt.T)
+    print 'kurt(r1) =', kurt(Recon[:,0])
+    print 'kurt(r2) =', kurt(Recon[:,1])
+
+    pyplot.figure(5)
+    pyplot.subplot(4,1,1)
+    pyplot.title('original sources')
+    pyplot.plot(tt, s1, 'bo-')
+    pyplot.subplot(4,1,2)
+    pyplot.plot(tt, s2, 'bo-')
+    pyplot.subplot(4,1,3)
+    pyplot.title('reconstructed sources')
+    pyplot.plot(tt, Recon[:,0], 'go-')
+    pyplot.subplot(4,1,4)
+    pyplot.plot(tt, Recon[:,1], 'go-')
 
     #pyplot.show()
     import ipdb; ipdb.set_trace()
