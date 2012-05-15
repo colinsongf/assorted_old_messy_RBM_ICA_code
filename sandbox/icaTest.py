@@ -1,4 +1,4 @@
-#! /usr/bin/env ipython --pylab
+#! /usr/bin/env ipythonpl
 
 import pdb
 import os
@@ -187,24 +187,12 @@ def main(savedir = None):
     minAngleFnLC20 = lambda theta: minfnLC20(dot(rotMat(theta)[0,:], W.T).T)
     minAngleFnNExp = lambda theta: minfnNExp(dot(rotMat(theta)[0,:], W.T).T)
 
-
+    #########
     # Chosen objective function. Change this line to change which objective is used.
-    minDataFn = minfnK
+    #########
+    minDataFn = minfnK 
 
     minAngleFn = lambda theta: minDataFn(dot(rotMat(theta)[0,:], W.T).T)
-
-
-    #minfnK    = lambda theta: -kurt(dot(rotMat(theta)[0,:], W.T).T)**2
-    #minfnNEnt = lambda theta: -negentropy(dot(rotMat(theta)[0,:], W.T).T)
-    #minfnLC10 = lambda theta: -logcosh10(dot(rotMat(theta)[0,:], W.T).T)
-    #minfnLC15 = lambda theta: -logcosh15(dot(rotMat(theta)[0,:], W.T).T)
-    #minfnLC20 = lambda theta: -logcosh20(dot(rotMat(theta)[0,:], W.T).T)
-    #minfnNExp = lambda theta: -negexp(dot(rotMat(theta)[0,:], W.T).T)
-    #
-    ## Change this line to change which objective is used
-    #minfn = minfnK
-
-
     angle0 = 0
     xopt = fmin_bfgs(minAngleFn, angle0)
     xopt = xopt[0] % pi
@@ -264,20 +252,6 @@ def main(savedir = None):
 
 
 if __name__ == '__main__':
-    resman.start('junk', diary = False)
+    resman.start('junk', diary = True)
     main(resman.rundir)
     resman.stop()
-    #pyplot.show()
-    print 'shown'
-    
-    #import IPython; IPython.embed()
-    #import IPython.core
-    #IPython.core.ipapi.launch_new_instance(locals())
-    #IPython.core.interactiveshell.InteractiveShell()
-
-    #from IPython.core.debugger import Tracer
-    #debug = Tracer()
-    #debug()
-
-
-    
