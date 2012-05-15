@@ -1,10 +1,12 @@
 #! /usr/bin/env ipython --pylab
 
-from numpy import *
 import pdb
+import os
+from numpy import *
 from matplotlib import pyplot
 from scipy.optimize import fmin_bfgs
 
+from rbm.ResultsManager import resman
 from rbm.pca import PCA
 
 
@@ -19,7 +21,7 @@ def assertMean0Var1(xx):
 def kurt(xx):
     assertMean0Var1(xx)
     if len(xx.shape) > 1:
-        pdb.set_trace()        
+        pdb.set_trace()
     return mean(xx**4, axis=0) - 3 * mean(xx**2, axis=0)**2
 
 
@@ -59,13 +61,17 @@ def negexp(xx):
 
 
 def rotMat(theta):
-    tt = array(theta).flatten()[0]  # handle numbers or arrays passed as arguments
+    # handle numbers or arrays passed as arguments
+    tt = array(theta).flatten()
+    if len(tt) > 1:
+        raise Exception('got long theta, probably an error')
+    tt = tt[0]
     return array([[cos(tt), -sin(tt)],
                   [sin(tt), cos(tt)]])
 
 
 
-def main():
+def main(savedir = None):
     N = 200
     tt = linspace(0, 10, N)
 
@@ -164,34 +170,60 @@ def main():
     for ii, theta in enumerate(thetas):
         kurt1[ii] = kurt(dot(rotMat(theta)[0,:], W.T).T)
 
-    minfnK    = lambda theta: -kurt(dot(rotMat(theta)[0,:], W.T).T)**2
-    minfnNEnt = lambda theta: -negentropy(dot(rotMat(theta)[0,:], W.T).T)
-    minfnLC10 = lambda theta: -logcosh10(dot(rotMat(theta)[0,:], W.T).T)
-    minfnLC15 = lambda theta: -logcosh15(dot(rotMat(theta)[0,:], W.T).T)
-    minfnLC20 = lambda theta: -logcosh20(dot(rotMat(theta)[0,:], W.T).T)
-    minfnNExp = lambda theta: -negexp(dot(rotMat(theta)[0,:], W.T).T)
 
-    # Change this line to change which objective is used
-    minfn = minfnK
+    # functions of data
+    minfnK    = lambda data: -kurt(data)**2
+    minfnNEnt = lambda data: -negentropy(data)
+    minfnLC10 = lambda data: -logcosh10(data)
+    minfnLC15 = lambda data: -logcosh15(data)
+    minfnLC20 = lambda data: -logcosh20(data)
+    minfnNExp = lambda data: -negexp(data)
+
+    # functions of the rotation angle, given W as the data
+    minAngleFnK    = lambda theta: minfnK(dot(rotMat(theta)[0,:], W.T).T)
+    minAngleFnNEnt = lambda theta: minfnNEnt(dot(rotMat(theta)[0,:], W.T).T)
+    minAngleFnLC10 = lambda theta: minfnLC10(dot(rotMat(theta)[0,:], W.T).T)
+    minAngleFnLC15 = lambda theta: minfnLC15(dot(rotMat(theta)[0,:], W.T).T)
+    minAngleFnLC20 = lambda theta: minfnLC20(dot(rotMat(theta)[0,:], W.T).T)
+    minAngleFnNExp = lambda theta: minfnNExp(dot(rotMat(theta)[0,:], W.T).T)
+
+
+    # Chosen objective function. Change this line to change which objective is used.
+    minDataFn = minfnK
+
+    minAngleFn = lambda theta: minDataFn(dot(rotMat(theta)[0,:], W.T).T)
+
+
+    #minfnK    = lambda theta: -kurt(dot(rotMat(theta)[0,:], W.T).T)**2
+    #minfnNEnt = lambda theta: -negentropy(dot(rotMat(theta)[0,:], W.T).T)
+    #minfnLC10 = lambda theta: -logcosh10(dot(rotMat(theta)[0,:], W.T).T)
+    #minfnLC15 = lambda theta: -logcosh15(dot(rotMat(theta)[0,:], W.T).T)
+    #minfnLC20 = lambda theta: -logcosh20(dot(rotMat(theta)[0,:], W.T).T)
+    #minfnNExp = lambda theta: -negexp(dot(rotMat(theta)[0,:], W.T).T)
+    #
+    ## Change this line to change which objective is used
+    #minfn = minfnK
+
 
     angle0 = 0
-    xopt = fmin_bfgs(minfn, angle0)
+    xopt = fmin_bfgs(minAngleFn, angle0)
+    xopt = xopt[0] % pi
 
-    mnval = array([minfn(aa) for aa in thetas])
+    mnval = array([minAngleFn(aa) for aa in thetas])
 
     pyplot.figure(4)
     pyplot.title('objective vs. angle')
-    #pyplot.plot(thetas, kurt1, 'bo-', thetas, mnval, 'k', xopt, minfn(xopt), 'ko')
-    pyplot.plot(thetas, mnval, 'b', xopt, minfn(xopt), 'ko')
+    #pyplot.plot(thetas, kurt1, 'bo-', thetas, mnval, 'k', xopt, minAngleFn(xopt), 'ko')
+    pyplot.plot(thetas, mnval, 'b', xopt, minAngleFn(xopt), 'ko')
 
     pyplot.figure(5)
     pyplot.title('different gaussianness measures vs. angle')
-    pyplot.subplot(6,1,1);  pyplot.plot(thetas, array([minfnK(aa) for aa in thetas]))
-    pyplot.subplot(6,1,2);  pyplot.plot(thetas, array([minfnNEnt(aa) for aa in thetas]))
-    pyplot.subplot(6,1,3);  pyplot.plot(thetas, array([minfnLC10(aa) for aa in thetas]))
-    pyplot.subplot(6,1,4);  pyplot.plot(thetas, array([minfnLC15(aa) for aa in thetas]))
-    pyplot.subplot(6,1,5);  pyplot.plot(thetas, array([minfnLC20(aa) for aa in thetas]))
-    pyplot.subplot(6,1,6);  pyplot.plot(thetas, array([minfnNExp(aa) for aa in thetas]))
+    pyplot.subplot(6,1,1); pyplot.title('Kurt'); pyplot.plot(thetas, array([minAngleFnK(aa) for aa in thetas]))
+    pyplot.subplot(6,1,2); pyplot.title('NegEnt'); pyplot.plot(thetas, array([minAngleFnNEnt(aa) for aa in thetas]))
+    pyplot.subplot(6,1,3); pyplot.title('LogCosh10'); pyplot.plot(thetas, array([minAngleFnLC10(aa) for aa in thetas]))
+    pyplot.subplot(6,1,4); pyplot.title('LogCosh15'); pyplot.plot(thetas, array([minAngleFnLC15(aa) for aa in thetas]))
+    pyplot.subplot(6,1,5); pyplot.title('LogCosh20'); pyplot.plot(thetas, array([minAngleFnLC20(aa) for aa in thetas]))
+    pyplot.subplot(6,1,6); pyplot.title('NegExp'); pyplot.plot(thetas, array([minAngleFnNExp(aa) for aa in thetas]))
 
     Ropt = rotMat(xopt)
     Recon = dot(W, Ropt.T)
@@ -199,12 +231,13 @@ def main():
     print 'kurt(r2) =', kurt(Recon[:,1])
 
     print
-    print 'objective(s1) =', minfn(s1)
-    print 'objective(s2) =', minfn(s2)
-    print 'objective(w1) =', minfn(w1)
-    print 'objective(w2) =', minfn(w2)
-    print 'objective(r1) =', minfn(Recon[:,0])
-    print 'objective(r2) =', minfn(Recon[:,1])
+    print 'objective(s1) =', minDataFn(s1)
+    print 'objective(s2) =', minDataFn(s2)
+    print 'objective(w1) =', minDataFn(w1)
+    print 'objective(w2) =', minDataFn(w2)
+    print 'objective(r1) =', minDataFn(Recon[:,0])
+    print 'objective(r2) =', minDataFn(Recon[:,1])
+    print 'optimal theta:', xopt, '(+pi/2 =', (xopt+pi/2)%pi, ')'
 
     pyplot.figure(6)
     pyplot.subplot(4,1,1)
@@ -219,12 +252,21 @@ def main():
     pyplot.plot(tt, Recon[:,1], 'go-')
 
     #pyplot.show()
+
+    if savedir:
+        figname = lambda ii : os.path.join(savedir, 'figure_%02d.png' % ii)
+        for ii in range(6):
+            pyplot.figure(ii+1)
+            pyplot.savefig(figname(ii+1))
+
     import ipdb; ipdb.set_trace()
     
 
 
 if __name__ == '__main__':
-    main()
+    resman.start('junk', diary = False)
+    main(resman.rundir)
+    resman.stop()
     #pyplot.show()
     print 'shown'
     
