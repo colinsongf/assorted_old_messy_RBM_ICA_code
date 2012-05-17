@@ -1,7 +1,7 @@
 #! /usr/bin/env ipythonpl
 
 import pdb
-import os
+import os, sys
 from numpy import *
 from matplotlib import pyplot
 from scipy.optimize import fmin_bfgs
@@ -71,7 +71,7 @@ def rotMat(theta):
 
 
 
-def main(savedir = None):
+def main(addNoise = 0, savedir = None):
     N = 200
     tt = linspace(0, 10, N)
 
@@ -109,6 +109,11 @@ def main(savedir = None):
     print ' negexp(s2) =', negexp(s2)
     
     X = dot(S, A)
+
+    if addNoise > 0:
+        print 'Adding noise!'
+        X += random.normal(0, addNoise, X.shape)
+    
     #print 'X', X
 
     x1 = X[:,0]
@@ -252,6 +257,7 @@ def main(savedir = None):
 
 
 if __name__ == '__main__':
-    resman.start('junk', diary = True)
-    main(resman.rundir)
+    resman.start('junk', diary = False)
+    #main(addNoise = 0, resman.rundir)
+    main(addNoise = 0)
     resman.stop()
