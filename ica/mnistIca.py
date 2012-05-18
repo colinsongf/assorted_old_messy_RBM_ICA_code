@@ -16,11 +16,11 @@ from sklearn.decomposition import FastICA
 
 from rbm.ResultsManager import resman
 from rbm.pca import PCA
-from rbm.utils import tile_raster_images, load_mnist_data
+from rbm.utils import tile_raster_images, load_mnist_data, saveToFile
 
 
 
-def main(datasets, savedir = None, quickHack = False):
+def main(datasets, savedir = None, smallImgHack = False, quickHack = False):
     '''Demonstrate ICA on the MNIST data set.'''
 
     random.seed(1)
@@ -31,9 +31,13 @@ def main(datasets, savedir = None, quickHack = False):
     test_set_x,  test_set_y  = datasets[2]
 
     if quickHack:
+        print '!!! Using quickHack !!!'
         train_set_x = train_set_x[:2500,:]
         if train_set_y is not None:
             train_set_y = train_set_y[:2500]
+    if smallImgHack:
+        print '!!! Using smallImgHack !!! (images will be misaligned)'
+        train_set_x = train_set_x[:,:100]
 
     print ('(%d, %d, %d) %d dimensional examples in (train, valid, test)' % 
            (train_set_x.shape[0], valid_set_x.shape[0], test_set_x.shape[0], train_set_x.shape[1]))
@@ -45,8 +49,7 @@ def main(datasets, savedir = None, quickHack = False):
              X = train_set_x,
              img_shape = (imgDim,imgDim), tile_shape = (10,15),
              tile_spacing=(1,1)))
-    if savedir:
-        image.save(os.path.join(savedir, 'data_raw.png'))
+    if savedir:  image.save(os.path.join(savedir, 'data_raw.png'))
     image.show()
 
     pyplot.figure()
@@ -59,10 +62,10 @@ def main(datasets, savedir = None, quickHack = False):
 
 
     # 1. Whiten data
-    print 'Whitening data with pca...',; sys.stdout.flush()
+    print 'Whitening data with pca...'
     pca = PCA(train_set_x)
     xWhite = pca.toZca(train_set_x)
-    print 'done.'
+    print '  done.'
 
     pyplot.figure()
     for ii in range(20):
@@ -76,22 +79,23 @@ def main(datasets, savedir = None, quickHack = False):
              X = xWhite,
              img_shape = (imgDim,imgDim), tile_shape = (10,15),
              tile_spacing=(1,1)))
-    if savedir:
-        image.save(os.path.join(savedir, 'data_white.png'))
+    if savedir:  image.save(os.path.join(savedir, 'data_white.png'))
     image.show()
 
 
     # 2. Fit ICA
     rng = random.RandomState(1)
-    print 'Fitting ICA...',; sys.stdout.flush()
     ica = FastICA(random_state = rng, whiten = False)
+    print 'Fitting ICA...'
     ica.fit(xWhite)
-    print 'done.'
-    print 'Geting sources and mixing matrix...',; sys.stdout.flush()
+    print '  done.'
+    if savedir:  saveToFile(os.path.join(savedir, 'ica.pkl.gz'), ica)
+
+    print 'Geting sources and mixing matrix...'
     sourcesWhite = ica.transform(xWhite)  # Estimate the sources
     #S_fica /= S_fica.std(axis=0)   # (should already be done)
     mixingMatrix = ica.get_mixing_matrix()
-    print 'done.'
+    print '  done.'
 
     sources = pca.fromZca(sourcesWhite)
     
@@ -101,8 +105,25 @@ def main(datasets, savedir = None, quickHack = False):
              X = mixingMatrix,
              img_shape = (imgDim,imgDim), tile_shape = (10,15),
              tile_spacing=(1,1)))
-    if savedir:
-        image.save(os.path.join(savedir, 'ic.png'))
+    if savedir:  image.save(os.path.join(savedir, 'ic_white.png'))
+    image.show()
+    image = Image.fromarray(tile_raster_images(
+             X = mixingMatrix.T,
+             img_shape = (imgDim,imgDim), tile_shape = (10,15),
+             tile_spacing=(1,1)))
+    if savedir:  image.save(os.path.join(savedir, 'ic_white.T.png'))
+    image.show()
+    image = Image.fromarray(tile_raster_images(
+             X = pca.fromZca(mixingMatrix),
+             img_shape = (imgDim,imgDim), tile_shape = (10,15),
+             tile_spacing=(1,1)))
+    if savedir:  image.save(os.path.join(savedir, 'ic_raw.png'))
+    image.show()
+    image = Image.fromarray(tile_raster_images(
+             X = pca.fromZca(mixingMatrix.T),
+             img_shape = (imgDim,imgDim), tile_shape = (10,15),
+             tile_spacing=(1,1)))
+    if savedir:  image.save(os.path.join(savedir, 'ic_raw.T.png'))
     image.show()
 
     pyplot.figure()
@@ -117,24 +138,22 @@ def main(datasets, savedir = None, quickHack = False):
              X = sourcesWhite,
              img_shape = (imgDim,imgDim), tile_shape = (10,15),
              tile_spacing=(1,1)))
-    if savedir:
-        image.save(os.path.join(savedir, 'sources_white.png'))
+    if savedir:  image.save(os.path.join(savedir, 'sources_white.png'))
     image.show()
 
     image = Image.fromarray(tile_raster_images(
              X = sources,
              img_shape = (imgDim,imgDim), tile_shape = (10,15),
              tile_spacing=(1,1)))
-    if savedir:
-        image.save(os.path.join(savedir, 'sources_raw.png'))
+    if savedir:  image.save(os.path.join(savedir, 'sources_raw.png'))
     image.show()
 
 
     
     if savedir:
         print 'plots saved in', savedir
-
-    import ipdb; ipdb.set_trace()
+    else:
+        import ipdb; ipdb.set_trace()
 
 
 
@@ -143,8 +162,8 @@ if __name__ == '__main__':
     datasets = load_mnist_data('../data/mnist.pkl.gz', shared = False)
 
     main(datasets = datasets,
-         addNoise = 0,
-         #savedir = resman.rundir,     # comment out to show plots instead of saving
-         doFastICA = False,
+         savedir = resman.rundir,     # comment out to show plots instead of saving
+         smallImgHack = False,
+         quickHack = False,
          )
     resman.stop()
