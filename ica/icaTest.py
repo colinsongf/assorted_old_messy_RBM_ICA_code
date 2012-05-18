@@ -258,6 +258,6 @@ def main(addNoise = 0, savedir = None):
 
 if __name__ == '__main__':
     resman.start('junk', diary = False)
-    #main(addNoise = 0, resman.rundir)
+    #main(addNoise = 0, savedir = resman.rundir)
     main(addNoise = 0)
     resman.stop()
