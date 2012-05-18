@@ -10,6 +10,7 @@ import pdb
 import os, sys
 from numpy import *
 from matplotlib import pyplot
+from PIL import Image
 
 from sklearn.decomposition import FastICA
 
@@ -54,7 +55,7 @@ def main(datasets, savedir = None, quickHack = False):
         pyplot.subplot(4,5,ii+1)
         pyplot.title('raw dim %d' % idx)
         pyplot.hist(train_set_x[:,idx])
-    if savedir: pyplot.savefig('data_raw_hist.png')
+    if savedir: pyplot.savefig(os.path.join(savedir, 'data_raw_hist.png'))
 
 
     # 1. Whiten data
@@ -69,7 +70,7 @@ def main(datasets, savedir = None, quickHack = False):
         pyplot.subplot(4,5,ii+1)
         pyplot.title('white dim %d' % idx)
         pyplot.hist(xWhite[:,idx])
-    if savedir: pyplot.savefig('data_white_hist.png')
+    if savedir: pyplot.savefig(os.path.join(savedir, 'data_white_hist.png'))
 
     image = Image.fromarray(tile_raster_images(
              X = xWhite,
@@ -110,7 +111,7 @@ def main(datasets, savedir = None, quickHack = False):
         pyplot.subplot(4,5,ii+1)
         pyplot.title('sourceWhite %d' % idx)
         pyplot.hist(sourcesWhite[:,idx])
-    if savedir: pyplot.savefig('sources_white_hist.png')
+    if savedir: pyplot.savefig(os.path.join(savedir, 'sources_white_hist.png'))
 
     image = Image.fromarray(tile_raster_images(
              X = sourcesWhite,
