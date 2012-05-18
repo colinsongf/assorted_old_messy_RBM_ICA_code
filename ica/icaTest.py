@@ -71,7 +71,7 @@ def rotMat(theta):
 
 
 
-def main(addNoise = 0, savedir = None):
+def main(addNoise = 0, savedir = None, doFastICA = False):
     N = 200
     tt = linspace(0, 10, N)
 
@@ -168,7 +168,6 @@ def main(addNoise = 0, savedir = None):
     pyplot.subplot(2,2,4)
     pyplot.plot(w1, w2, 'bo')
 
-
     # Compute kurtosis at different angles
     thetas = linspace(0, pi, 100)
     kurt1 = 0 * thetas
@@ -198,16 +197,34 @@ def main(addNoise = 0, savedir = None):
     minDataFn = minfnK 
 
     minAngleFn = lambda theta: minDataFn(dot(rotMat(theta)[0,:], W.T).T)
-    angle0 = 0
-    xopt = fmin_bfgs(minAngleFn, angle0)
-    xopt = xopt[0] % pi
+
+    if doFastICA:
+        # Use FastICA from sklearn
+        #pdb.set_trace()
+        from sklearn.decomposition import FastICA
+        rng = random.RandomState(1)
+        ica = FastICA(random_state = rng, whiten = False)
+        ica.fit(W)
+        Recon = ica.transform(W)  # Estimate the sources
+        #S_fica /= S_fica.std(axis=0)   # (should already be done)
+        Ropt = ica.get_mixing_matrix()
+    else:
+        # Manually fit angle using fmin_bfgs
+        angle0 = 0
+        xopt = fmin_bfgs(minAngleFn, angle0)
+        xopt = xopt[0] % pi
+        Ropt = rotMat(xopt)
+        Recon = dot(W, Ropt.T)
 
     mnval = array([minAngleFn(aa) for aa in thetas])
 
     pyplot.figure(4)
     pyplot.title('objective vs. angle')
     #pyplot.plot(thetas, kurt1, 'bo-', thetas, mnval, 'k', xopt, minAngleFn(xopt), 'ko')
-    pyplot.plot(thetas, mnval, 'b', xopt, minAngleFn(xopt), 'ko')
+    pyplot.plot(thetas, mnval, 'b')
+    if not doFastICA:
+        pyplot.hold(True)
+        pyplot.plot(xopt, minAngleFn(xopt), 'ko')
 
     pyplot.figure(5)
     pyplot.title('different gaussianness measures vs. angle')
@@ -217,9 +234,7 @@ def main(addNoise = 0, savedir = None):
     pyplot.subplot(6,1,4); pyplot.title('LogCosh15'); pyplot.plot(thetas, array([minAngleFnLC15(aa) for aa in thetas]))
     pyplot.subplot(6,1,5); pyplot.title('LogCosh20'); pyplot.plot(thetas, array([minAngleFnLC20(aa) for aa in thetas]))
     pyplot.subplot(6,1,6); pyplot.title('NegExp'); pyplot.plot(thetas, array([minAngleFnNExp(aa) for aa in thetas]))
-
-    Ropt = rotMat(xopt)
-    Recon = dot(W, Ropt.T)
+    
     print 'kurt(r1) =', kurt(Recon[:,0])
     print 'kurt(r2) =', kurt(Recon[:,1])
 
@@ -230,7 +245,12 @@ def main(addNoise = 0, savedir = None):
     print 'objective(w2) =', minDataFn(w2)
     print 'objective(r1) =', minDataFn(Recon[:,0])
     print 'objective(r2) =', minDataFn(Recon[:,1])
-    print 'optimal theta:', xopt, '(+pi/2 =', (xopt+pi/2)%pi, ')'
+    print 'optimal theta:',
+    if doFastICA:
+        print '<not computed with FastICA>'
+    else:
+        print xopt, '(+pi/2 =', (xopt+pi/2)%pi, ')'
+    print 'Optimal rotation matrix:\n', Ropt
 
     pyplot.figure(6)
     pyplot.subplot(4,1,1)
@@ -251,13 +271,16 @@ def main(addNoise = 0, savedir = None):
         for ii in range(6):
             pyplot.figure(ii+1)
             pyplot.savefig(figname(ii+1))
-
-    import ipdb; ipdb.set_trace()
+        print 'plots saved in', savedir
+    else:
+        import ipdb; ipdb.set_trace()
     
 
 
 if __name__ == '__main__':
     resman.start('junk', diary = False)
-    #main(addNoise = 0, savedir = resman.rundir)
-    main(addNoise = 0)
+    main(addNoise = 0,
+         #savedir = resman.rundir,     # comment out to show plots instead of saving
+         doFastICA = False,
+         )
     resman.stop()
