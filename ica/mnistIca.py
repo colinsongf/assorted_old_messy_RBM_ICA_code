@@ -20,8 +20,8 @@ from rbm.utils import tile_raster_images, load_mnist_data, saveToFile
 
 
 
-def main(datasets, savedir = None, smallImgHack = False, quickHack = False):
-    '''Demonstrate ICA on the MNIST data set.'''
+def testIca(datasets, savedir = None, smallImgHack = False, quickHack = False):
+    '''Test ICA on a given dataset.'''
 
     random.seed(1)
 
@@ -158,6 +158,8 @@ def main(datasets, savedir = None, smallImgHack = False, quickHack = False):
 
 
 if __name__ == '__main__':
+    '''Demonstrate ICA on the MNIST data set.'''
+
     resman.start('junk', diary = False)
     datasets = load_mnist_data('../data/mnist.pkl.gz', shared = False)
 

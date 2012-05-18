@@ -104,6 +104,22 @@ def load_mnist_data(dataset, shared = True):
 
 
 
+def loadUpsonData(trainFile, testFile):
+    ''' Loads the dataset and returns in the expected train,valid,test format.'''
+
+    # Load the dataset
+    ff = gzip.open(trainFile,'rb')
+    train_set = pickle.load(ff)
+    ff.close()
+    ff = gzip.open(testFile,'rb')
+    test_set = pickle.load(ff)
+    ff.close()
+
+    # no validation set, no y (purely unsupervised)
+    return [train_set, None], [numpy.array([]), None], [test_set, None]
+
+
+
 ''' This file contains different utility functions that are not connected 
 in anyway to the networks presented in the tutorials, but rather help in 
 processing the outputs into a more understandable way. 

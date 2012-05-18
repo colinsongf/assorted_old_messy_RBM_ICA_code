@@ -9,23 +9,7 @@ from numpy import *
 
 from ResultsManager import resman
 from rbm import RBM, test_rbm
-
-
-
-
-def loadUpsonData(trainFile, testFile):
-    ''' Loads the dataset and returns in the expected train,valid,test format.'''
-
-    # Load the dataset
-    ff = gzip.open(trainFile,'rb')
-    train_set = pickle.load(ff)
-    ff.close()
-    ff = gzip.open(testFile,'rb')
-    test_set = pickle.load(ff)
-    ff.close()
-
-    # no validation set, no y (purely unsupervised)
-    return [train_set, None], [array([]), None], [test_set, None]
+from utils import loadUpsonData
 
 
 
