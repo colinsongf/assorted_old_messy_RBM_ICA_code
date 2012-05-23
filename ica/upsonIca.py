@@ -6,17 +6,8 @@ Research code
 Jason Yosinski
 '''
 
-import pdb
-import os, sys
-from numpy import *
-from matplotlib import pyplot
-from PIL import Image
-
-from sklearn.decomposition import FastICA
-
 from rbm.ResultsManager import resman
-from rbm.pca import PCA
-from rbm.utils import tile_raster_images, load_mnist_data, loadUpsonData, saveToFile
+from rbm.utils import loadUpsonData
 from mnistIca import testIca
 
 
