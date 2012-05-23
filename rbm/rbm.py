@@ -79,9 +79,9 @@ class RBM(object):
 
     def free_energy(self, v_sample):
         ''' Function to compute the free energy '''
-        wx_b = T.dot(v_sample, self.W) + self.hbias
-        vbias_term = T.dot(v_sample, self.vbias)
-        hidden_term = T.sum(T.log(1+T.exp(wx_b)),axis = 1)
+        wx_b = dot(v_sample, self.W) + self.hbias
+        vbias_term = dot(v_sample, self.vbias)
+        hidden_term = sum(log(1+exp(wx_b)), axis = -1)
         return -hidden_term - vbias_term
 
 
@@ -151,7 +151,8 @@ class RBM(object):
         return [pre_sigmoid_h1, h1_mean, h1_sample, pre_sigmoid_v1, v1_mean, v1_sample]
 
 
-    def train(self, train_x, lr = 0.1, persistent = None, k = 1, metrics = False, plotWeights = False):
+    def train(self, train_x, lr = 0.1, persistent = None, k = 1, metrics = False,
+              plotWeights = False, output_dir = 'rbm_plots'):
         '''
         This functions implements one step of CD-k or PCD-k (no PCD yet)
 
@@ -208,16 +209,16 @@ class RBM(object):
             pyplot.subplot(234); self.plotWeightHist(dvbias)
             pyplot.subplot(235); self.plotWeightHist(dW.flatten())
             pyplot.subplot(236); self.plotWeightHist(dhbias)
-            pyplot.savefig(os.path.join(resman.rundir, 'weightHist_%s' % plotWeights))
+            pyplot.savefig(os.path.join(output_dir, 'weightHist_%s' % plotWeights))
             pyplot.close()
             
             #pyplot.figure()
             #pyplot.imshow(ph1_mean, cmap='gray', interpolation='nearest', vmin=0, vmax=1)
-            #pyplot.savefig(os.path.join(resman.rundir, 'hiddenProb_%05d' % self.trainIter))
+            #pyplot.savefig(os.path.join(output_dir, 'hiddenProb_%05d' % self.trainIter))
             #pyplot.close()
 
             image = Image.fromarray(ph1_mean * 256)
-            image.convert('L').save(os.path.join(resman.rundir, 'hiddenProb_%s.png' % plotWeights))
+            image.convert('L').save(os.path.join(output_dir, 'hiddenProb_%s.png' % plotWeights))
 
             self.vbias += dvbias
             self.hbias += dhbias
@@ -387,7 +388,8 @@ def test_rbm(learning_rate=0.1, training_epochs = 15,
 
             # metric is xEntropyCost, reconError
             metric = rbm.train(train_set_x[batch_index*batch_size:(batch_index+1)*batch_size],
-                               lr = learning_rate, metrics = calcMetrics, plotWeights = plotWeights)
+                               lr = learning_rate, metrics = calcMetrics, plotWeights = plotWeights,
+                               output_dir = output_dir)
 
             if calcMetrics:
                 if len(metrics) == 0:

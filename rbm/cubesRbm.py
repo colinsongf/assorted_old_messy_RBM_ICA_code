@@ -34,7 +34,7 @@ if __name__ == '__main__':
                               n_hidden = 200, 
                               learning_rate = .1, 
                               output_dir = resman.rundir,
-                              quickHack = false,
+                              quickHack = False,
                               imgPlotFunction = lambda xx: xx[:,0:img_dim*img_dim],  # HACK: plot first slice
                               )
     resman.stop()
