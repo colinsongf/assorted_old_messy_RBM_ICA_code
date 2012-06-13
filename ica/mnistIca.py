@@ -30,6 +30,7 @@ def testIca(datasets, savedir = None, smallImgHack = False, quickHack = False):
     valid_set_x, valid_set_y = datasets[1]
     test_set_x,  test_set_y  = datasets[2]
 
+    pdb.set_trace()
     if quickHack:
         print '!!! Using quickHack !!!'
         train_set_x = train_set_x[:2500,:]
@@ -163,9 +164,9 @@ if __name__ == '__main__':
     resman.start('junk', diary = False)
     datasets = load_mnist_data('../data/mnist.pkl.gz', shared = False)
 
-    main(datasets = datasets,
-         savedir = resman.rundir,     # comment out to show plots instead of saving
-         smallImgHack = False,
-         quickHack = False,
-         )
+    testIca(datasets = datasets,
+            savedir = resman.rundir,     # comment out to show plots instead of saving
+            smallImgHack = False,
+            quickHack = False,
+            )
     resman.stop()
