@@ -74,7 +74,7 @@ def testIca(datasets, savedir = None, smallImgHack = False, quickHack = False):
     for ii in range(20):
         idx = randIdxWhite[ii]
         pyplot.subplot(4,5,ii+1)
-        pyplot.title('white dim %d' % idx)
+        pyplot.title('data white dim %d' % idx)
         pyplot.hist(xWhite[:,idx])
     if savedir: pyplot.savefig(os.path.join(savedir, 'data_white_hist.png'))
 
@@ -87,7 +87,7 @@ def testIca(datasets, savedir = None, smallImgHack = False, quickHack = False):
 
     pyplot.figure()
     pyplot.hold(True)
-    pyplot.title('white random dims 0-20')
+    pyplot.title('data white 20 random dims')
     histMax = 0
     histMin = 1e10
     for ii in range(20):
@@ -164,6 +164,27 @@ def testIca(datasets, savedir = None, smallImgHack = False, quickHack = False):
              tile_spacing=(1,1)))
     if savedir:  image.save(os.path.join(savedir, 'sources_white.png'))
     image.show()
+
+    pyplot.figure()
+    pyplot.hold(True)
+    pyplot.title('sources white 20 random dims')
+    histMax = 0
+    histMin = 1e10
+    for ii in range(20):
+        idx = randIdxSource[ii]
+        hist, binEdges = histogram(sourcesWhite[:,idx], bins = 20, density = True)
+        histMax = max(histMax, max(hist))
+        histMin = min(histMin, min(hist[hist != 0]))   # min non-zero entry
+        binMiddles = binEdges[:-1] + (binEdges[1] - binEdges[0])/2
+        #print ' %d from %f to %f' % (ii, min(binMiddles), max(binMiddles))
+        pyplot.semilogy(binMiddles, hist, '.-')
+    pyplot.axis('tight')
+    ax = looser(pyplot.axis(), semilogy = True)
+    xAbsMax = max(fabs(ax[0:2]))
+    xx = linspace(-xAbsMax, xAbsMax, 100)
+    pyplot.semilogy(xx, mlab.normpdf(xx, 0, 1), 'k', linewidth = 3)
+    pyplot.axis((-xAbsMax, xAbsMax, ax[2], ax[3]))
+    if savedir: pyplot.savefig(os.path.join(savedir, 'sources_white_log_hist.png'))
 
     image = Image.fromarray(tile_raster_images(
              X = sources,
