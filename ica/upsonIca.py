@@ -6,9 +6,9 @@ Research code
 Jason Yosinski
 '''
 
-from rbm.ResultsManager import resman
+from ica import testIca
 from rbm.utils import loadUpsonData
-from mnistIca import testIca
+from rbm.ResultsManager import resman
 
 
 
