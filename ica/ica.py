@@ -9,14 +9,14 @@ Jason Yosinski
 import pdb
 import os, sys
 from numpy import *
-from matplotlib import pyplot
+from matplotlib import pyplot, mlab
 from PIL import Image
 
 from sklearn.decomposition import FastICA
 
 from rbm.ResultsManager import resman
 from rbm.pca import PCA
-from rbm.utils import tile_raster_images, load_mnist_data, saveToFile
+from rbm.utils import tile_raster_images, load_mnist_data, saveToFile, looser
 
 
 
@@ -44,7 +44,11 @@ def testIca(datasets, savedir = None, smallImgHack = False, quickHack = False):
 
     nDim = train_set_x.shape[1]
     imgDim = int(round(sqrt(nDim)))    # Might not always be true...
-    
+
+    randIdxRaw    = random.randint(0, nDim, 100)
+    randIdxWhite  = random.randint(0, nDim, 100)
+    randIdxSource = random.randint(0, nDim, 100)
+
     image = Image.fromarray(tile_raster_images(
              X = train_set_x,
              img_shape = (imgDim,imgDim), tile_shape = (10,15),
@@ -54,12 +58,11 @@ def testIca(datasets, savedir = None, smallImgHack = False, quickHack = False):
 
     pyplot.figure()
     for ii in range(20):
-        idx = random.randint(0, nDim)
+        idx = randIdxRaw[ii]
         pyplot.subplot(4,5,ii+1)
         pyplot.title('raw dim %d' % idx)
         pyplot.hist(train_set_x[:,idx])
     if savedir: pyplot.savefig(os.path.join(savedir, 'data_raw_hist.png'))
-
 
     # 1. Whiten data
     print 'Whitening data with pca...'
@@ -69,7 +72,7 @@ def testIca(datasets, savedir = None, smallImgHack = False, quickHack = False):
 
     pyplot.figure()
     for ii in range(20):
-        idx = random.randint(0, nDim)
+        idx = randIdxWhite[ii]
         pyplot.subplot(4,5,ii+1)
         pyplot.title('white dim %d' % idx)
         pyplot.hist(xWhite[:,idx])
@@ -81,6 +84,27 @@ def testIca(datasets, savedir = None, smallImgHack = False, quickHack = False):
              tile_spacing=(1,1)))
     if savedir:  image.save(os.path.join(savedir, 'data_white.png'))
     image.show()
+
+    pyplot.figure()
+    pyplot.hold(True)
+    pyplot.title('white random dims 0-20')
+    histMax = 0
+    histMin = 1e10
+    for ii in range(20):
+        idx = randIdxWhite[ii]
+        hist, binEdges = histogram(xWhite[:,idx], bins = 20, density = True)
+        histMax = max(histMax, max(hist))
+        histMin = min(histMin, min(hist[hist != 0]))   # min non-zero entry
+        binMiddles = binEdges[:-1] + (binEdges[1] - binEdges[0])/2
+        #print ' %d from %f to %f' % (ii, min(binMiddles), max(binMiddles))
+        pyplot.semilogy(binMiddles, hist, '.-')
+    pyplot.axis('tight')
+    ax = looser(pyplot.axis(), semilogy = True)
+    xAbsMax = max(fabs(ax[0:2]))
+    xx = linspace(-xAbsMax, xAbsMax, 100)
+    pyplot.semilogy(xx, mlab.normpdf(xx, 0, 1), 'k', linewidth = 3)
+    pyplot.axis((-xAbsMax, xAbsMax, ax[2], ax[3]))
+    if savedir: pyplot.savefig(os.path.join(savedir, 'data_white_log_hist.png'))
 
 
     # 2. Fit ICA
@@ -128,7 +152,7 @@ def testIca(datasets, savedir = None, smallImgHack = False, quickHack = False):
 
     pyplot.figure()
     for ii in range(20):
-        idx = random.randint(0, nDim)
+        idx = randIdxSource[ii]
         pyplot.subplot(4,5,ii+1)
         pyplot.title('sourceWhite %d' % idx)
         pyplot.hist(sourcesWhite[:,idx])
