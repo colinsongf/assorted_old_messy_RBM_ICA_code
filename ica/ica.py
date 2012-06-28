@@ -85,6 +85,7 @@ def testIca(datasets, savedir = None, smallImgHack = False, quickHack = False):
     if savedir:  image.save(os.path.join(savedir, 'data_white.png'))
     image.show()
 
+    # 1.1 plot hist
     pyplot.figure()
     pyplot.hold(True)
     pyplot.title('data white 20 random dims')
@@ -106,6 +107,18 @@ def testIca(datasets, savedir = None, smallImgHack = False, quickHack = False):
     pyplot.axis((-xAbsMax, xAbsMax, ax[2], ax[3]))
     if savedir: pyplot.savefig(os.path.join(savedir, 'data_white_log_hist.png'))
 
+    # 1.2 plot points
+    pyplot.figure()
+    pyplot.hold(True)
+    pyplot.title('data white 20 random dims')
+    nSamples = min(xWhite.shape[0], 1000)
+    print 'data_white_log_points plotted with', nSamples, 'samples.'
+    for ii in range(10):
+        idx = randIdxWhite[ii]
+        pyplot.plot(xWhite[:nSamples,idx],
+                    ii + random.uniform(-.25, .25, nSamples), 'o')
+    pyplot.axis('tight')
+    if savedir: pyplot.savefig(os.path.join(savedir, 'data_white_log_points.png'))
 
     # 2. Fit ICA
     rng = random.RandomState(1)
@@ -165,6 +178,7 @@ def testIca(datasets, savedir = None, smallImgHack = False, quickHack = False):
     if savedir:  image.save(os.path.join(savedir, 'sources_white.png'))
     image.show()
 
+    # 3.1 plot hist
     pyplot.figure()
     pyplot.hold(True)
     pyplot.title('sources white 20 random dims')
@@ -185,6 +199,20 @@ def testIca(datasets, savedir = None, smallImgHack = False, quickHack = False):
     pyplot.semilogy(xx, mlab.normpdf(xx, 0, 1), 'k', linewidth = 3)
     pyplot.axis((-xAbsMax, xAbsMax, ax[2], ax[3]))
     if savedir: pyplot.savefig(os.path.join(savedir, 'sources_white_log_hist.png'))
+
+    # 3.2 plot points
+    pyplot.figure()
+    pyplot.hold(True)
+    pyplot.title('sources white 20 random dims')
+    nSamples = min(sourcesWhite.shape[0], 1000)
+    print 'sources_white_log_points plotted with', nSamples, 'samples.'
+    for ii in range(10):
+        idx = randIdxWhite[ii]
+        pyplot.plot(sourcesWhite[:nSamples,idx],
+                    ii + random.uniform(-.25, .25, nSamples), 'o')
+    pyplot.axis('tight')
+    if savedir: pyplot.savefig(os.path.join(savedir, 'sources_white_log_points.png'))
+
 
     image = Image.fromarray(tile_raster_images(
              X = sources,
