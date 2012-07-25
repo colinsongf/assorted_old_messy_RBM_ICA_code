@@ -35,7 +35,7 @@ def loadCifarData(cifarDirectory):
     classNames = batchMeta['label_names']
 
     # no validation set,
-    return ([train_set_x, train_set_y], [array([]), None], [test_set_x, test_set_y]), classNames
+    return [[train_set_x, train_set_y], [array([]), None], [test_set_x, test_set_y]], classNames
 
 
 
@@ -53,4 +53,4 @@ def loadCifarDataMonochrome(cifarDirectory):
     test_set_x_mono /= 3
 
     # no validation set,
-    return ([train_set_x_mono, datasets[0][1]], datasets[1], [test_set_x_mono, datasets[2][1]]), classNames
+    return [[train_set_x_mono, datasets[0][1]], datasets[1], [test_set_x_mono, datasets[2][1]]], classNames
