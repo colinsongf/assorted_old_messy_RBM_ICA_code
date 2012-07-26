@@ -254,271 +254,271 @@ def tile_raster_images(X, img_shape, tile_shape, tile_spacing = (0,0),
 
 
 
-def fmtSeconds(sec):
-    sign = ''
-    if sec < 0:
-        sign = '-'
-        sec = -sec
-    hours, remainder = divmod(sec, 3600)
-    minutes, seconds = divmod(remainder, 60)
-    if hours > 0:
-        return sign + '%d:%02d:%02d' % (hours, minutes, int(seconds)) + ('%.3f' % (seconds-int(seconds)))[1:]
-    elif minutes > 0:
-        return sign + '%d:%02d' % (minutes, int(seconds)) + ('%.3f' % (seconds-int(seconds)))[1:]
-    else:
-        return sign + '%d' % int(seconds) + ('%.3f' % (seconds-int(seconds)))[1:]
-
-
-
-class OutstreamHandler(object):
-    def __init__(self, writeHandler, flushHandler):
-        self.writeHandler = writeHandler
-        self.flushHandler = flushHandler
-
-    def write(self, message):
-        self.writeHandler(message)
-
-    def flush(self):
-        self.flushHandler()
-
-
-
-class OutputLogger(object):
-    '''A logging utility to override sys.stdout'''
-
-    '''Buffer states'''
-    class BState:
-        EMPTY  = 0
-        STDOUT = 1
-        STDERR = 2
-            
-    def __init__(self, filename):
-        self.stdout = sys.stdout
-        self.stderr = sys.stderr
-        self.log = logging.getLogger('autologger')
-        self.log.propagate = False
-        self.log.setLevel(logging.DEBUG)
-        self.fileHandler = logging.FileHandler(filename)
-        formatter = logging.Formatter('%(asctime)s.%(msecs)03d %(message)s', datefmt='%y.%m.%d.%H.%M.%S')
-        self.fileHandler.setFormatter(formatter)
-        self.log.addHandler(self.fileHandler)
-
-        self.stdOutHandler = OutstreamHandler(self.handleWriteOut,
-                                              self.handleFlushOut)
-        self.stdErrHandler = OutstreamHandler(self.handleWriteErr,
-                                              self.handleFlushErr)
-        self.buffer = ''
-        self.bufferState = self.BState.EMPTY
-        self.started = False
-
-
-    def startCapture(self):
-        if self.started:
-            raise Exception('ERROR: OutputLogger capture was already started.')
-        self.started = True
-        sys.stdout = self.stdOutHandler
-        sys.stderr = self.stdErrHandler
-
-    def finishCapture(self):
-        if not self.started:
-            raise Exception('ERROR: OutputLogger capture was not started.')
-        self.started = False
-        self.flush()
-        sys.stdout = self.stdout
-        sys.stderr = self.stderr
-
-    def handleWriteOut(self, message):
-        self.write(message, self.BState.STDOUT)
-        
-    def handleWriteErr(self, message):
-        self.write(message, self.BState.STDERR)
-
-    def handleFlushOut(self):
-        self.flush()
-        
-    def handleFlushErr(self):
-        self.flush()
-        
-    def write(self, message, destination):
-        if destination == self.BState.STDOUT:
-            self.stdout.write(message)
-        else:
-            self.stderr.write(message)
-        
-        if destination == self.bufferState or self.bufferState == self.BState.EMPTY:
-            self.buffer += message
-            self.bufferState = destination
-        else:
-            # flush and change buffer
-            self.flush()
-            assert(self.buffer == '')
-            self.bufferState = destination
-            self.buffer = '' + message
-        if '\n' in self.buffer:
-            self.flush()
-
-    def flush(self):
-        self.stdout.flush()
-        self.stderr.flush()
-        if self.bufferState != self.BState.EMPTY:
-            if len(self.buffer) > 0 and self.buffer[-1] == '\n':
-                self.buffer = self.buffer[:-1]
-            if self.bufferState == self.BState.STDOUT:
-                for line in self.buffer.split('\n'):
-                    self.log.info('  ' + line)
-            elif self.bufferState == self.BState.STDERR:
-                for line in self.buffer.split('\n'):
-                    self.log.info('* ' + line)
-            self.buffer = ''
-            self.bufferState = self.BState.EMPTY
-        self.fileHandler.flush()
-
-
-
-def gitExecutable():
-    return 'git'
-
-
-
-def runCmd(args):
-    proc = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    out,err = proc.communicate()
-    code = proc.wait()
-
-    if code != 0:
-        print out
-        print err
-        raise Exception('Got error from running command with args ' + repr(args))
-
-    return out, err
-
-
-
-def gitLastCommit():
-    return runCmd(('git', 'rev-parse', '--short', 'HEAD'))[0].strip()
-
-
-
-def gitCurrentBranch():
-    out, err = runCmd(('git', 'branch'))
-    for line in out.split('\n'):
-        if len(line) > 2 and line[0] == '*':
-            return line[2:]
-    raise Exception('Error getting current branch from git stdout/stderr %s, %s.' % (repr(out), repr(err)))
-
-
-
-def gitStatus():
-    return runCmd(('git', 'status'))[0].strip()
-
-
-
-def gitDiff(color = False):
-    if color:
-        return runCmd(('git', 'diff', '--color'))[0].strip()
-    else:
-        return runCmd(('git', 'diff'))[0].strip()
-
-
-
-def hostname():
-    return runCmd('hostname')[0].strip()
-
-
-
-RESULTS_SUBDIR = 'results'
-
-class ResultsManager(object):
-    '''Creates directory for results'''
-
-    def __init__(self, resultsSubdir = None):
-        self._resultsSubdir = resultsSubdir
-        if self._resultsSubdir is None:
-            self._resultsSubdir = RESULTS_SUBDIR
-        if not stat.S_ISDIR(os.stat(self._resultsSubdir).st_mode):
-            raise Exception('Please create the results directory "%s" first.' % resultsSubdir)
-        self._name = None
-        self._outLogger = None
-        self.diary = None
-        
-    def start(self, description = '', diary = True):
-        if self._name is not None:
-            self.finish()
-        self.diary = diary
-        lastCommit = gitLastCommit()
-        curBranch = gitCurrentBranch()
-        timestamp = datetime.datetime.now().strftime('%y%m%d_%H%M%S')
-
-        basename = '%s_%s_%s' % (timestamp, lastCommit, curBranch)
-        if description:
-            basename += '_%s' % description
-        success = False
-        ii = 0
-        while not success:
-            name = basename + ('_%d' % ii if ii > 0 else '')
-            try:
-                os.mkdir(os.path.join(self._resultsSubdir, name))
-                success = True
-            except OSError:
-                print >>sys.stderr, name, 'already exists, appending suffix to name'
-                ii += 1
-        self._name = name
-
-        if self.diary:
-            self._outLogger = OutputLogger(os.path.join(self.rundir, 'diary'))
-            self._outLogger.startCapture()
-
-        self.startWall = time.time()
-        self.startProc = time.clock()
-
-        # print the command that was executed
-        print '  Logging directory:', self.rundir
-        print '        Command run:', ' '.join(sys.argv)
-        print '           Hostname:', hostname()
-        print '  Working directory:', os.getcwd()
-        if not self.diary:
-            print '<diary not saved>'
-            # just log these three lines
-            with open(os.path.join(self.rundir, 'diary'), 'w') as ff:
-                print >>ff, '  Logging directory:', self.rundir
-                print >>ff, '        Command run:', ' '.join(sys.argv)
-                print >>ff, '           Hostname:', hostname()
-                print >>ff, '  Working directory:', os.getcwd()
-                print >>ff, '<diary not saved>'
-
-        with open(os.path.join(self.rundir, 'gitinfo'), 'w') as ff:
-            ff.write('%s %s\n' % (lastCommit, curBranch))
-        with open(os.path.join(self.rundir, 'gitstat'), 'w') as ff:
-            ff.write(gitStatus() + '\n')
-        with open(os.path.join(self.rundir, 'gitdiff'), 'w') as ff:
-            ff.write(gitDiff() + '\n')
-        with open(os.path.join(self.rundir, 'gitcolordiff'), 'w') as ff:
-            ff.write(gitDiff(color=True) + '\n')
-
-    def stop(self):
-        # TODO: output timing info?
-        if not self.diary:
-            # just log these couple lines before resetting our name
-            with open(os.path.join(self.rundir, 'diary'), 'a') as ff:
-                print >>ff, '       Wall time: ', fmtSeconds(time.time() - self.startWall)
-                print >>ff, '  Processor time: ', fmtSeconds(time.clock() - self.startProc)
-        self._name = None
-        print '       Wall time: ', fmtSeconds(time.time() - self.startWall)
-        print '  Processor time: ', fmtSeconds(time.clock() - self.startProc)
-        if self.diary:
-            self._outLogger.finishCapture()
-            self._outLogger = None
-
-
-    @property
-    def rundir(self):
-        if self._name:
-            return os.path.join(self._resultsSubdir, self._name)
-
-    @property
-    def runname(self):
-        return self._name
-
+#def fmtSeconds(sec):
+#    sign = ''
+#    if sec < 0:
+#        sign = '-'
+#        sec = -sec
+#    hours, remainder = divmod(sec, 3600)
+#    minutes, seconds = divmod(remainder, 60)
+#    if hours > 0:
+#        return sign + '%d:%02d:%02d' % (hours, minutes, int(seconds)) + ('%.3f' % (seconds-int(seconds)))[1:]
+#    elif minutes > 0:
+#        return sign + '%d:%02d' % (minutes, int(seconds)) + ('%.3f' % (seconds-int(seconds)))[1:]
+#    else:
+#        return sign + '%d' % int(seconds) + ('%.3f' % (seconds-int(seconds)))[1:]
+#
+#
+#
+#class OutstreamHandler(object):
+#    def __init__(self, writeHandler, flushHandler):
+#        self.writeHandler = writeHandler
+#        self.flushHandler = flushHandler
+#
+#    def write(self, message):
+#        self.writeHandler(message)
+#
+#    def flush(self):
+#        self.flushHandler()
+#
+#
+#
+#class OutputLogger(object):
+#    '''A logging utility to override sys.stdout'''
+#
+#    '''Buffer states'''
+#    class BState:
+#        EMPTY  = 0
+#        STDOUT = 1
+#        STDERR = 2
+#            
+#    def __init__(self, filename):
+#        self.stdout = sys.stdout
+#        self.stderr = sys.stderr
+#        self.log = logging.getLogger('autologger')
+#        self.log.propagate = False
+#        self.log.setLevel(logging.DEBUG)
+#        self.fileHandler = logging.FileHandler(filename)
+#        formatter = logging.Formatter('%(asctime)s.%(msecs)03d %(message)s', datefmt='%y.%m.%d.%H.%M.%S')
+#        self.fileHandler.setFormatter(formatter)
+#        self.log.addHandler(self.fileHandler)
+#
+#        self.stdOutHandler = OutstreamHandler(self.handleWriteOut,
+#                                              self.handleFlushOut)
+#        self.stdErrHandler = OutstreamHandler(self.handleWriteErr,
+#                                              self.handleFlushErr)
+#        self.buffer = ''
+#        self.bufferState = self.BState.EMPTY
+#        self.started = False
+#
+#
+#    def startCapture(self):
+#        if self.started:
+#            raise Exception('ERROR: OutputLogger capture was already started.')
+#        self.started = True
+#        sys.stdout = self.stdOutHandler
+#        sys.stderr = self.stdErrHandler
+#
+#    def finishCapture(self):
+#        if not self.started:
+#            raise Exception('ERROR: OutputLogger capture was not started.')
+#        self.started = False
+#        self.flush()
+#        sys.stdout = self.stdout
+#        sys.stderr = self.stderr
+#
+#    def handleWriteOut(self, message):
+#        self.write(message, self.BState.STDOUT)
+#        
+#    def handleWriteErr(self, message):
+#        self.write(message, self.BState.STDERR)
+#
+#    def handleFlushOut(self):
+#        self.flush()
+#        
+#    def handleFlushErr(self):
+#        self.flush()
+#        
+#    def write(self, message, destination):
+#        if destination == self.BState.STDOUT:
+#            self.stdout.write(message)
+#        else:
+#            self.stderr.write(message)
+#        
+#        if destination == self.bufferState or self.bufferState == self.BState.EMPTY:
+#            self.buffer += message
+#            self.bufferState = destination
+#        else:
+#            # flush and change buffer
+#            self.flush()
+#            assert(self.buffer == '')
+#            self.bufferState = destination
+#            self.buffer = '' + message
+#        if '\n' in self.buffer:
+#            self.flush()
+#
+#    def flush(self):
+#        self.stdout.flush()
+#        self.stderr.flush()
+#        if self.bufferState != self.BState.EMPTY:
+#            if len(self.buffer) > 0 and self.buffer[-1] == '\n':
+#                self.buffer = self.buffer[:-1]
+#            if self.bufferState == self.BState.STDOUT:
+#                for line in self.buffer.split('\n'):
+#                    self.log.info('  ' + line)
+#            elif self.bufferState == self.BState.STDERR:
+#                for line in self.buffer.split('\n'):
+#                    self.log.info('* ' + line)
+#            self.buffer = ''
+#            self.bufferState = self.BState.EMPTY
+#        self.fileHandler.flush()
+#
+#
+#
+#def gitExecutable():
+#    return 'git'
+#
+#
+#
+#def runCmd(args):
+#    proc = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+#    out,err = proc.communicate()
+#    code = proc.wait()
+#
+#    if code != 0:
+#        print out
+#        print err
+#        raise Exception('Got error from running command with args ' + repr(args))
+#
+#    return out, err
+#
+#
+#
+#def gitLastCommit():
+#    return runCmd(('git', 'rev-parse', '--short', 'HEAD'))[0].strip()
+#
+#
+#
+#def gitCurrentBranch():
+#    out, err = runCmd(('git', 'branch'))
+#    for line in out.split('\n'):
+#        if len(line) > 2 and line[0] == '*':
+#            return line[2:]
+#    raise Exception('Error getting current branch from git stdout/stderr %s, %s.' % (repr(out), repr(err)))
+#
+#
+#
+#def gitStatus():
+#    return runCmd(('git', 'status'))[0].strip()
+#
+#
+#
+#def gitDiff(color = False):
+#    if color:
+#        return runCmd(('git', 'diff', '--color'))[0].strip()
+#    else:
+#        return runCmd(('git', 'diff'))[0].strip()
+#
+#
+#
+#def hostname():
+#    return runCmd('hostname')[0].strip()
+#
+#
+#
+#RESULTS_SUBDIR = 'results'
+#
+#class ResultsManager(object):
+#    '''Creates directory for results'''
+#
+#    def __init__(self, resultsSubdir = None):
+#        self._resultsSubdir = resultsSubdir
+#        if self._resultsSubdir is None:
+#            self._resultsSubdir = RESULTS_SUBDIR
+#        if not stat.S_ISDIR(os.stat(self._resultsSubdir).st_mode):
+#            raise Exception('Please create the results directory "%s" first.' % resultsSubdir)
+#        self._name = None
+#        self._outLogger = None
+#        self.diary = None
+#        
+#    def start(self, description = '', diary = True):
+#        if self._name is not None:
+#            self.finish()
+#        self.diary = diary
+#        lastCommit = gitLastCommit()
+#        curBranch = gitCurrentBranch()
+#        timestamp = datetime.datetime.now().strftime('%y%m%d_%H%M%S')
+#
+#        basename = '%s_%s_%s' % (timestamp, lastCommit, curBranch)
+#        if description:
+#            basename += '_%s' % description
+#        success = False
+#        ii = 0
+#        while not success:
+#            name = basename + ('_%d' % ii if ii > 0 else '')
+#            try:
+#                os.mkdir(os.path.join(self._resultsSubdir, name))
+#                success = True
+#            except OSError:
+#                print >>sys.stderr, name, 'already exists, appending suffix to name'
+#                ii += 1
+#        self._name = name
+#
+#        if self.diary:
+#            self._outLogger = OutputLogger(os.path.join(self.rundir, 'diary'))
+#            self._outLogger.startCapture()
+#
+#        self.startWall = time.time()
+#        self.startProc = time.clock()
+#
+#        # print the command that was executed
+#        print '  Logging directory:', self.rundir
+#        print '        Command run:', ' '.join(sys.argv)
+#        print '           Hostname:', hostname()
+#        print '  Working directory:', os.getcwd()
+#        if not self.diary:
+#            print '<diary not saved>'
+#            # just log these three lines
+#            with open(os.path.join(self.rundir, 'diary'), 'w') as ff:
+#                print >>ff, '  Logging directory:', self.rundir
+#                print >>ff, '        Command run:', ' '.join(sys.argv)
+#                print >>ff, '           Hostname:', hostname()
+#                print >>ff, '  Working directory:', os.getcwd()
+#                print >>ff, '<diary not saved>'
+#
+#        with open(os.path.join(self.rundir, 'gitinfo'), 'w') as ff:
+#            ff.write('%s %s\n' % (lastCommit, curBranch))
+#        with open(os.path.join(self.rundir, 'gitstat'), 'w') as ff:
+#            ff.write(gitStatus() + '\n')
+#        with open(os.path.join(self.rundir, 'gitdiff'), 'w') as ff:
+#            ff.write(gitDiff() + '\n')
+#        with open(os.path.join(self.rundir, 'gitcolordiff'), 'w') as ff:
+#            ff.write(gitDiff(color=True) + '\n')
+#
+#    def stop(self):
+#        # TODO: output timing info?
+#        if not self.diary:
+#            # just log these couple lines before resetting our name
+#            with open(os.path.join(self.rundir, 'diary'), 'a') as ff:
+#                print >>ff, '       Wall time: ', fmtSeconds(time.time() - self.startWall)
+#                print >>ff, '  Processor time: ', fmtSeconds(time.clock() - self.startProc)
+#        self._name = None
+#        print '       Wall time: ', fmtSeconds(time.time() - self.startWall)
+#        print '  Processor time: ', fmtSeconds(time.clock() - self.startProc)
+#        if self.diary:
+#            self._outLogger.finishCapture()
+#            self._outLogger = None
+#
+#
+#    @property
+#    def rundir(self):
+#        if self._name:
+#            return os.path.join(self._resultsSubdir, self._name)
+#
+#    @property
+#    def runname(self):
+#        return self._name
+#
 
 
 def imagesc(W, pixwidth=1, ax=None, grayscale=True):

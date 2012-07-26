@@ -1,0 +1,46 @@
+#! /usr/bin/env python
+
+import argparse
+import subprocess
+import sys
+from ResultsManager import ResultsManager, resman
+from argparse import RawTextHelpFormatter
+
+
+
+if __name__ == '__main__':
+    description = '''Start or stop a run with the Results Manager. Usage:
+    # starts a run with default name of junk
+    %s --start
+
+    # starts a run with the name foo
+    %s --name foo --start
+
+    # stops the run at the given path, wrapping up the diary by appending the total elapsed wall time.
+    %s --stop results/120726_160522_6d9ab2_master_junk ''' % (sys.argv[0], sys.argv[0], sys.argv[0])
+    parser = argparse.ArgumentParser(description=description, formatter_class=RawTextHelpFormatter)
+    parser.add_argument('--name', metavar = 'name', type = str,
+                        default = 'junk',
+                        help='Name of run for ResultsManager. Default: junk')
+    parser.add_argument('--start', action = 'store_true',
+                        help='Start logging.')
+    parser.add_argument('--stop', type = str, nargs = 1,
+                        help='Stop logging.')
+
+    args = parser.parse_args()
+
+    if args.start == bool(args.stop):
+        parser.error('Must specify exactly one of --start and --stop.')
+
+    if args.start:
+        resman.start(args.name, diary = True)
+        print
+        print resman.rundir
+        print '---------- External mode: start ----------'
+    elif args.stop:
+        print 'stop is', args.stop
+        print '---------- External mode: stop  ----------'
+        resumedResman = ResultsManager(resumeExistingRun = args.stop[0])
+        resumedResman.stop()
+    else:
+        raise Exception('Logic error: expected start or stop to be true')
