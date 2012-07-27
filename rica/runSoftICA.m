@@ -1,9 +1,11 @@
 %% Note: This sample code requires minFunc to run.
 %        But you can use softICACost.m with your own optimizer of choice.
 clear all;
-addpath ~/work/RNN/minFunc/   % this should point to minFunc
+%addpath ~/work/RNN/minFunc/   % this should point to minFunc
                               % http://www.di.ens.fr/~mschmidt/Software/minFunc.html
                               % minFunc 2009 seems to work well
+addpath ~/s/deep_learning/rica/minFunc/
+
 %% Load and configure a training dataset
 global params;
 params.m=20000;                 % num patches
@@ -40,8 +42,15 @@ randTheta = randTheta(:);
 % optimize
 [opttheta, cost, exitflag] = minFunc( @(theta) softICACost(theta, x, params), randTheta, options);   % Use x or xw 
 
+% Save or load
+if resman_rundir()
+    filename = [resman_rundir() '/opttheta.oct'];
+    save('-binary', filename, 'opttheta', 'cost', 'exitflag');
+    disp(sprintf('saved optimization results to %s', filename));
+end
+%load('opttheta.oct')
+
 % display result
 W = reshape(opttheta, params.numFeatures, params.n);
+
 display_network(W');
-
-

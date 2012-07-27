@@ -1,10 +1,8 @@
-
-
 % QUOC/NGIAM: Because we'd like to get students into the habit of commenting their code, please
 % add some appropriate comments to this function too.
 function [h, array] = display_network(A, opt_normalize, opt_graycolor, cols, opt_colmajor)
 
-warning off all
+%warning off all
 
 if ~exist('opt_normalize', 'var') || isempty(opt_normalize)
     opt_normalize= true;
@@ -83,12 +81,14 @@ else
 end
 
 if opt_graycolor
-    h=imagesc(array,'EraseMode','none',[-1 1]);
+    %h=imagesc(array,'EraseMode','none',[-1 1]);
+    h=imagesc(array, [-1 1]);
 else
-    h=imagesc(array,'EraseMode','none',[-1 1]);
+    %h=imagesc(array,'EraseMode','none',[-1 1]);
+    h=imagesc(array, [-1 1]);
 end
 axis image off
 
 drawnow;
 
-warning on all
+%warning on all
