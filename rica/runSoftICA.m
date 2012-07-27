@@ -1,6 +1,6 @@
 %% Note: This sample code requires minFunc to run.
 %        But you can use softICACost.m with your own optimizer of choice.
-clear all;
+clear;
 %addpath ~/work/RNN/minFunc/   % this should point to minFunc
                               % http://www.di.ens.fr/~mschmidt/Software/minFunc.html
                               % minFunc 2009 seems to work well
