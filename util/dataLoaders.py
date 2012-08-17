@@ -3,6 +3,8 @@
 import cPickle as pickle
 import numpy
 from numpy import array, zeros
+import gzip
+import cPickle as pickle
 import pdb
 
 
@@ -54,3 +56,10 @@ def loadCifarDataMonochrome(cifarDirectory):
 
     # no validation set,
     return [[train_set_x_mono, datasets[0][1]], datasets[1], [test_set_x_mono, datasets[2][1]]], classNames
+
+
+
+def loadFromPklGz(filename):
+    with gzip.open(filename, 'rb') as ff:
+        ret = pickle.load(ff)
+    return ret
