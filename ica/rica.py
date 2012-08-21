@@ -194,7 +194,7 @@ if __name__ == '__main__':
     resman.start('junk', diary = False)
 
     data = loadFromPklGz('../data/rica_hyv_patches_16.pkl.gz')
-
+    random.seed(0)
     rica = RICA(imgDim = 16,
                 saveDir = resman.rundir)
     rica.run(data, maxFun = 10)
