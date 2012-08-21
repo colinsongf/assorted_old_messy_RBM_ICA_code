@@ -191,7 +191,7 @@ class RICA(object):
 
 
 if __name__ == '__main__':
-    resman.start('prica_010', diary = True)
+    resman.start('junk', diary = False)
 
     data = loadFromPklGz('../data/rica_hyv_patches_16.pkl.gz')
 
