@@ -22,6 +22,11 @@ reconstruction_cost = 0.5 * sum(sum(diff.^2));
 outderv = diff;
 
 % compute the cost comprised of: 1) sparsity and 2) reconstruction
+%disp('sparsity_cost');
+%disp(sparsity_cost);
+%disp('reconstruction_cost');
+%disp(reconstruction_cost);
+
 cost = sparsity_cost + reconstruction_cost;
 
 % Backprop Output Layer
@@ -37,3 +42,5 @@ Wgrad = W1grad + W2grad';
 % unproject gradient for minFunc
 grad = l2rowscaledg(Wold, W, Wgrad, 1);
 grad = grad(:);
+
+%disp(sprintf('cost is %g', cost));

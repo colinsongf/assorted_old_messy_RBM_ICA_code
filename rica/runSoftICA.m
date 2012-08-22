@@ -6,6 +6,9 @@ clear;
                               % minFunc 2009 seems to work well
 addpath ~/s/deep_learning/rica/minFunc/
 
+rand('seed', 1)
+randn('seed', 1)
+
 %% Load and configure a training dataset
 global params;
 params.m=20000;                 % num patches
@@ -38,6 +41,12 @@ options.MaxIter = 300;
 randTheta = randn(params.numFeatures,params.n)*0.01;  % 1/sqrt(params.n);
 randTheta = randTheta ./ repmat(sqrt(sum(randTheta.^2,2)), 1, size(randTheta,2)); 
 randTheta = randTheta(:);
+
+% COMPARISON
+%disp('cost right now')
+%[cost,grad] = softICACost(randTheta, x, params);
+%disp(cost);
+%keyboard;
 
 % optimize
 [opttheta, cost, exitflag] = minFunc( @(theta) softICACost(theta, x, params), randTheta, options);   % Use x or xw 
