@@ -26,43 +26,18 @@ def whiten1f(xx):
 
 def l2RowScaled(xx):
     epsilon = 1e-5;
-    return (xx.T / (sum(xx**2,1) + epsilon)).T
+    return (xx.T / sqrt(sum(xx**2,1) + epsilon)).T
 
 
 
 def l2RowScaledGrad(xx, yy, outerDeriv):
+    # TODO: may still need to check this!
     epsilon = 1e-5;
     epsSumSq = sum(xx ** 2, 1) + epsilon
     l2Rows = sqrt(epsSumSq)
 
     grad = (outerDeriv.T / l2Rows).T - (yy.T * (sum(outerDeriv * xx, 1) / epsSumSq)).T
     return grad
-
-
-
-class OneTwoFunction(object):
-    '''Allows a function to be called that returns a tuple. '''
-
-    def __init__(self, function):
-        self.function = function
-        self.nextCall = 1
-        self.result = None
-
-    def one(self, value):
-        if self.nextCall != 1:
-            raise Exception('Wrong call order; was expecting %d' % self.nextCall)
-        self.lastValue = value
-        self.result = self.function(value)
-        self.nextCall = 2
-        return self.result[0]
-
-    def two(self, value):
-        if self.nextCall != 2:
-            raise Exception('Wrong call order; was expecting %d' % self.nextCall)
-        if value != self.lastValue:
-            raise Exception('Called two with a different value.')
-        self.nextCall = 1
-        return self.result[1]
 
 
 
@@ -82,7 +57,6 @@ class RICA(object):
 
         # NOTE: Flattening and reshaping is in C order in numpy but Fortran order in Matlab. This should not matter.
         WW = WW.reshape(self.nFeatures, nInputDim)
-
         WWold = WW
         WW = l2RowScaled(WW)
 
@@ -98,6 +72,7 @@ class RICA(object):
         # K = 1./K;
         KK = sqrt(self.epsilon + hidden ** 2)
         sparsityCost = self.lambd * sum(KK)
+        KK = 1/KK
 
         # % Reconstruction Loss and Back Prop
         # diff = (r - x);
@@ -109,6 +84,7 @@ class RICA(object):
 
         # % compute the cost comprised of: 1) sparsity and 2) reconstruction
         # cost = sparsity_cost + reconstruction_cost;
+        #print '   sp', sparsityCost, 'rc', reconstructionCost
         cost = sparsityCost + reconstructionCost
 
         # % Backprop Output Layer
@@ -139,32 +115,16 @@ class RICA(object):
         '''data should be one data point per COLUMN! (different)'''
         nInputDim = data.shape[0]
 
+        # Project each patch to the unit ball
+        patchNorms = sqrt(sum(data**2, 0) + (1e-8))
+        data = data / patchNorms
+
         # Initialize weights WW
         WW = random.randn(self.nFeatures, nInputDim)
         WW = (WW.T / sqrt(sum(WW ** 2, 1))).T
+        #loadedWW = loadtxt('../octave-randTheta')
+        #WW = loadedWW
         WW = WW.flatten()
-
-        # Run optimization
-        #xopt = fmin_bfgs(lambda WW : self.cost(WW, data), WW)
-        #function = OneTwoFunction(lambda WW : self.cost(WW, data))
-
-        #def costFn(xx):
-        #    print 'costFn'
-        #    return self.cost(xx, data)[0]
-        #def gradFn(xx):
-        #    print 'gradFn'
-        #    return self.cost(xx, data)[1]
-        
-        #xopt = fmin_bfgs(costFn,
-        #                 WW,
-        #                 fprime = gradFn,
-        #                 maxiter = 3)
-        #xopt = minimize(lambda WW : self.cost(WW, data),
-        #                WW,
-        #                method = 'BFGS',
-        #                jac = True,    # returned along with cost
-        #                options = {'maxiter': 3, 'disp': True},
-        #                )
 
         # HACK to make faster HACK
         data = data[:,:8000]
@@ -172,6 +132,7 @@ class RICA(object):
         print 'RICA fitting with %d %d-dimensional data points' % (data.shape[1], data.shape[0])
 
         print 'Starting optimization, maximum function calls =', maxFun
+
         startWall = time.time()
         xopt, fval, info = fmin_l_bfgs_b(lambda WW : self.cost(WW, data),
                                          WW,
@@ -192,9 +153,11 @@ class RICA(object):
         WW = xopt.reshape(self.nFeatures, nInputDim)
         if self.saveDir:  saveToFile(os.path.join(self.saveDir, 'WW.pkl.gz'), WW)
 
+        tilesX = int(sqrt(self.nFeatures * 2./3))
+        tilesY = self.nFeatures / tilesX
         image = Image.fromarray(tile_raster_images(
             X = WW,
-            img_shape = (self.imgDim, self.imgDim), tile_shape = (24,33),
+            img_shape = (self.imgDim, self.imgDim), tile_shape = (tilesX,tilesY),
             tile_spacing=(1,1)))
         if self.saveDir:  image.save(os.path.join(self.saveDir, 'WW.png'))
 
@@ -206,7 +169,10 @@ if __name__ == '__main__':
     data = loadFromPklGz('../data/rica_hyv_patches_16.pkl.gz')
     random.seed(0)
     rica = RICA(imgDim = 16,
+                nFeatures = 400,
+                lambd = .05,
+                epsilon = 1e-5,
                 saveDir = resman.rundir)
-    rica.run(data, maxFun = 1000)
+    rica.run(data, maxFun = 10)
 
     resman.stop()
