@@ -7,19 +7,15 @@ Jason Yosinski
 '''
 
 import pdb
-import os, sys
+import os, sys, time
 from numpy import *
 from matplotlib import pyplot, mlab
 from PIL import Image
-
-from util.ResultsManager import resman
-from util.plotting import tile_raster_images
-from rbm.pca import PCA
-from rbm.utils import load_mnist_data, saveToFile, looser
-
-#from scipy.optimize import fmin_bfgs, minimize
 from scipy.optimize.lbfgsb import fmin_l_bfgs_b
-from util.dataLoaders import loadFromPklGz
+
+from util.ResultsManager import resman, fmtSeconds
+from util.plotting import tile_raster_images
+from util.dataLoaders import loadFromPklGz, saveToFile
 
 
 
@@ -170,33 +166,47 @@ class RICA(object):
         #                options = {'maxiter': 3, 'disp': True},
         #                )
 
-        print 'Starting optimization, maximum function calls = ', maxFun
+        # HACK to make faster HACK
+        data = data[:,:8000]
+
+        print 'RICA fitting with %d %d-dimensional data points' % (data.shape[1], data.shape[0])
+
+        print 'Starting optimization, maximum function calls =', maxFun
+        startWall = time.time()
         xopt, fval, info = fmin_l_bfgs_b(lambda WW : self.cost(WW, data),
                                          WW,
                                          fprime = None,   # function call returns value and gradient
                                          approx_grad = False,
                                          iprint = 1,
+                                         factr = 1e3,
                                          maxfun = maxFun)
+        wallSeconds = time.time() - startWall
+        print 'Optimization results:'
+        for key,val in info.iteritems():
+            print '  %20s: %s' % (key, repr(val))
+        print '  %20s: %s' % ('fval', fval)
+        print '  %20s: %s' % ('fval/example', fval/data.shape[1])
+        print '  %20s: %s' % ('wall time', fmtSeconds(wallSeconds))
+        print '  %20s: %s' % ('wall time/funcall', fmtSeconds(wallSeconds / info['funcalls']))
         
-        print 'OPT DONE'
         WW = xopt.reshape(self.nFeatures, nInputDim)
+        if self.saveDir:  saveToFile(os.path.join(self.saveDir, 'WW.pkl.gz'), WW)
 
         image = Image.fromarray(tile_raster_images(
             X = WW,
             img_shape = (self.imgDim, self.imgDim), tile_shape = (24,33),
             tile_spacing=(1,1)))
         if self.saveDir:  image.save(os.path.join(self.saveDir, 'WW.png'))
-        #image.show()
 
 
 
 if __name__ == '__main__':
-    resman.start('junk', diary = False)
+    resman.start('junk', diary = True)
 
     data = loadFromPklGz('../data/rica_hyv_patches_16.pkl.gz')
     random.seed(0)
     rica = RICA(imgDim = 16,
                 saveDir = resman.rundir)
-    rica.run(data, maxFun = 10)
-    
+    rica.run(data, maxFun = 1000)
+
     resman.stop()

@@ -59,6 +59,15 @@ def loadCifarDataMonochrome(cifarDirectory):
 
 
 
+def saveToFile(filename, obj, quiet = False):
+    ff = gzip.open(filename, 'wb')
+    pickle.dump(obj, ff, protocol = -1)
+    if not quiet:
+        print 'saved to', filename
+    ff.close()
+
+
+
 def loadFromPklGz(filename):
     with gzip.open(filename, 'rb') as ff:
         ret = pickle.load(ff)
