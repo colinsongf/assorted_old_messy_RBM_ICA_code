@@ -127,7 +127,7 @@ class RICA(object):
         WW = WW.flatten()
 
         # HACK to make faster HACK
-        data = data[:,:8000]
+        #data = data[:,:8000]
 
         print 'RICA fitting with %d %d-dimensional data points' % (data.shape[1], data.shape[0])
 
