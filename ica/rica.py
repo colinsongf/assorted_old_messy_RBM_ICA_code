@@ -9,14 +9,19 @@ Jason Yosinski
 import pdb
 import os, sys, time
 from numpy import *
-from matplotlib import pyplot, mlab
 from PIL import Image
 from scipy.optimize.lbfgsb import fmin_l_bfgs_b
+
+import matplotlib
+matplotlib.use('Agg') # plot with no display
+from matplotlib import pyplot
 
 from util.ResultsManager import resman, fmtSeconds
 from util.plotting import tile_raster_images
 from util.dataLoaders import loadFromPklGz, saveToFile
+from util.math import sigmoid
 from rbm.pca import PCA
+from rbm.utils import imagesc
 
 
 
@@ -109,10 +114,12 @@ class RICA(object):
         grad = l2RowScaledGrad(WWold, WW, WGrad)
         grad = grad.flatten()
 
+        print 'f =', cost, '|grad| =', linalg.norm(grad)
+
         return cost, grad
 
 
-    def run(self, data, maxFun = 300, whiten = False):
+    def run(self, data, maxFun = 300, whiten = False, normData = True):
         '''data should be one data point per COLUMN! (different)'''
         nInputDim = data.shape[0]
 
@@ -125,7 +132,16 @@ class RICA(object):
 
         if whiten:
             pca = PCA(data.T)
-            data = pca.toZca(data.T).T
+            dataWhite = pca.toZca(data.T, epsilon = 1e-6).T
+
+            if self.saveDir:
+                pyplot.semilogy(pca.fracVar, 'o-')
+                pyplot.title('Fractional variance in each dimension')
+                pyplot.savefig(os.path.join(self.saveDir, 'fracVar.png'))
+                pyplot.savefig(os.path.join(self.saveDir, 'fracVar.pdf'))
+                pyplot.close()
+
+            data = dataWhite
 
         if self.saveDir:
             image = Image.fromarray(tile_raster_images(
@@ -134,9 +150,16 @@ class RICA(object):
                 tile_spacing=(1,1)))
             image.save(os.path.join(self.saveDir, 'data.png'))
 
-        # Project each patch to the unit ball
-        patchNorms = sqrt(sum(data**2, 0) + (1e-8))
-        data = data / patchNorms
+        if self.saveDir:
+            imagesc(cov(data))
+            pyplot.savefig(os.path.join(self.saveDir, 'dataCov_prenorm.png'))
+        if normData:
+            # Project each patch to the unit ball
+            patchNorms = sqrt(sum(data**2, 0) + (1e-8))
+            data = data / patchNorms
+        if self.saveDir:
+            imagesc(cov(data))
+            pyplot.savefig(os.path.join(self.saveDir, 'dataCov_postnorm.png'))
 
         # Initialize weights WW
         WW = random.randn(self.nFeatures, nInputDim)
@@ -180,18 +203,44 @@ class RICA(object):
             tile_spacing=(1,1)))
         if self.saveDir:  image.save(os.path.join(self.saveDir, 'WW.png'))
 
+        # Activation histograms
+        hiddenActivationsData = dot(WW, data[:,:200])
+        randomData = random.randn(data.shape[0], 200)
+        randNorms = sqrt(sum(randomData**2, 0) + (1e-8))
+        randomData /= randNorms
+        hiddenActivationsRandom = dot(WW, randomData)
+
+        for ii in range(10):
+            pyplot.clf()
+            pyplot.hist(hiddenActivationsData[:,ii])
+            pyplot.savefig(os.path.join(self.saveDir, 'hidden_act_data_hist_%03d.png' % ii))
+        for ii in range(10):
+            pyplot.clf()
+            pyplot.hist(hiddenActivationsRandom[:,ii])
+            pyplot.savefig(os.path.join(self.saveDir, 'hidden_act_rand_hist_%03d.png' % ii))
+
+
+        if self.saveDir:
+            image = Image.fromarray(sigmoid(hiddenActivationsData.T) * 256).convert('L')
+            image.save(os.path.join(self.saveDir, 'hidden_act_data.png'))
+            image = Image.fromarray(sigmoid(hiddenActivationsRandom.T) * 256).convert('L')
+            image.save(os.path.join(self.saveDir, 'hidden_act_random.png'))
+
+        pdb.set_trace()
+
 
 
 if __name__ == '__main__':
-    resman.start('junk', diary = True)
+    resman.start('junk', diary = False)
 
     data = loadFromPklGz('../data/rica_hyv_patches_16.pkl.gz')
+    
     random.seed(0)
     rica = RICA(imgDim = 16,
                 nFeatures = 400,
                 lambd = .05,
                 epsilon = 1e-5,
                 saveDir = resman.rundir)
-    rica.run(data, maxFun = 10)
+    rica.run(data, maxFun = 300)
 
     resman.stop()
