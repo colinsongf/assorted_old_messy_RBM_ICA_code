@@ -226,8 +226,6 @@ class RICA(object):
             image = Image.fromarray(sigmoid(hiddenActivationsRandom.T) * 256).convert('L')
             image.save(os.path.join(self.saveDir, 'hidden_act_random.png'))
 
-        pdb.set_trace()
-
 
 
 if __name__ == '__main__':
