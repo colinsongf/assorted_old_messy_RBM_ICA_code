@@ -16,6 +16,7 @@ from scipy.optimize.lbfgsb import fmin_l_bfgs_b
 from util.ResultsManager import resman, fmtSeconds
 from util.plotting import tile_raster_images
 from util.dataLoaders import loadFromPklGz, saveToFile
+from rbm.pca import PCA
 
 
 
@@ -111,9 +112,27 @@ class RICA(object):
         return cost, grad
 
 
-    def run(self, data, maxFun = 300):
+    def run(self, data, maxFun = 300, whiten = False):
         '''data should be one data point per COLUMN! (different)'''
         nInputDim = data.shape[0]
+
+        if self.saveDir:
+            image = Image.fromarray(tile_raster_images(
+                X = data.T,
+                img_shape = (self.imgDim, self.imgDim), tile_shape = (20, 30),
+                tile_spacing=(1,1)))
+            image.save(os.path.join(self.saveDir, 'data_raw.png'))
+
+        if whiten:
+            pca = PCA(data.T)
+            data = pca.toZca(data.T).T
+
+        if self.saveDir:
+            image = Image.fromarray(tile_raster_images(
+                X = data.T,
+                img_shape = (self.imgDim, self.imgDim), tile_shape = (20, 30),
+                tile_spacing=(1,1)))
+            image.save(os.path.join(self.saveDir, 'data.png'))
 
         # Project each patch to the unit ball
         patchNorms = sqrt(sum(data**2, 0) + (1e-8))

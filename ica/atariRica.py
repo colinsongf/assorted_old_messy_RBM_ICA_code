@@ -30,6 +30,6 @@ if __name__ == '__main__':
                 lambd = .05,
                 epsilon = 1e-5,
                 saveDir = resman.rundir)
-    rica.run(data, maxFun = 300)
+    rica.run(data, maxFun = 300, whiten = True)
 
     resman.stop()
