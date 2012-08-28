@@ -215,6 +215,10 @@ class RICA(object):
         print '  %20s: %s' % ('wall time/funcall', fmtSeconds(wallSeconds / info['funcalls']))
         
         WW = xopt.reshape(self.nFeatures, nInputDim)
+
+        # Renormalize each patch of WW back to unit ball
+        WW = (WW.T / sqrt(sum(WW**2, axis=1))).T
+        
         if self.saveDir:  saveToFile(os.path.join(self.saveDir, 'WW.pkl.gz'), WW)
 
         if self.saveDir:
