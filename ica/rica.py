@@ -48,18 +48,19 @@ def l2RowScaledGrad(xx, yy, outerDeriv):
 
 
 class RICA(object):
-    def __init__(self, imgDim, lambd = .005, nFeatures = 800, epsilon = 1e-5, saveDir = ''):
-        self.lambd     = lambd
-        self.nFeatures = nFeatures
-        self.epsilon   = epsilon
-        self.saveDir   = saveDir
-        self.imgDim    = imgDim
-
+    def __init__(self, imgShape, lambd = .005, nFeatures = 800, epsilon = 1e-5, saveDir = ''):
+        self.lambd      = lambd
+        self.nFeatures  = nFeatures
+        self.epsilon    = epsilon
+        self.saveDir    = saveDir
+        self.imgShape   = imgShape
+        self.imgIsColor = len(imgShape) > 2
+        self.nInputDim  = prod(self.imgShape)
 
     def cost(self, WW, data):
         nInputDim = data.shape[0]
-        if self.imgDim ** 2 != nInputDim:
-            raise Exception('Expected %d * %d = %d input, but got %d' % (self.imgDim, self.imgDim, self.imgDim**2, nInputDim))
+        if self.nInputDim != nInputDim:
+            raise Exception('Expected shape %s = %d dimensional input, but got %d' % (repr(self.imgShape), self.nInputDim, nInputDim))
 
         # NOTE: Flattening and reshaping is in C order in numpy but Fortran order in Matlab. This should not matter.
         WW = WW.reshape(self.nFeatures, nInputDim)
@@ -125,10 +126,23 @@ class RICA(object):
 
         if self.saveDir:
             image = Image.fromarray(tile_raster_images(
-                X = data.T,
-                img_shape = (self.imgDim, self.imgDim), tile_shape = (20, 30),
-                tile_spacing=(1,1)))
+                X = data.T, img_shape = self.imgShape,
+                tile_shape = (20, 30), tile_spacing=(1,1),
+                scale_rows_to_unit_interval = False))
             image.save(os.path.join(self.saveDir, 'data_raw.png'))
+            image = Image.fromarray(tile_raster_images(
+                X = data.T, img_shape = self.imgShape,
+                tile_shape = (20, 30), tile_spacing=(1,1),
+                scale_rows_to_unit_interval = True,
+                scale_colors_together = True))
+            image.save(os.path.join(self.saveDir, 'data_raw_rescale.png'))
+            if self.imgIsColor:
+                image = Image.fromarray(tile_raster_images(
+                    X = data.T, img_shape = self.imgShape,
+                    tile_shape = (20, 30), tile_spacing=(1,1),
+                    scale_rows_to_unit_interval = True,
+                    scale_colors_together = False))
+                image.save(os.path.join(self.saveDir, 'data_raw_rescale_indiv.png'))
 
         if whiten:
             pca = PCA(data.T)
@@ -143,12 +157,20 @@ class RICA(object):
 
             data = dataWhite
 
-        if self.saveDir:
-            image = Image.fromarray(tile_raster_images(
-                X = data.T,
-                img_shape = (self.imgDim, self.imgDim), tile_shape = (20, 30),
-                tile_spacing=(1,1)))
-            image.save(os.path.join(self.saveDir, 'data.png'))
+            if self.saveDir:
+                image = Image.fromarray(tile_raster_images(
+                    X = data.T, img_shape = self.imgShape,
+                    tile_shape = (20, 30), tile_spacing=(1,1),
+                    scale_rows_to_unit_interval = True,
+                    scale_colors_together = True))
+                image.save(os.path.join(self.saveDir, 'data_white_rescale.png'))
+                if self.imgIsColor:
+                    image = Image.fromarray(tile_raster_images(
+                        X = data.T, img_shape = self.imgShape,
+                        tile_shape = (20, 30), tile_spacing=(1,1),
+                        scale_rows_to_unit_interval = True,
+                        scale_colors_together = False))
+                    image.save(os.path.join(self.saveDir, 'data_white_rescale_indiv.png'))
 
         if self.saveDir:
             imagesc(cov(data))
@@ -195,13 +217,21 @@ class RICA(object):
         WW = xopt.reshape(self.nFeatures, nInputDim)
         if self.saveDir:  saveToFile(os.path.join(self.saveDir, 'WW.pkl.gz'), WW)
 
-        tilesX = int(sqrt(self.nFeatures * 2./3))
-        tilesY = self.nFeatures / tilesX
-        image = Image.fromarray(tile_raster_images(
-            X = WW,
-            img_shape = (self.imgDim, self.imgDim), tile_shape = (tilesX,tilesY),
-            tile_spacing=(1,1)))
-        if self.saveDir:  image.save(os.path.join(self.saveDir, 'WW.png'))
+        if self.saveDir:
+            tilesX = int(sqrt(self.nFeatures * 2./3))
+            tilesY = self.nFeatures / tilesX
+            image = Image.fromarray(tile_raster_images(
+                X = WW,
+                img_shape = self.imgShape, tile_shape = (tilesX,tilesY),
+                tile_spacing=(1,1),
+                scale_colors_together = True))
+            image.save(os.path.join(self.saveDir, 'WW.png'))
+            image = Image.fromarray(tile_raster_images(
+                X = WW,
+                img_shape = self.imgShape, tile_shape = (tilesX,tilesY),
+                tile_spacing=(1,1),
+                scale_colors_together = False))
+            image.save(os.path.join(self.saveDir, 'WW_rescale_indiv.png'))
 
         # Activation histograms
         hiddenActivationsData = dot(WW, data[:,:200])
@@ -210,20 +240,21 @@ class RICA(object):
         randomData /= randNorms
         hiddenActivationsRandom = dot(WW, randomData)
 
-        for ii in range(10):
-            pyplot.clf()
-            pyplot.hist(hiddenActivationsData[:,ii])
-            pyplot.savefig(os.path.join(self.saveDir, 'hidden_act_data_hist_%03d.png' % ii))
-        for ii in range(10):
-            pyplot.clf()
-            pyplot.hist(hiddenActivationsRandom[:,ii])
-            pyplot.savefig(os.path.join(self.saveDir, 'hidden_act_rand_hist_%03d.png' % ii))
-
+        enableIndividualHistograms = False
+        if enableIndividualHistograms:
+            for ii in range(10):
+                pyplot.clf()
+                pyplot.hist(hiddenActivationsData[:,ii])
+                pyplot.savefig(os.path.join(self.saveDir, 'hidden_act_data_hist_%03d.png' % ii))
+            for ii in range(10):
+                pyplot.clf()
+                pyplot.hist(hiddenActivationsRandom[:,ii])
+                pyplot.savefig(os.path.join(self.saveDir, 'hidden_act_rand_hist_%03d.png' % ii))
 
         if self.saveDir:
-            image = Image.fromarray(sigmoid(hiddenActivationsData.T) * 256).convert('L')
+            image = Image.fromarray((hiddenActivationsData.T + 1) * 128).convert('L')
             image.save(os.path.join(self.saveDir, 'hidden_act_data.png'))
-            image = Image.fromarray(sigmoid(hiddenActivationsRandom.T) * 256).convert('L')
+            image = Image.fromarray((hiddenActivationsRandom.T + 1) * 128).convert('L')
             image.save(os.path.join(self.saveDir, 'hidden_act_random.png'))
 
 
@@ -234,7 +265,7 @@ if __name__ == '__main__':
     data = loadFromPklGz('../data/rica_hyv_patches_16.pkl.gz')
     
     random.seed(0)
-    rica = RICA(imgDim = 16,
+    rica = RICA(imgShape = (16, 16),
                 nFeatures = 400,
                 lambd = .05,
                 epsilon = 1e-5,

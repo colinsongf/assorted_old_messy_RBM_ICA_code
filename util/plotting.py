@@ -13,6 +13,7 @@ For example ``tile_raster_images`` helps in generating a easy to grasp
 image from a set of samples or weights.
 '''
 
+import pdb
 import numpy
 
 def scale_to_unit_interval(ndar,eps=1e-8):
@@ -23,8 +24,18 @@ def scale_to_unit_interval(ndar,eps=1e-8):
     return ndar
 
 
+def scale_all_rows_to_unit_interval(ndar,eps=1e-8):
+    ''' Scales each row in the 2D array ndar to be between 0 and 1 '''
+    assert(len(ndar.shape) == 2)
+    ndar = ndar.copy()
+    ndar = (ndar.T - ndar.min(axis=1)).T
+    ndar = (ndar.T / (ndar.max(axis=1)+eps)).T
+    return ndar
+
+
 def tile_raster_images(X, img_shape, tile_shape, tile_spacing = (0,0), 
-              scale_rows_to_unit_interval = True, output_pixel_vals = True):
+                       scale_rows_to_unit_interval = True, scale_colors_together = False,
+                       output_pixel_vals = True):
     '''
     Transform an array with one flattened image per row, into an array in 
     which images are reshaped and layed out like tiles on a floor.
@@ -55,10 +66,14 @@ def tile_raster_images(X, img_shape, tile_shape, tile_spacing = (0,0),
     :rtype: a 2-d array with same dtype as X.
 
     '''
- 
-    assert len(img_shape) == 2
+
+    assert(len(img_shape) == 2 or (len(img_shape) == 3 and img_shape[2] == 3)) # grayscale or RGB color
     assert len(tile_shape) == 2
     assert len(tile_spacing) == 2
+
+    isColor = len(img_shape) == 3
+
+    #pdb.set_trace()
 
     # The expression below can be re-written in a more C style as 
     # follows : 
@@ -70,6 +85,29 @@ def tile_raster_images(X, img_shape, tile_shape, tile_spacing = (0,0),
     #                tile_spacing[1]
     out_shape = [(ishp + tsp) * tshp - tsp for ishp, tshp, tsp 
                         in zip(img_shape, tile_shape, tile_spacing)]
+
+    if isColor:
+        # massage to expected tuple form
+        #assert(X.shape[1] % 3 == 0)
+        #nPerChannel = X.shape[1] / 3
+
+        if output_pixel_vals:
+            dt = 'uint8'
+        else:
+            dt = X.dtype
+        if str(dt) not in ('uint8', 'float32'):
+            raise Exception('color only worsk for uint8 or float32 dtype, not %s' % dt)
+
+        if scale_rows_to_unit_interval and scale_colors_together:
+            X = scale_all_rows_to_unit_interval(X)
+
+        X = X.reshape(X.shape[0], img_shape[0], img_shape[1], img_shape[2])
+        X = (X[:,:,:,0].reshape(X.shape[0], img_shape[0] * img_shape[1]),
+             X[:,:,:,1].reshape(X.shape[0], img_shape[0] * img_shape[1]),
+             X[:,:,:,2].reshape(X.shape[0], img_shape[0] * img_shape[1]),
+             None, #numpy.ones(X[:,0:nPerChannel].shape, dtype=dt), # hardcode complete opacity
+             )
+
 
     if isinstance(X, tuple):
         assert len(X) == 4
@@ -90,15 +128,24 @@ def tile_raster_images(X, img_shape, tile_shape, tile_spacing = (0,0),
         for i in xrange(4):
             if X[i] is None:
                 # if channel is None, fill it with zeros of the correct 
-                # dtype
+                # dtype (unless it's the alpha channel)
                 dt = out_array.dtype
                 if output_pixel_vals:
                     dt = 'uint8'
+                #if i == 3:
+                #    # alpha channel
+                #    out_array[:,:,i] = numpy.ones(out_shape, dtype=dt)+channel_defaults[i]
+                #    pdb.set_trace()
+                #else:
                 out_array[:,:,i] = numpy.zeros(out_shape, dtype=dt)+channel_defaults[i]
             else:
                 # use a recurrent call to compute the channel and store it 
                 # in the output
-                out_array[:,:,i] = tile_raster_images(X[i], img_shape, tile_shape, tile_spacing, scale_rows_to_unit_interval, output_pixel_vals)
+                doScaleRows = scale_rows_to_unit_interval
+                if isColor and scale_colors_together:
+                    # already scaled whole rows
+                    doScaleRows = False
+                out_array[:,:,i] = tile_raster_images(X[i], img_shape[0:2], tile_shape, tile_spacing, doScaleRows, False, output_pixel_vals)
         return out_array
 
     else:
@@ -119,7 +166,7 @@ def tile_raster_images(X, img_shape, tile_shape, tile_spacing = (0,0),
         for tile_row in xrange(tile_shape[0]):
             for tile_col in xrange(tile_shape[1]):
                 if tile_row * tile_shape[1] + tile_col < X.shape[0]:
-                    if scale_rows_to_unit_interval:
+                    if scale_rows_to_unit_interval and not (isColor and scale_colors_together):
                         # if we should scale values to be between 0 and 1 
                         # do this by calling the `scale_to_unit_interval`
                         # function

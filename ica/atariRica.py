@@ -22,15 +22,15 @@ from util.dataLoaders import loadFromPklGz, saveToFile
 if __name__ == '__main__':
     resman.start('junk', diary = False)
 
-    data = loadFromPklGz('../data/atari/mspacmantrain_15_50000_1c.pkl.gz')
+    data = loadFromPklGz('../data/atari/mspacmantrain_15_50000_3c.pkl.gz')
     data = data.T   # Make into one example per column
     
     random.seed(0)
-    rica = RICA(imgDim = 15,
+    rica = RICA(imgShape = (15, 15, 3),
                 nFeatures = 400,
                 lambd = .05,
                 epsilon = 1e-5,
                 saveDir = resman.rundir)
-    rica.run(data, maxFun = 1, whiten = True)
+    rica.run(data, maxFun = 300, whiten = True)
 
     resman.stop()
