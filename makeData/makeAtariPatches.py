@@ -37,10 +37,11 @@ def randomSampleMatrix(filterNames, Nw = 10, Nsamples = 10, color = False):
     # select random windows
     maxJ = size[0] - Nw
     maxI = size[1] - Nw
-    randomSamples = vstack((random.randint(0, Nw, Nsamples),
+    randomSamples = vstack((random.randint(0, Nimages, Nsamples),
                             random.randint(0, maxI+1, Nsamples),
                             random.randint(0, maxJ+1, Nsamples))).T
-    randomSamples.sort(0)   # for efficient loading and unloading of images into memory. Re-randomize before returing
+    sortIdx = argsort(randomSamples[:,0])
+    randomSamples = randomSamples[sortIdx,:]   # for efficient loading and unloading of images into memory. Re-randomize before returing
 
     nChannels = 3 if color else 1
     imageMatrix = zeros((Nsamples, Nw * Nw * nChannels), dtype = float32)
@@ -81,6 +82,10 @@ def main():
 
     trainFilter = ['frame_000001', 'frame_000002', 'frame_000003']
     testFilter  = ['frame_000004', 'frame_000005', 'frame_000006']
+
+    #test
+    #saveToFile(pathToData + 'junk.pkl.gz', randomSampleMatrix(trainFilter, Nw = 15, Nsamples = 50000, color = True))
+    #sys.exit(1)
 
     # monochrome
     saveToFile(pathToData + 'train_02_50_1c.pkl.gz',    randomSampleMatrix(trainFilter, Nw = 02, Nsamples = 50, color = False))

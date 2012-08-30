@@ -40,6 +40,7 @@ def randomSampleMatrix(filterNames, Nw = 10, Nsamples = 10):
     randomSamples = vstack((random.randint(0, Nw, Nsamples),
                             random.randint(0, maxI+1, Nsamples),
                             random.randint(0, maxJ+1, Nsamples))).T
+    raise Exception('fix this next line!')
     randomSamples.sort(0)   # for efficient loading and unloading of images into memory. Re-randomize before returing
     
     imageMatrix = zeros((Nsamples, Nw * Nw), dtype = float32)
