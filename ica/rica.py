@@ -55,6 +55,7 @@ class RICA(object):
         self.imgShape   = imgShape
         self.imgIsColor = len(imgShape) > 2
         self.nInputDim  = prod(self.imgShape)
+        self.costLog    = None
 
     def cost(self, WW, data):
         nInputDim = data.shape[0]
@@ -92,6 +93,12 @@ class RICA(object):
         # cost = sparsity_cost + reconstruction_cost;
         #print '   sp', sparsityCost, 'rc', reconstructionCost
         cost = sparsityCost + reconstructionCost
+
+        thislog = array([sparsityCost, reconstructionCost, cost])
+        if isinstance(self.costLog, ndarray):
+            self.costLog = vstack((self.costLog, thislog))
+        else:
+            self.costLog = thislog
 
         # % Backprop Output Layer
         # W2grad = outderv * h';
@@ -200,6 +207,7 @@ class RICA(object):
 
         print 'Starting optimization, maximum function calls =', maxFun
 
+        self.costLog = None
         startWall = time.time()
         xopt, fval, info = fmin_l_bfgs_b(lambda WW : self.cost(WW, data),
                                          WW,
@@ -216,7 +224,18 @@ class RICA(object):
         print '  %20s: %s' % ('fval/example', fval/data.shape[1])
         print '  %20s: %s' % ('wall time', fmtSeconds(wallSeconds))
         print '  %20s: %s' % ('wall time/funcall', fmtSeconds(wallSeconds / info['funcalls']))
-        
+
+        # plot sparsity/reconstruction costs over time
+        costs = self.costLog
+        self.costLog = None
+        pyplot.plot(costs[:,0], 'b-', costs[:,1], 'r-')
+        pyplot.hold(True)
+        pyplot.plot(costs[:,2], '--', color = (.7,0,.7,1))
+        pyplot.legend(('sparsity * %s' % repr(self.lambd), 'reconstruction', 'total'))
+        pyplot.xlabel('iteration'); pyplot.ylabel('cost')
+        pyplot.savefig(os.path.join(self.saveDir, 'cost.png'))
+        pyplot.savefig(os.path.join(self.saveDir, 'cost.pdf'))
+
         WW = xopt.reshape(self.nFeatures, nInputDim)
 
         # Renormalize each patch of WW back to unit ball
