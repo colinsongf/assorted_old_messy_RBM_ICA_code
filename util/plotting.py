@@ -15,6 +15,7 @@ image from a set of samples or weights.
 
 import pdb
 import numpy
+import Image
 
 def scale_to_unit_interval(ndar,eps=1e-8):
     ''' Scales all values in the ndarray ndar to be between 0 and 1 '''
@@ -185,3 +186,16 @@ def tile_raster_images(X, img_shape, tile_shape, tile_spacing = (0,0),
                         = this_img * c
         return out_array
 
+
+
+def pil_imagesc(arr, epsilon = 1e-8, saveto = None):
+    '''Like imagesc for Octave/Matlab, but using PIL.'''
+
+    imarray = numpy.array(arr, dtype = numpy.float32)
+    imarray -= imarray.min()
+    imarray /= (imarray.max() + epsilon)
+    image = Image.fromarray(imarray * 255).convert('L')
+    if saveto:
+        image.save(saveto)
+
+    

@@ -17,11 +17,10 @@ matplotlib.use('Agg') # plot with no display
 from matplotlib import pyplot
 
 from util.ResultsManager import resman, fmtSeconds
-from util.plotting import tile_raster_images
+from util.plotting import tile_raster_images, pil_imagesc
 from util.dataLoaders import loadFromPklGz, saveToFile
 from util.math import sigmoid
 from rbm.pca import PCA
-from rbm.utils import imagesc
 
 
 
@@ -144,6 +143,10 @@ class RICA(object):
                     scale_colors_together = False))
                 image.save(os.path.join(self.saveDir, 'data_raw_rescale_indiv.png'))
 
+        if self.saveDir:
+            pil_imagesc(cov(data),
+                        saveto = os.path.join(self.saveDir, 'dataCov_0raw.png'))
+
         if whiten:
             pca = PCA(data.T)
             dataWhite = pca.toZca(data.T, epsilon = 1e-6).T
@@ -173,15 +176,15 @@ class RICA(object):
                     image.save(os.path.join(self.saveDir, 'data_white_rescale_indiv.png'))
 
         if self.saveDir:
-            imagesc(cov(data))
-            pyplot.savefig(os.path.join(self.saveDir, 'dataCov_prenorm.png'))
+            pil_imagesc(cov(data),
+                        saveto = os.path.join(self.saveDir, 'dataCov_1prenorm.png'))
         if normData:
             # Project each patch to the unit ball
             patchNorms = sqrt(sum(data**2, 0) + (1e-8))
             data = data / patchNorms
         if self.saveDir:
-            imagesc(cov(data))
-            pyplot.savefig(os.path.join(self.saveDir, 'dataCov_postnorm.png'))
+            pil_imagesc(cov(data),
+                        saveto = os.path.join(self.saveDir, 'dataCov_2postnorm.png'))
 
         # Initialize weights WW
         WW = random.randn(self.nFeatures, nInputDim)
