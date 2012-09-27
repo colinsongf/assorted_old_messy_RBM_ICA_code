@@ -21,6 +21,8 @@ from util.dataLoaders import loadFromPklGz, saveToFile
 
 
 def ricaRun(randSeed, resman):
+    testfn('rica')
+
     data = loadFromPklGz('../data/atari/mspacmantrain_15_50000_3c.pkl.gz')
     data = data.T   # Make into one example per column
 
@@ -39,33 +41,37 @@ def ricaRun(randSeed, resman):
     return 'finished return value'
 
 
-def testfn():
+def testfn(st = None):
+    print '-' * 40
+    if st: print st
     print 'sys.path is', sys.path
     print 'cwd is', os.getcwd()
+    print '-' * 40
 
 
 if __name__ == '__main__':
     resman.start('junk', diary = False)
 
-    print 'local'
-    testfn()
+    testfn('local')
 
     ppservers = tuple(['xanthus-%d.mae.cornell.edu' % ii for ii in range(1,7)])
     job_server = pp.Server(ncpus=0, ppservers=ppservers)
     jobs = []    
     for ii in range(1):
-        #jobs.append((ii,
-        #             job_server.submit(ricaRun,
-        #                               args = (ii, resman),
-        #                               modules=('from rica import RICA',
-        #                                        'from util.ResultsManager import resman, fmtSeconds',
-        #                                        'from util.plotting import tile_raster_images',
-        #                                        'from util.dataLoaders import loadFromPklGz, saveToFile',
-        #                                        ),
-        #                               ))
-        #            )
         jobs.append((ii,
                      job_server.submit(testfn,
+                                       args = ('just test',),
+                                       ))
+                    )
+
+        jobs.append((ii,
+                     job_server.submit(ricaRun,
+                                       args = (ii, resman),
+                                       modules=('from rica import RICA',
+                                                'from util.ResultsManager import resman, fmtSeconds',
+                                                'from util.plotting import tile_raster_images',
+                                                'from util.dataLoaders import loadFromPklGz, saveToFile',
+                                                ),
                                        ))
                     )
     print 'jobs is', jobs
