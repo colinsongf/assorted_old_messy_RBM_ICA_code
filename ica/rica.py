@@ -17,11 +17,10 @@ matplotlib.use('Agg') # plot with no display
 from matplotlib import pyplot
 
 from util.ResultsManager import resman, fmtSeconds
-from util.plotting import tile_raster_images
+from util.plotting import tile_raster_images, pil_imagesc
 from util.dataLoaders import loadFromPklGz, saveToFile
 from util.math import sigmoid
 from rbm.pca import PCA
-from rbm.utils import imagesc
 
 
 
@@ -56,6 +55,7 @@ class RICA(object):
         self.imgShape   = imgShape
         self.imgIsColor = len(imgShape) > 2
         self.nInputDim  = prod(self.imgShape)
+        self.costLog    = None
 
     def cost(self, WW, data):
         nInputDim = data.shape[0]
@@ -93,6 +93,12 @@ class RICA(object):
         # cost = sparsity_cost + reconstruction_cost;
         #print '   sp', sparsityCost, 'rc', reconstructionCost
         cost = sparsityCost + reconstructionCost
+
+        thislog = array([sparsityCost, reconstructionCost, cost])
+        if isinstance(self.costLog, ndarray):
+            self.costLog = vstack((self.costLog, thislog))
+        else:
+            self.costLog = thislog
 
         # % Backprop Output Layer
         # W2grad = outderv * h';
@@ -144,6 +150,10 @@ class RICA(object):
                     scale_colors_together = False))
                 image.save(os.path.join(self.saveDir, 'data_raw_rescale_indiv.png'))
 
+        if self.saveDir:
+            pil_imagesc(cov(data),
+                        saveto = os.path.join(self.saveDir, 'dataCov_0raw.png'))
+
         if whiten:
             pca = PCA(data.T)
             dataWhite = pca.toZca(data.T, epsilon = 1e-6).T
@@ -173,15 +183,15 @@ class RICA(object):
                     image.save(os.path.join(self.saveDir, 'data_white_rescale_indiv.png'))
 
         if self.saveDir:
-            imagesc(cov(data))
-            pyplot.savefig(os.path.join(self.saveDir, 'dataCov_prenorm.png'))
+            pil_imagesc(cov(data),
+                        saveto = os.path.join(self.saveDir, 'dataCov_1prenorm.png'))
         if normData:
             # Project each patch to the unit ball
             patchNorms = sqrt(sum(data**2, 0) + (1e-8))
             data = data / patchNorms
         if self.saveDir:
-            imagesc(cov(data))
-            pyplot.savefig(os.path.join(self.saveDir, 'dataCov_postnorm.png'))
+            pil_imagesc(cov(data),
+                        saveto = os.path.join(self.saveDir, 'dataCov_2postnorm.png'))
 
         # Initialize weights WW
         WW = random.randn(self.nFeatures, nInputDim)
@@ -197,6 +207,7 @@ class RICA(object):
 
         print 'Starting optimization, maximum function calls =', maxFun
 
+        self.costLog = None
         startWall = time.time()
         xopt, fval, info = fmin_l_bfgs_b(lambda WW : self.cost(WW, data),
                                          WW,
@@ -213,7 +224,18 @@ class RICA(object):
         print '  %20s: %s' % ('fval/example', fval/data.shape[1])
         print '  %20s: %s' % ('wall time', fmtSeconds(wallSeconds))
         print '  %20s: %s' % ('wall time/funcall', fmtSeconds(wallSeconds / info['funcalls']))
-        
+
+        # plot sparsity/reconstruction costs over time
+        costs = self.costLog
+        self.costLog = None
+        pyplot.plot(costs[:,0], 'b-', costs[:,1], 'r-')
+        pyplot.hold(True)
+        pyplot.plot(costs[:,2], '--', color = (.7,0,.7,1))
+        pyplot.legend(('sparsity * %s' % repr(self.lambd), 'reconstruction', 'total'))
+        pyplot.xlabel('iteration'); pyplot.ylabel('cost')
+        pyplot.savefig(os.path.join(self.saveDir, 'cost.png'))
+        pyplot.savefig(os.path.join(self.saveDir, 'cost.pdf'))
+
         WW = xopt.reshape(self.nFeatures, nInputDim)
 
         # Renormalize each patch of WW back to unit ball
