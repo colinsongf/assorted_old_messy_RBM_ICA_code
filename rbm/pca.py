@@ -146,8 +146,8 @@ class PCA:
             raise RuntimeError('we assume data in a is organized with numrows>numcols')
 
         self.mu          = xx.mean(axis=0)
-        self.centeredXX  = self.center(xx)
-        self.sigma       = dot(self.centeredXX.T, self.centeredXX) / self.nn
+        centeredXX       = self.center(xx)
+        self.sigma       = dot(centeredXX.T, centeredXX) / self.nn
 
         # Columns of UU are the eigenvectors of self.sigma, i.e. the
         # principle components. UU and VV are transpose of each other;
