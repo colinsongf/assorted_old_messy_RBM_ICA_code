@@ -19,6 +19,8 @@ def getXmlFiles(dataPath):
                 #print filename,
                 #print 'yes'
                 ret.append(filename)
+                if len(ret) % 1000 == 0:
+                    print 'xmlFiles so far:', len(ret)
             else:
                 pass
                 #print 'no'
@@ -28,7 +30,7 @@ def getXmlFiles(dataPath):
 
 
 
-def HN(hnExec, shapesDat, xmlFile, outputPrefix):
+def hyperneatExport(hnExec, shapesDat, xmlFile, outputPrefix):
     args = (hnExec, '-I', shapesDat, xmlFile, '-O', outputPrefix)
     proc = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     out,err = proc.communicate()
@@ -43,7 +45,7 @@ def HN(hnExec, shapesDat, xmlFile, outputPrefix):
 
 def main():
     if len(sys.argv) <= 3:
-        print 'Usage:\n    # process xml files into txt shape files.\n    %s path_to_HN_exec path_to_shapes.dat path_to_directory_of_shapes   ' % (sys.argv[0])
+        print 'Usage:\n    # process xml files into txt shape files.\n    %s path_to_HN_exec path_to_shapes.dat path_to_directory_of_shapes' % (sys.argv[0])
         sys.exit(1)
 
     hnPath = sys.argv[1]
@@ -62,14 +64,14 @@ def main():
         JOBS = True
         if JOBS:
             jobs.append((ii, xmlFile, 
-                         job_server.submit(HN,
+                         job_server.submit(hyperneatExport,
                                            (hnPath, shapesDatPath, xmlFile, outputPrefix),
                                            modules=('subprocess',),
                                            ))
                         )
             #print 'started', ii
         else:
-            HN(hnPath, shapesDatPath, xmlFile, outputPrefix)
+            hyperneatExport(hnPath, shapesDatPath, xmlFile, outputPrefix)
             #print 'done with', xmlFile
 
     for ii, xmlFile, job in jobs:
