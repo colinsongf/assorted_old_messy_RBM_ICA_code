@@ -24,7 +24,7 @@ def getTxtFiles(dataPath):
                 #print filename,
                 #print 'yes'
                 ret.append(filename)
-                if len(ret) % 1000 == 0:
+                if len(ret) % 10000 == 0:
                     print 'txtFiles so far:', len(ret)
             else:
                 pass
@@ -46,10 +46,13 @@ def txt2Mat(txtFile, shapeVoxels):
 
 
 
-def efSample(availableTxtFiles, fileFilter = None, seed = 0, Nsamples = 10):
-    txtFiles = list(availableTxtFiles)
-    nTxtFiles = len(txtFiles)
+def efSample(availableTxtFiles, saveLocation, fileFilter = None, seed = 0, Nsamples = 10, Nsplits = 1):
+    '''saveLocation like "../data/endlessforms/train_%s_%d_%d.pkl.gz" (real, size, serial)'''
+
+    allTxtFiles = list(availableTxtFiles)
+    nTxtFiles = len(allTxtFiles)
     random.seed(seed)
+    random.shuffle(allTxtFiles)
 
     #if fileFilter:
     #    lenFilt = len(fileFilter)
@@ -62,55 +65,62 @@ def efSample(availableTxtFiles, fileFilter = None, seed = 0, Nsamples = 10):
     #    nTxtFiles = len(txtFiles)
     #    print 'Filtered using', fileFilter, 'to', nTxtFiles, 'txt files'
 
-    if Nsamples > nTxtFiles:
-        raise Exception('Did not find enough txt files (%d < requested %d)' % (nTxtFiles, Nsamples))
+    Ntotal = Nsamples * Nsplits
+    if Ntotal > nTxtFiles:
+        raise Exception('Did not find enough txt files (%d < requested %d)' % (nTxtFiles, Ntotal))
 
-    print 'Choosing', Nsamples, 'random files'
+    print 'Choosing', Ntotal, 'random files total (%d per file x %d files)' % (Nsamples, Nsplits)
 
-    random.shuffle(txtFiles)
-    txtFiles = txtFiles[:Nsamples]
-    # Convert 'aaaix0tl1w_00000_EXPORT_4.txt' -> ('aaaix0tl1w', 0, 4)
-    labels = []
-    for txtFile in txtFiles:
-        path, filename = os.path.split(txtFile)
-        runId, genSerial, junk, orgId = filename[:-4].split('_')
-        labels.append((runId, int(genSerial), int(orgId)))
+    for splitIdx in range(Nsplits):
+        #print 'Split', splitIdx
 
-    job_server = pp.Server(ncpus=3)
-    jobs = []
-    
-    USE_PP = False
-    data = zeros((Nsamples, SHAPE_VOXELS))
-    for ii, txtFile in enumerate(txtFiles):
+        txtFiles = allTxtFiles[(splitIdx*Nsamples):((splitIdx+1)*Nsamples)]
+        labels = []
+        for txtFile in txtFiles:
+            # Convert 'aaaix0tl1w_00000_EXPORT_4.txt' -> ('aaaix0tl1w', 0, 4)
+            path, filename = os.path.split(txtFile)
+            runId, genSerial, junk, orgId = filename[:-4].split('_')
+            labels.append((runId, int(genSerial), int(orgId)))
+
+        USE_PP = False
+
         if USE_PP:
-            jobs.append((ii, txtFile,
-                         job_server.submit(txt2Mat,
-                                           (txtFile, SHAPE_VOXELS),
-                                           modules=('numpy',),
-                                           ))
-                        )
-            #print 'started', ii
-        else:
-            data[ii,:] = txt2Mat(txtFile, SHAPE_VOXELS)
-            #print 'done with', txtFile
+            job_server = pp.Server(ncpus = 20)
+            jobs = []
 
-    if USE_PP:
-        for ii, txtFile, job in jobs:
-            #print ii, txtFile,
-            sys.stdout.flush()
-            data[ii,:] = job()
-            #print 'done'
-            #print ii, txtFile, results, 'done'
-            if ii % 100 == 0:
-                print 'Finished %d/%d jobs' % (ii, len(jobs))
-            if ii % 10000 == 0:
-                job_server.print_stats()
+        data = zeros((Nsamples, SHAPE_VOXELS), dtype = 'float32')
 
-        print
+        for ii, txtFile in enumerate(txtFiles):
+            if USE_PP:
+                jobs.append((ii, txtFile,
+                             job_server.submit(txt2Mat,
+                                               (txtFile, SHAPE_VOXELS),
+                                               modules=('numpy',),
+                                               ))
+                            )
+                #print 'started', ii
+            else:
+                data[ii,:] = txt2Mat(txtFile, SHAPE_VOXELS)
+                #print 'done with', txtFile
 
-        job_server.print_stats()
+        if USE_PP:
+            for ii, txtFile, job in jobs:
+                #print ii, txtFile,
+                #sys.stdout.flush()
+                data[ii,:] = job()
+                #print 'done'
+                #print ii, txtFile, results, 'done'
+                if ii % 100 == 0:
+                    print 'Finished %d/%d jobs' % (ii, len(jobs))
+                if ii % 10000 == 0:
+                    job_server.print_stats()
 
-    return labels, data
+            print
+
+            job_server.print_stats()
+
+        saveToFile(saveLocation % ('real', Nsamples, splitIdx), (labels, data))
+        saveToFile(saveLocation % ('bool', Nsamples, splitIdx), (labels, data > THRESHOLD))
 
 
 
@@ -140,68 +150,17 @@ def main():
         else:
             testFiles.append(txtFile)
 
-    labels, data = efSample(trainFiles, seed = 0, Nsamples = 50)
-    saveToFile('../data/endlessforms/train_real_50.pkl.gz',   (labels, data))
-    saveToFile('../data/endlessforms/train_thresh_50.pkl.gz', (labels, data > THRESHOLD))
-    labels, data = efSample(testFiles, seed = 0, Nsamples = 50)
-    saveToFile('../data/endlessforms/train_real_50.pkl.gz',   (labels, data))
-    saveToFile('../data/endlessforms/train_thresh_50.pkl.gz', (labels, data > THRESHOLD))
+    efSample(trainFiles, '../data/endlessforms/train_%s_%d_%d.pkl.gz', seed = 0, Nsamples = 50,    Nsplits = 10)
+    efSample(testFiles,  '../data/endlessforms/test_%s_%d_%d.pkl.gz',  seed = 0, Nsamples = 50,    Nsplits = 10)
 
-    labels, data = efSample(trainFiles, seed = 0, Nsamples = 500)
-    saveToFile('../data/endlessforms/train_real_500.pkl.gz',   (labels, data))
-    saveToFile('../data/endlessforms/train_thresh_500.pkl.gz', (labels, data > THRESHOLD))
-    labels, data = efSample(testFiles, seed = 0, Nsamples = 500)
-    saveToFile('../data/endlessforms/train_real_500.pkl.gz',   (labels, data))
-    saveToFile('../data/endlessforms/train_thresh_500.pkl.gz', (labels, data > THRESHOLD))
+    efSample(trainFiles, '../data/endlessforms/train_%s_%d_%d.pkl.gz', seed = 0, Nsamples = 500,   Nsplits = 10)
+    efSample(testFiles,  '../data/endlessforms/test_%s_%d_%d.pkl.gz',  seed = 0, Nsamples = 500,   Nsplits = 10)
 
-    labels, data = efSample(trainFiles, seed = 0, Nsamples = 5000)
-    saveToFile('../data/endlessforms/train_real_5000.pkl.gz',   (labels, data))
-    saveToFile('../data/endlessforms/train_thresh_5000.pkl.gz', (labels, data > THRESHOLD))
-    labels, data = efSample(testFiles, seed = 0, Nsamples = 5000)
-    saveToFile('../data/endlessforms/train_real_5000.pkl.gz',   (labels, data))
-    saveToFile('../data/endlessforms/train_thresh_5000.pkl.gz', (labels, data > THRESHOLD))
+    efSample(trainFiles, '../data/endlessforms/train_%s_%d_%d.pkl.gz', seed = 0, Nsamples = 5000,  Nsplits = 10)
+    efSample(testFiles,  '../data/endlessforms/test_%s_%d_%d.pkl.gz',  seed = 0, Nsamples = 5000,  Nsplits = 10)
 
-    labels, data = efSample(trainFiles, seed = 0, Nsamples = 50000)
-    saveToFile('../data/endlessforms/train_real_50000.pkl.gz',   (labels, data))
-    saveToFile('../data/endlessforms/train_thresh_50000.pkl.gz', (labels, data > THRESHOLD))
-    labels, data = efSample(testFiles, seed = 0, Nsamples = 50000)
-    saveToFile('../data/endlessforms/train_real_50000.pkl.gz',   (labels, data))
-    saveToFile('../data/endlessforms/train_thresh_50000.pkl.gz', (labels, data > THRESHOLD))
-
-    labels, data = efSample(trainFiles, seed = 0, Nsamples = 100000)
-    saveToFile('../data/endlessforms/train_real_100000.pkl.gz',   (labels, data))
-    saveToFile('../data/endlessforms/train_thresh_100000.pkl.gz', (labels, data > THRESHOLD))
-    labels, data = efSample(testFiles, seed = 0, Nsamples = 100000)
-    saveToFile('../data/endlessforms/train_real_100000.pkl.gz',   (labels, data))
-    saveToFile('../data/endlessforms/train_thresh_100000.pkl.gz', (labels, data > THRESHOLD))
-
-    labels, data = efSample(trainFiles, seed = 0, Nsamples = 200000)
-    saveToFile('../data/endlessforms/train_real_200000.pkl.gz',   (labels, data))
-    saveToFile('../data/endlessforms/train_thresh_200000.pkl.gz', (labels, data > THRESHOLD))
-    labels, data = efSample(testFiles, seed = 0, Nsamples = 200000)
-    saveToFile('../data/endlessforms/train_real_200000.pkl.gz',   (labels, data))
-    saveToFile('../data/endlessforms/train_thresh_200000.pkl.gz', (labels, data > THRESHOLD))
-
-    labels, data = efSample(trainFiles, seed = 0, Nsamples = 300000)
-    saveToFile('../data/endlessforms/train_real_300000.pkl.gz',   (labels, data))
-    saveToFile('../data/endlessforms/train_thresh_300000.pkl.gz', (labels, data > THRESHOLD))
-    labels, data = efSample(testFiles, seed = 0, Nsamples = 300000)
-    saveToFile('../data/endlessforms/train_real_300000.pkl.gz',   (labels, data))
-    saveToFile('../data/endlessforms/train_thresh_300000.pkl.gz', (labels, data > THRESHOLD))
-
-    labels, data = efSample(trainFiles, seed = 0, Nsamples = 400000)
-    saveToFile('../data/endlessforms/train_real_400000.pkl.gz',   (labels, data))
-    saveToFile('../data/endlessforms/train_thresh_400000.pkl.gz', (labels, data > THRESHOLD))
-    labels, data = efSample(testFiles, seed = 0, Nsamples = 400000)
-    saveToFile('../data/endlessforms/train_real_400000.pkl.gz',   (labels, data))
-    saveToFile('../data/endlessforms/train_thresh_400000.pkl.gz', (labels, data > THRESHOLD))
-
-    labels, data = efSample(trainFiles, seed = 0, Nsamples = 500000)
-    saveToFile('../data/endlessforms/train_real_500000.pkl.gz',   (labels, data))
-    saveToFile('../data/endlessforms/train_thresh_500000.pkl.gz', (labels, data > THRESHOLD))
-    labels, data = efSample(testFiles, seed = 0, Nsamples = 500000)
-    saveToFile('../data/endlessforms/train_real_500000.pkl.gz',   (labels, data))
-    saveToFile('../data/endlessforms/train_thresh_500000.pkl.gz', (labels, data > THRESHOLD))
+    efSample(trainFiles, '../data/endlessforms/train_%s_%d_%d.pkl.gz', seed = 0, Nsamples = 50000, Nsplits = 10)
+    efSample(testFiles,  '../data/endlessforms/test_%s_%d_%d.pkl.gz',  seed = 0, Nsamples = 50000, Nsplits = 10)
 
 
 
