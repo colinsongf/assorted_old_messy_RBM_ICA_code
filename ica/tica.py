@@ -172,7 +172,7 @@ class TICA(RICA):
 
 
 if __name__ == '__main__':
-    resman.start('tica_speed64', diary = True)
+    resman.start('junk', diary = False)
 
     data = loadFromPklGz('../data/rica_hyv_patches_16.pkl.gz')
     
@@ -184,6 +184,6 @@ if __name__ == '__main__':
                 epsilon = 1e-5,
                 float32 = False,
                 saveDir = resman.rundir)
-    tica.run(data, maxFun = 10)
+    tica.run(data, maxFun = 30)
 
     resman.stop()
