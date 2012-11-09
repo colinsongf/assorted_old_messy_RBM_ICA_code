@@ -171,6 +171,20 @@ class TICA(RICA):
         return self.hiddenLayerShape
 
 
+    def plotCostLog(self):
+        # plot sparsity/reconstruction costs over time
+        costs = self.costLog
+        self.costLog = None
+        pyplot.plot(costs[:,0], 'b-', costs[:,1], 'r-')
+        pyplot.hold(True)
+        pyplot.plot(costs[:,2], '--', color = (.7,0,.7,1))
+        pyplot.legend(('pooling/sparsity * %s' % repr(self.lambd), 'reconstruction', 'total'))
+        pyplot.xlabel('iteration'); pyplot.ylabel('cost')
+        if self.saveDir:
+            pyplot.savefig(os.path.join(self.saveDir, 'cost.png'))
+            pyplot.savefig(os.path.join(self.saveDir, 'cost.pdf'))
+
+
 
 if __name__ == '__main__':
     resman.start('junk', diary = False)
