@@ -128,10 +128,7 @@ class RICA(object):
         return cost, grad
 
 
-    def run(self, data, maxFun = 300, whiten = False, normData = True):
-        '''data should be one data point per COLUMN! (different)'''
-        nInputDim = data.shape[0]
-
+    def dataPrep(self, data, whiten, normData):
         if self.saveDir:
             image = Image.fromarray(tile_raster_images(
                 X = data.T, img_shape = self.imgShape,
@@ -195,9 +192,12 @@ class RICA(object):
             pil_imagesc(cov(data),
                         saveto = os.path.join(self.saveDir, 'dataCov_2postnorm.png'))
 
+        return data
 
+
+    def runOptimization(self, data, maxFun):
         # Initialize weights WW
-        WW = random.randn(self.nFeatures, nInputDim)
+        WW = random.randn(self.nFeatures, self.nInputDim)
         WW = (WW.T / sqrt(sum(WW ** 2, 1))).T
         WW = WW.flatten()
 
@@ -227,7 +227,6 @@ class RICA(object):
                                     jac = True,    # const function retuns both value and gradient
                                     method = 'L-BFGS-B',
                                     options = {'maxiter': maxFun, 'disp': True})
-        xopt = results['x']
         fval = results['fun']
         wallSeconds = time.time() - startWall
         print 'Optimization results:'
@@ -238,6 +237,15 @@ class RICA(object):
         print '  %20s: %s' % ('wall time', fmtSeconds(wallSeconds))
         print '  %20s: %s' % ('wall time/funcall', fmtSeconds(wallSeconds / results['nfev']))
 
+        WW = results['x'].reshape(self.nFeatures, self.nInputDim)
+
+        # Renormalize each patch of WW back to unit ball
+        WW = (WW.T / sqrt(sum(WW**2, axis=1))).T
+
+        return WW
+
+
+    def plotCostLog(self):
         # plot sparsity/reconstruction costs over time
         costs = self.costLog
         self.costLog = None
@@ -246,16 +254,12 @@ class RICA(object):
         pyplot.plot(costs[:,2], '--', color = (.7,0,.7,1))
         pyplot.legend(('sparsity * %s' % repr(self.lambd), 'reconstruction', 'total'))
         pyplot.xlabel('iteration'); pyplot.ylabel('cost')
-        pyplot.savefig(os.path.join(self.saveDir, 'cost.png'))
-        pyplot.savefig(os.path.join(self.saveDir, 'cost.pdf'))
+        if self.saveDir:
+            pyplot.savefig(os.path.join(self.saveDir, 'cost.png'))
+            pyplot.savefig(os.path.join(self.saveDir, 'cost.pdf'))
 
-        WW = xopt.reshape(self.nFeatures, nInputDim)
 
-        # Renormalize each patch of WW back to unit ball
-        WW = (WW.T / sqrt(sum(WW**2, axis=1))).T
-        
-        if self.saveDir:  saveToFile(os.path.join(self.saveDir, 'WW.pkl.gz'), WW)
-
+    def plotWW(self, WW):
         if self.saveDir:
             tilesX = int(sqrt(self.nFeatures * 2./3))
             tilesY = self.nFeatures / tilesX
@@ -272,6 +276,8 @@ class RICA(object):
                 scale_colors_together = False))
             image.save(os.path.join(self.saveDir, 'WW_rescale_indiv.png'))
 
+
+    def plotActivations(self, WW, data):
         # Activation histograms
         hiddenActivationsData = dot(WW, data[:,:200])
         randomData = random.randn(data.shape[0], 200)
@@ -295,6 +301,22 @@ class RICA(object):
             image.save(os.path.join(self.saveDir, 'hidden_act_data.png'))
             image = Image.fromarray((hiddenActivationsRandom.T + 1) * 128).convert('L')
             image.save(os.path.join(self.saveDir, 'hidden_act_random.png'))
+
+
+    def run(self, data, maxFun = 300, whiten = False, normData = True):
+        '''data should be one data point per COLUMN! (different)'''
+
+        data = self.dataPrep(data, whiten = whiten, normData = normData)
+
+        WW = self.runOptimization(data, maxFun)
+
+        if self.saveDir:
+            saveToFile(os.path.join(self.saveDir, 'WW.pkl.gz'), WW)
+
+        # Make and save some plots
+        self.plotCostLog()
+        self.plotWW(WW)
+        self.plotActivations(WW, data)
 
 
 
