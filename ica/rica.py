@@ -59,7 +59,7 @@ class RICA(object):
         self.float32    = float32
         self.costLog    = None
 
-    def cost(self, WW, data):
+    def cost(self, WW, data, plotEvery = None):
         nInputDim = data.shape[0]
         if self.nInputDim != nInputDim:
             raise Exception('Expected shape %s = %d dimensional input, but got %d' % (repr(self.imgShape), self.nInputDim, nInputDim))
@@ -68,6 +68,10 @@ class RICA(object):
         WW = WW.reshape(self.nFeatures, nInputDim)
         WWold = WW
         WW = l2RowScaled(WW)
+
+        numEvals = 0 if self.costLog is None else self.costLog.shape[0]
+        if plotEvery and numEvals % plotEvery == 0:
+            self.plotWW(WW, filePrefix = 'intermed_WW_%04d' % numEvals)
 
         # % Forward Prop
         # h = W*x;
@@ -195,7 +199,7 @@ class RICA(object):
         return data
 
 
-    def runOptimization(self, data, maxFun):
+    def runOptimization(self, data, maxFun, plotEvery):
         # Initialize weights WW
         WW = random.randn(self.nFeatures, self.nInputDim)
         WW = (WW.T / sqrt(sum(WW ** 2, 1))).T
@@ -222,7 +226,7 @@ class RICA(object):
         #                                 iprint = 1,
         #                                 factr = 1e3,
         #                                 maxfun = maxFun)
-        results = minimize(lambda WW : self.cost(WW, data),
+        results = minimize(lambda WW : self.cost(WW, data, plotEvery),
                                     WW,
                                     jac = True,    # const function retuns both value and gradient
                                     method = 'L-BFGS-B',
@@ -259,22 +263,28 @@ class RICA(object):
             pyplot.savefig(os.path.join(self.saveDir, 'cost.pdf'))
 
 
-    def plotWW(self, WW):
+    def getXYNumTiles(self):
+        tilesX = int(sqrt(self.nFeatures * 2./3))
+        tilesY = self.nFeatures / tilesX
+        return tilesX, tilesY
+
+    
+    def plotWW(self, WW, filePrefix = 'WW'):
         if self.saveDir:
-            tilesX = int(sqrt(self.nFeatures * 2./3))
-            tilesY = self.nFeatures / tilesX
+            tilesX, tilesY = self.getXYNumTiles()
             image = Image.fromarray(tile_raster_images(
                 X = WW,
                 img_shape = self.imgShape, tile_shape = (tilesX,tilesY),
                 tile_spacing=(1,1),
                 scale_colors_together = True))
-            image.save(os.path.join(self.saveDir, 'WW.png'))
-            image = Image.fromarray(tile_raster_images(
-                X = WW,
-                img_shape = self.imgShape, tile_shape = (tilesX,tilesY),
-                tile_spacing=(1,1),
-                scale_colors_together = False))
-            image.save(os.path.join(self.saveDir, 'WW_rescale_indiv.png'))
+            image.save(os.path.join(self.saveDir, '%s.png' % filePrefix))
+            if self.imgIsColor:
+                image = Image.fromarray(tile_raster_images(
+                    X = WW,
+                    img_shape = self.imgShape, tile_shape = (tilesX,tilesY),
+                    tile_spacing=(1,1),
+                    scale_colors_together = False))
+                image.save(os.path.join(self.saveDir, '%s_rescale_indiv.png' % filePrefix))
 
 
     def plotActivations(self, WW, data):
@@ -303,12 +313,12 @@ class RICA(object):
             image.save(os.path.join(self.saveDir, 'hidden_act_random.png'))
 
 
-    def run(self, data, maxFun = 300, whiten = False, normData = True):
+    def run(self, data, maxFun = 300, whiten = False, normData = True, plotEvery = None):
         '''data should be one data point per COLUMN! (different)'''
 
         data = self.dataPrep(data, whiten = whiten, normData = normData)
 
-        WW = self.runOptimization(data, maxFun)
+        WW = self.runOptimization(data, maxFun, plotEvery)
 
         if self.saveDir:
             saveToFile(os.path.join(self.saveDir, 'WW.pkl.gz'), WW)
@@ -324,6 +334,7 @@ if __name__ == '__main__':
     resman.start('junk', diary = False)
 
     data = loadFromPklGz('../data/rica_hyv_patches_16.pkl.gz')
+    #data = data[:,:5000]  #HACK
     
     random.seed(0)
     rica = RICA(imgShape = (16, 16),
@@ -332,6 +343,6 @@ if __name__ == '__main__':
                 epsilon = 1e-5,
                 float32 = False,
                 saveDir = resman.rundir)
-    rica.run(data, maxFun = 30)
+    rica.run(data, plotEvery = None, maxFun = 30)
 
     resman.stop()

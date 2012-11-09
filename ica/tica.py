@@ -89,7 +89,7 @@ class TICA(RICA):
             self.HH = array(self.HH, dtype='float32')
 
 
-    def cost(self, WW, data):
+    def cost(self, WW, data, plotEvery = None):
         '''Main method of TICA that differs from RICA.'''
 
         nInputDim = data.shape[0]
@@ -105,19 +105,15 @@ class TICA(RICA):
         WWold = WW
         WW = l2RowScaled(WW)
 
-        # % Forward Prop
-        # h = W*x;
-        # r = W'*h;
+        numEvals = 0 if self.costLog is None else self.costLog.shape[0]
+        if plotEvery and numEvals % plotEvery == 0:
+            self.plotWW(WW, filePrefix = 'intermed_WW_%04d' % numEvals)
+
+        # Forward Prop
         hidden = dot(WW, data)
         reconstruction = dot(WW.T, hidden)
         
-        #pdb.set_trace()
-        #print 'TICA HERE'
-
-        # % Reconstruction Loss and Back Prop
-        # diff = (r - x);
-        # reconstruction_cost = 0.5 * sum(sum(diff.^2));
-        # outderv = diff;
+        # Reconstruction cost
         reconDiff = reconstruction - data
         reconstructionCost = sum(reconDiff ** 2)
 
@@ -171,11 +167,16 @@ class TICA(RICA):
             return cost, grad
 
 
+    def getXYNumTiles(self):
+        return self.hiddenLayerShape
+
+
 
 if __name__ == '__main__':
     resman.start('junk', diary = False)
 
     data = loadFromPklGz('../data/rica_hyv_patches_16.pkl.gz')
+    #data = data[:,:5000]  #HACK
     
     random.seed(0)
     tica = TICA(imgShape = (16, 16),
@@ -185,6 +186,6 @@ if __name__ == '__main__':
                 epsilon = 1e-5,
                 float32 = False,
                 saveDir = resman.rundir)
-    tica.run(data, maxFun = 30)
+    tica.run(data, plotEvery = None, maxFun = 30)
 
     resman.stop()
