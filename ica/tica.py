@@ -177,12 +177,28 @@ if __name__ == '__main__':
 
     data = loadFromPklGz('../data/rica_hyv_patches_16.pkl.gz')
     #data = data[:,:5000]  #HACK
+
+    #hiddenISize = 20
+    #hiddenJSize = 20
+    #lambd = .05
+    #neighborhoodSize = 1
+    #print '\nChosen TICA parameters'
+
+    hiddenISize = random.randint(4, 25+1)
+    hiddenJSize = random.randint(10, 30+1)
+    lambd = .05 * 2 ** random.randint(-4, 4+1)
+    neighborhoodSize = random.randint(1, 4+1)
+    print '\nRandomly selected TICA parameters'
+
+    for key in ['hiddenISize', 'hiddenJSize', 'lambd', 'neighborhoodSize']:
+        print '  %20s: %s' % (key, locals()[key])
     
     random.seed(0)
     tica = TICA(imgShape = (16, 16),
-                hiddenLayerShape = (20, 20),
+                hiddenLayerShape = (hiddenISize, hiddenJSize),
+                neighborhoodSize = neighborhoodSize,
                 shrink = 0,
-                lambd = .05,
+                lambd = lambd,
                 epsilon = 1e-5,
                 float32 = False,
                 saveDir = resman.rundir)
