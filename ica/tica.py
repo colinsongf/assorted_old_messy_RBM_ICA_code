@@ -141,7 +141,7 @@ class TICA(RICA):
         reconstructionCostGrad = 2 * dot(RxT + RxT.T, WW.T).T
 
         # Gradient of sparsity / pooling term
-        SLOW_WAY = True
+        SLOW_WAY = False
         if SLOW_WAY:
             poolingCostGrad = zeros(WW.shape)
             for ii in range(nDatapoints):
@@ -153,21 +153,12 @@ class TICA(RICA):
 
         # fast way?
         Ha = dot(self.HH.T, 1/absPooledActivations)
-        poolingCostGrad = self.lambd * dot(data, (hidden * Ha).T).T
-        #foo = self.lambd * ((1/absPooledActivations) * (hidden.T * self.HH))
+        poolingCostGrad = self.lambd * dot(hidden * Ha, data.T)
 
-        print 'fast way'
-        print poolingCostGrad[:4,:4]
+        #print 'fast way'
+        #print poolingCostGrad[:4,:4]
 
-
-
-
-        oo = ones(nInputDim)
-        gradMaybe = 2 * dot(dot(reconDiff.T, WW.T), (outer(oo, data) + outer(data, oo)))
-
-
-
-
+        WGrad = reconstructionCostGrad + poolingCostGrad
 
         # Log some statistics
         thislog = array([poolingCost, reconstructionCost, cost])
@@ -176,10 +167,13 @@ class TICA(RICA):
         else:
             self.costLog = thislog
 
-        return cost, gradMaybe    # HACK for now, don't return gradient
-        return cost, None    # HACK for now, don't return gradient
+        grad = l2RowScaledGrad(WWold, WW, WGrad)
+        grad = grad.flatten()
 
-    
+        return cost, grad
+
+
+        # NOT USED..................
 
         # % Backprop Output Layer
         # W2grad = outderv * h';
