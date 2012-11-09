@@ -10,7 +10,8 @@ import pdb
 import os, sys, time
 from numpy import *
 from PIL import Image
-from scipy.optimize.lbfgsb import fmin_l_bfgs_b
+#from scipy.optimize.lbfgsb import fmin_l_bfgs_b
+from scipy.optimize import minimize
 
 import matplotlib
 matplotlib.use('Agg') # plot with no display
@@ -47,7 +48,7 @@ def l2RowScaledGrad(xx, yy, outerDeriv):
 
 
 class RICA(object):
-    def __init__(self, imgShape, lambd = .005, nFeatures = 800, epsilon = 1e-5, saveDir = ''):
+    def __init__(self, imgShape, lambd = .005, nFeatures = 800, epsilon = 1e-5, float32 = False, saveDir = ''):
         self.lambd      = lambd
         self.nFeatures  = nFeatures
         self.epsilon    = epsilon
@@ -55,6 +56,7 @@ class RICA(object):
         self.imgShape   = imgShape
         self.imgIsColor = len(imgShape) > 2
         self.nInputDim  = prod(self.imgShape)
+        self.float32    = float32
         self.costLog    = None
 
     def cost(self, WW, data):
@@ -193,12 +195,16 @@ class RICA(object):
             pil_imagesc(cov(data),
                         saveto = os.path.join(self.saveDir, 'dataCov_2postnorm.png'))
 
+
         # Initialize weights WW
         WW = random.randn(self.nFeatures, nInputDim)
         WW = (WW.T / sqrt(sum(WW ** 2, 1))).T
-        #loadedWW = loadtxt('../octave-randTheta')
-        #WW = loadedWW
         WW = WW.flatten()
+
+        # Convert to float32 to be faster, if desired
+        if self.float32:
+            data = array(data, dtype='float32')
+            WW = array(WW, dtype='float32')
 
         # HACK to make faster HACK
         #data = data[:,:8000]
@@ -209,13 +215,18 @@ class RICA(object):
 
         self.costLog = None
         startWall = time.time()
-        xopt, fval, info = fmin_l_bfgs_b(lambda WW : self.cost(WW, data),
-                                         WW,
-                                         fprime = None,   # function call returns value and gradient
-                                         approx_grad = False,
-                                         iprint = 1,
-                                         factr = 1e3,
-                                         maxfun = maxFun)
+        #xopt, fval, info = fmin_l_bfgs_b(lambda WW : self.cost(WW, data),
+        #                                 WW,
+        #                                 fprime = None,   # function call returns value and gradient
+        #                                 approx_grad = False,
+        #                                 iprint = 1,
+        #                                 factr = 1e3,
+        #                                 maxfun = maxFun)
+        xopt, fval, info = minimize(lambda WW : self.cost(WW, data),
+                                    WW,
+                                    jac = True,    # const function retuns both value and gradient
+                                    method = 'L-BFGS-B',
+                                    options = {'maxiter': maxFun, 'disp': True})
         wallSeconds = time.time() - startWall
         print 'Optimization results:'
         for key,val in info.iteritems():
@@ -295,7 +306,8 @@ if __name__ == '__main__':
                 nFeatures = 400,
                 lambd = .05,
                 epsilon = 1e-5,
+                float32 = False,
                 saveDir = resman.rundir)
-    rica.run(data, maxFun = 300)
+    rica.run(data, maxFun = 30)
 
     resman.stop()

@@ -20,24 +20,21 @@ except ImportError:
 
 
 
-def fullNeighborMatrix(hiddenLayerShape, neighborhoodSize):
-    nHidden = prod(hiddenLayerShape)
-    ret = zeros(hiddenLayerShape + hiddenLayerShape)  # 4D tensor
-
-    rangeNeighborII = range(-neighborhoodSize, neighborhoodSize + 1)
-    rangeNeighborJJ = range(-neighborhoodSize, neighborhoodSize + 1)
-
-    for ii in range(hiddenLayerShape[0]):
-        for jj in range(hiddenLayerShape[1]):
-            for nnii in rangeNeighborII:
-                for nnjj in rangeNeighborJJ:
-                    ret[ii, jj, (ii+nnii) % hiddenLayerShape[0], (jj+nnjj) % hiddenLayerShape[1]] = 1
-
-    return reshape(ret, (nHidden, nHidden))
-
-
-
 def neighborMatrix(hiddenLayerShape, neighborhoodSize, shrink = 0):
+    '''Generate the neighbor matrix H, a 4D tensor where for the original tensor:
+    
+        H_i,j,k,l = 1 if the pooled unit at i,j is connected to the hidden unit at k,l
+
+    Note: the tensor is returned flattened to 2D.
+
+    hiddenLayerShape: size of the hidden layer, like (20,30)
+    neighborhoodSize: number of pixels to grow the neighborhood
+        by. e.g. ns=0 -> no pooling, ns=1 -> 3x3 neighborhoods.
+    shrink: shrink each edge of the pooling units by this much vs. the
+        hidden layer size. Just added to illustrate that the number of
+        pooling neurons need not equal the number of hidden neurons.
+    '''
+    
     if shrink < 0:
         raise Exception('shrink parameter must be >= 0')
     if shrink*2 >= min(hiddenLayerShape):
@@ -64,22 +61,32 @@ def neighborMatrix(hiddenLayerShape, neighborhoodSize, shrink = 0):
 
 
 
+def fullNeighborMatrix(hiddenLayerShape, neighborhoodSize):
+    return neighborMatrix(hiddenLayerShape, neighborMatrix, shrink = 0)
+
+
+
 class TICA(RICA):
     '''See RICA for constructor arguments.'''
 
-    def __init__(self, imgShape, lambd = .005, hiddenLayerShape = (10,10), neighborhoodSize = 1, shrink = 0, epsilon = 1e-5, saveDir = ''):
+    def __init__(self, imgShape, lambd = .005, hiddenLayerShape = (10,10), neighborhoodSize = 1,
+                 shrink = 0, epsilon = 1e-5, saveDir = '',
+                 float32 = False):
         self.hiddenLayerShape = hiddenLayerShape
         
         super(TICA, self).__init__(imgShape = imgShape,
                                    lambd = lambd,
                                    nFeatures = prod(self.hiddenLayerShape),
                                    epsilon = epsilon,
+                                   float32 = float32,
                                    saveDir = saveDir)
 
         self.neighborhoodSize = neighborhoodSize
         self.shrink = shrink
         self.nPooled = (self.hiddenLayerShape[0] - self.shrink*2) * (self.hiddenLayerShape[1] - self.shrink*2)
         self.HH = neighborMatrix(self.hiddenLayerShape, self.neighborhoodSize, shrink = self.shrink)
+        if self.float32:
+            self.HH = array(self.HH, dtype='float32')
 
 
     def cost(self, WW, data):
@@ -90,11 +97,13 @@ class TICA(RICA):
         if self.nInputDim != nInputDim:
             raise Exception('Expected shape %s = %d dimensional input, but got %d' % (repr(self.imgShape), self.nInputDim, nInputDim))
 
+        if self.float32:
+            WW = array(WW, dtype='float32')
+        
         # NOTE: Flattening and reshaping is in C order in numpy but Fortran order in Matlab. This should not matter.
         WW = WW.reshape(self.nFeatures, nInputDim)
         WWold = WW
         WW = l2RowScaled(WW)
-
 
         # % Forward Prop
         # h = W*x;
@@ -112,31 +121,15 @@ class TICA(RICA):
         reconDiff = reconstruction - data
         reconstructionCost = sum(reconDiff ** 2)
 
-
         # L2 Pooling / Sparsity cost
         absPooledActivations = sqrt(self.epsilon + dot(self.HH, hidden ** 2))
         poolingTerm = absPooledActivations.sum()
         poolingCost = self.lambd * poolingTerm
 
-        # % Sparsity Cost
-        # K = sqrt(params.epsilon + h.^2);
-        # sparsity_cost = params.lambda * sum(sum(K));
-        # K = 1./K;
-        #KK = sqrt(self.epsilon + hidden ** 2)
-        #sparsityCost = self.lambd * sum(KK)
-        #KK = 1/KK
-
-        #outDeriv = reconDiff
-
         # Total cost
         cost = reconstructionCost + poolingCost
 
-
-        # HACK FOR TESTING!!!!!!!!!!!!!!
-        #cost = reconstructionCost
-
-
-        # Gradient of reconstruction cost term        
+        # Gradient of reconstruction cost term
         RxT = dot(reconDiff, data.T)
         reconstructionCostGrad = 2 * dot(RxT + RxT.T, WW.T).T
 
@@ -154,7 +147,6 @@ class TICA(RICA):
         # fast way?
         Ha = dot(self.HH.T, 1/absPooledActivations)
         poolingCostGrad = self.lambd * dot(hidden * Ha, data.T)
-
         #print 'fast way'
         #print poolingCostGrad[:4,:4]
 
@@ -170,54 +162,28 @@ class TICA(RICA):
         grad = l2RowScaledGrad(WWold, WW, WGrad)
         grad = grad.flatten()
 
-        return cost, grad
-
-
-        # NOT USED..................
-
-        # % Backprop Output Layer
-        # W2grad = outderv * h';
-        W2Grad = dot(outDeriv, hidden.T)
-
-        # % Backprop Hidden Layer
-        # outderv = W * outderv;
-        # outderv = outderv + params.lambda * (h .* K);
-        outDeriv = dot(WW, outDeriv)
-        outDeriv = outDeriv + self.lambd * (hidden * KK)
-
-        # W1grad = outderv * x';
-        # Wgrad = W1grad + W2grad';
-        W1Grad = dot(outDeriv, data.T)
-        WGrad = W1Grad + W2Grad.T
-
-        # % unproject gradient for minFunc
-        # grad = l2rowscaledg(Wold, W, Wgrad, 1);
-        # grad = grad(:);
-        grad = l2RowScaledGrad(WWold, WW, WGrad)
-        grad = grad.flatten()
-
-        print 'f =', cost, '|grad| =', linalg.norm(grad)
-
-        return cost, grad
-
-    def numericalCostGradient(self, WW, data):
-        gradCost = dfun = Gradient(lambda w: self.cost(w, data))
-        
-        return gradCost(WW)
+        #pdb.set_trace()
+        if self.float32:
+            # convert back to keep fortran happy
+            return cost, array(grad, dtype='float64')
+        else:
+            return cost, grad
 
 
 
 if __name__ == '__main__':
-    resman.start('junk', diary = False)
+    resman.start('tica_speed64', diary = True)
 
     data = loadFromPklGz('../data/rica_hyv_patches_16.pkl.gz')
     
     random.seed(0)
     tica = TICA(imgShape = (16, 16),
-                hiddenLayerShape = (4, 5),
+                hiddenLayerShape = (20, 20),
+                shrink = 0,
                 lambd = .05,
                 epsilon = 1e-5,
+                float32 = False,
                 saveDir = resman.rundir)
-    tica.run(data, maxFun = 300)
+    tica.run(data, maxFun = 10)
 
     resman.stop()
