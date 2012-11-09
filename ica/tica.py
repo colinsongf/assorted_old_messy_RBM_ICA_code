@@ -162,7 +162,8 @@ class TICA(RICA):
         grad = l2RowScaledGrad(WWold, WW, WGrad)
         grad = grad.flatten()
 
-        #pdb.set_trace()
+        print 'f =', cost, '|grad| =', linalg.norm(grad)
+
         if self.float32:
             # convert back to keep fortran happy
             return cost, array(grad, dtype='float64')

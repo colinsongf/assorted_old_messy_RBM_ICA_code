@@ -222,19 +222,21 @@ class RICA(object):
         #                                 iprint = 1,
         #                                 factr = 1e3,
         #                                 maxfun = maxFun)
-        xopt, fval, info = minimize(lambda WW : self.cost(WW, data),
+        results = minimize(lambda WW : self.cost(WW, data),
                                     WW,
                                     jac = True,    # const function retuns both value and gradient
                                     method = 'L-BFGS-B',
                                     options = {'maxiter': maxFun, 'disp': True})
+        xopt = results['x']
+        fval = results['fun']
         wallSeconds = time.time() - startWall
         print 'Optimization results:'
-        for key,val in info.iteritems():
-            print '  %20s: %s' % (key, repr(val))
+        for key in ['status', 'nfev', 'success', 'fun', 'message']:
+            print '  %20s: %s' % (key, results[key])
         print '  %20s: %s' % ('fval', fval)
         print '  %20s: %s' % ('fval/example', fval/data.shape[1])
         print '  %20s: %s' % ('wall time', fmtSeconds(wallSeconds))
-        print '  %20s: %s' % ('wall time/funcall', fmtSeconds(wallSeconds / info['funcalls']))
+        print '  %20s: %s' % ('wall time/funcall', fmtSeconds(wallSeconds / results['nfev']))
 
         # plot sparsity/reconstruction costs over time
         costs = self.costLog
