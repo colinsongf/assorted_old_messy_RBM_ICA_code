@@ -61,6 +61,7 @@ class RICA(object):
 
     def cost(self, WW, data, plotEvery = None):
         nInputDim = data.shape[0]
+        nDatapoints = data.shape[1]
         if self.nInputDim != nInputDim:
             raise Exception('Expected shape %s = %d dimensional input, but got %d' % (repr(self.imgShape), self.nInputDim, nInputDim))
 
@@ -95,17 +96,6 @@ class RICA(object):
         reconstructionCost = .5 * sum(reconDiff ** 2)
         outDeriv = reconDiff
 
-        # % compute the cost comprised of: 1) sparsity and 2) reconstruction
-        # cost = sparsity_cost + reconstruction_cost;
-        #print '   sp', sparsityCost, 'rc', reconstructionCost
-        cost = sparsityCost + reconstructionCost
-
-        thislog = array([sparsityCost, reconstructionCost, cost])
-        if isinstance(self.costLog, ndarray):
-            self.costLog = vstack((self.costLog, thislog))
-        else:
-            self.costLog = thislog
-
         # % Backprop Output Layer
         # W2grad = outderv * h';
         W2Grad = dot(outDeriv, hidden.T)
@@ -127,8 +117,23 @@ class RICA(object):
         grad = l2RowScaledGrad(WWold, WW, WGrad)
         grad = grad.flatten()
 
+        # % compute the cost comprised of: 1) sparsity and 2) reconstruction
+        # cost = sparsity_cost + reconstruction_cost;
+        #print '   sp', sparsityCost, 'rc', reconstructionCost
+        sparsityCost /= nDatapoints
+        reconstructionCost /= nDatapoints
+        cost = sparsityCost + reconstructionCost
+        WGrad /= nDatapoints
+
+        thislog = array([sparsityCost, reconstructionCost, cost])
+        if isinstance(self.costLog, ndarray):
+            self.costLog = vstack((self.costLog, thislog))
+        else:
+            self.costLog = thislog
+
         print 'f =', cost, '|grad| =', linalg.norm(grad)
 
+        # Return cost and grad per data point
         return cost, grad
 
 

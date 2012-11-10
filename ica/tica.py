@@ -7,7 +7,9 @@ Jason Yosinski
 '''
 
 import pdb
+import os
 from numpy import *
+from matplotlib import pyplot
 
 from util.ResultsManager import resman
 from util.dataLoaders import loadFromPklGz, saveToFile
@@ -20,7 +22,7 @@ except ImportError:
 
 
 
-def neighborMatrix(hiddenLayerShape, neighborhoodSize, shrink = 0):
+def neighborMatrix(hiddenLayerShape, neighborhoodSize, shrink = 0, gaussian = False):
     '''Generate the neighbor matrix H, a 4D tensor where for the original tensor:
     
         H_i,j,k,l = 1 if the pooled unit at i,j is connected to the hidden unit at k,l
@@ -48,16 +50,36 @@ def neighborMatrix(hiddenLayerShape, neighborhoodSize, shrink = 0):
     # ret_i,j,k,l = 1 if the pooled unit at i,j is connected to the hidden unit at k,l
     ret = zeros(pooledLayerShape + hiddenLayerShape)
 
-    rangeNeighborII = range(-neighborhoodSize, neighborhoodSize + 1)
-    rangeNeighborJJ = range(-neighborhoodSize, neighborhoodSize + 1)
+    if gaussian:
+        sigmaSq = float(neighborhoodSize)**2
+        halfIWidth = hiddenLayerShape[0]/2
+        halfJWidth = hiddenLayerShape[1]/2
+        for ii in range(pooledLayerShape[0]):
+            for jj in range(pooledLayerShape[1]):
+                for nnii in range(hiddenLayerShape[0]):
+                    for nnjj in range(hiddenLayerShape[1]):
+                        # get min dist (including wraparound)
+                        iDiff = (((ii - (nnii-shrink))+halfIWidth) % hiddenLayerShape[0])-halfIWidth
+                        jDiff = (((jj - (nnjj-shrink))+halfJWidth) % hiddenLayerShape[1])-halfJWidth
+                        distSq = iDiff ** 2 + jDiff ** 2
+                        weight = exp(-distSq / sigmaSq)
+                        #print ii, jj, nnii, nnjj, '  ', iDiff, jDiff, distSq, '%.3f' % exp(-distSq / sigmaSq)
+                        # cut off very low values
+                        ret[ii, jj, nnii, nnjj] = weight if weight > .01 else 0
+                        #ret[ii, jj, nnii, nnjj] = distSq   # Just for testing
+    else:
+        rangeNeighborII = range(-neighborhoodSize, neighborhoodSize + 1)
+        rangeNeighborJJ = range(-neighborhoodSize, neighborhoodSize + 1)
 
-    for ii in range(pooledLayerShape[0]):
-        for jj in range(pooledLayerShape[1]):
-            for nnii in rangeNeighborII:
-                for nnjj in rangeNeighborJJ:
-                    ret[ii, jj, (ii+shrink+nnii) % hiddenLayerShape[0], (jj+shrink+nnjj) % hiddenLayerShape[1]] = 1
+        for ii in range(pooledLayerShape[0]):
+            for jj in range(pooledLayerShape[1]):
+                for nnii in rangeNeighborII:
+                    for nnjj in rangeNeighborJJ:
+                        ret[ii, jj, (ii+shrink+nnii) % hiddenLayerShape[0], (jj+shrink+nnjj) % hiddenLayerShape[1]] = 1
 
-    return reshape(ret, (nPooled, nHidden))
+    ret = reshape(ret, (nPooled, nHidden))
+    ret = (ret.T / sum(ret, 1)).T     # Normalize to total weight 1 per pooling unit
+    return ret
 
 
 
@@ -69,9 +91,9 @@ def fullNeighborMatrix(hiddenLayerShape, neighborhoodSize):
 class TICA(RICA):
     '''See RICA for constructor arguments.'''
 
-    def __init__(self, imgShape, lambd = .005, hiddenLayerShape = (10,10), neighborhoodSize = 1,
-                 shrink = 0, epsilon = 1e-5, saveDir = '',
-                 float32 = False):
+    def __init__(self, imgShape, lambd = .005, hiddenLayerShape = (10,10), neighborhoodParams = ('gaussian', 1.0, 0),
+                 epsilon = 1e-5, saveDir = '', float32 = False):
+        ''''''
         self.hiddenLayerShape = hiddenLayerShape
         
         super(TICA, self).__init__(imgShape = imgShape,
@@ -81,10 +103,19 @@ class TICA(RICA):
                                    float32 = float32,
                                    saveDir = saveDir)
 
-        self.neighborhoodSize = neighborhoodSize
-        self.shrink = shrink
+        # Pooling neighborhood params
+        if len(neighborhoodParams) != 3:
+            raise Exception('Expected tuple of length 3 for neighborhoodParams')
+        self.neighborhoodType, self.neighborhoodSize, self.shrink = neighborhoodParams
+        self.neighborhoodType = self.neighborhoodType.lower()
+        if self.neighborhoodType not in ('gaussian', 'flat'):
+            raise Exception('Expected neighborhoodType to be gaussian or flat, but got "%s"' % repr(self.neighborhoodType))
+        self.neighborhoodIsGaussian = (self.neighborhoodType == 'gaussian')
+
         self.nPooled = (self.hiddenLayerShape[0] - self.shrink*2) * (self.hiddenLayerShape[1] - self.shrink*2)
-        self.HH = neighborMatrix(self.hiddenLayerShape, self.neighborhoodSize, shrink = self.shrink)
+        self.HH = neighborMatrix(self.hiddenLayerShape, self.neighborhoodSize,
+                                 shrink = self.shrink, gaussian = self.neighborhoodIsGaussian)
+
         if self.float32:
             self.HH = array(self.HH, dtype='float32')
 
@@ -122,9 +153,6 @@ class TICA(RICA):
         poolingTerm = absPooledActivations.sum()
         poolingCost = self.lambd * poolingTerm
 
-        # Total cost
-        cost = reconstructionCost + poolingCost
-
         # Gradient of reconstruction cost term
         RxT = dot(reconDiff, data.T)
         reconstructionCostGrad = 2 * dot(RxT + RxT.T, WW.T).T
@@ -146,10 +174,16 @@ class TICA(RICA):
         #print 'fast way'
         #print poolingCostGrad[:4,:4]
 
+        # Total cost and gradient per training example
+        poolingCost /= nDatapoints
+        reconstructionCost /= nDatapoints
+        totalCost = reconstructionCost + poolingCost
+        reconstructionCostGrad /= nDatapoints
+        poolingCostGrad /= nDatapoints
         WGrad = reconstructionCostGrad + poolingCostGrad
 
         # Log some statistics
-        thislog = array([poolingCost, reconstructionCost, cost])
+        thislog = array([poolingCost, reconstructionCost, totalCost])
         if isinstance(self.costLog, ndarray):
             self.costLog = vstack((self.costLog, thislog))
         else:
@@ -158,13 +192,13 @@ class TICA(RICA):
         grad = l2RowScaledGrad(WWold, WW, WGrad)
         grad = grad.flatten()
 
-        print 'f =', cost, '|grad| =', linalg.norm(grad)
+        print 'f =', totalCost, '|grad| =', linalg.norm(grad)
 
         if self.float32:
             # convert back to keep fortran happy
-            return cost, array(grad, dtype='float64')
+            return totalCost, array(grad, dtype='float64')
         else:
-            return cost, grad
+            return totalCost, grad
 
 
     def getXYNumTiles(self):
@@ -201,7 +235,7 @@ if __name__ == '__main__':
     hiddenISize = random.randint(4, 25+1)
     hiddenJSize = random.randint(10, 30+1)
     lambd = .05 * 2 ** random.randint(-4, 4+1)
-    neighborhoodSize = random.randint(1, 4+1)
+    neighborhoodSize = random.uniform(.1,3)
     print '\nRandomly selected TICA parameters'
 
     for key in ['hiddenISize', 'hiddenJSize', 'lambd', 'neighborhoodSize']:
@@ -210,12 +244,11 @@ if __name__ == '__main__':
     random.seed(0)
     tica = TICA(imgShape = (16, 16),
                 hiddenLayerShape = (hiddenISize, hiddenJSize),
-                neighborhoodSize = neighborhoodSize,
-                shrink = 0,
+                neighborhoodParams = ('gaussian', neighborhoodSize, 0),
                 lambd = lambd,
                 epsilon = 1e-5,
                 float32 = False,
                 saveDir = resman.rundir)
-    tica.run(data, plotEvery = None, maxFun = 30)
+    tica.run(data, plotEvery = 5, maxFun = 300)
 
     resman.stop()
