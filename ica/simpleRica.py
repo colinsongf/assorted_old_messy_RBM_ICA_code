@@ -17,7 +17,7 @@ from util.dataLoaders import loadFromPklGz, saveToFile
 
 
 if __name__ == '__main__':
-    resman.start('simpleShape_4_nw', diary = True)
+    resman.start('junk', diary = False)
 
     Nw = 4
     dataXX, dataYY = loadFromPklGz('../data/simpleShapes/train_%02d_50.pkl.gz' % Nw)
