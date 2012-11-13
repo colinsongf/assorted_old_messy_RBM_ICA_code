@@ -234,7 +234,7 @@ if __name__ == '__main__':
 
     hiddenISize = random.randint(4, 25+1)
     hiddenJSize = random.randint(10, 30+1)
-    lambd = .05 * 2 ** random.randint(-4, 4+1)
+    lambd = .1 * 2 ** random.randint(-5, 5+1)
     neighborhoodSize = random.uniform(.1,3)
     print '\nRandomly selected TICA parameters'
 
@@ -249,6 +249,6 @@ if __name__ == '__main__':
                 epsilon = 1e-5,
                 float32 = False,
                 saveDir = resman.rundir)
-    tica.run(data, plotEvery = 5, maxFun = 300)
+    tica.run(data, plotEvery = 2, maxFun = 300)
 
     resman.stop()
