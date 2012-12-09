@@ -8,7 +8,8 @@ import cPickle as pickle
 import numpy
 
 from matplotlib import pyplot
-from rbm.utils import imagesc, tile_raster_images
+from util.plotting import tile_raster_images
+from rbm.utils import imagesc
 from makeUpsonRovio1 import saveToFile
 
 
