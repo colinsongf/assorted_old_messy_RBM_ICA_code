@@ -318,6 +318,41 @@ class RICA(object):
             image.save(os.path.join(self.saveDir, 'hidden_act_random.png'))
 
 
+    def plotReconstructions(self, WW, data, number = 20):
+        '''Plots reconstructions for some randomly chosen data points.'''
+
+        if self.saveDir:
+            hidden = dot(WW, data[:,:number])
+            reconstruction = dot(WW.T, hidden)
+            
+            tilesX, tilesY = self.getXYNumTiles()
+            for ii in xrange(number):
+                hilightAmount = abs(hidden[:,ii])
+                hilightAmount -= hilightAmount.min()
+                hilightAmount /= hilightAmount.max() + 1e-6
+                hilights = outer(hilightAmount, array([1,0,0]))
+                tileImg = Image.fromarray(tile_raster_images(
+                    X = WW,
+                    img_shape = self.imgShape, tile_shape = (tilesX,tilesY),
+                    tile_spacing=(2,2),
+                    scale_colors_together = True,
+                    hilights = hilights))
+                rawReconErr = array([data[:,ii], reconstruction[:,ii], reconstruction[:,ii]-data[:,ii]])
+                rawReconErrImg = Image.fromarray(tile_raster_images(
+                    X = rawReconErr,
+                    img_shape = self.imgShape, tile_shape = (rawReconErr.shape[0], 1),
+                    tile_spacing=(1,1),
+                    scale_colors_together = True))
+                rescaleFactor = 2
+                rawReconErrImg = rawReconErrImg.resize([x*rescaleFactor for x in rawReconErrImg.size])
+                size = (tileImg.size[0] + rawReconErrImg.size[0] + rescaleFactor,
+                        max(tileImg.size[1], rawReconErrImg.size[1]))
+                wholeImage = Image.new('RGBA', size, (51, 51, 51))
+                wholeImage.paste(tileImg, (0, 0))
+                wholeImage.paste(rawReconErrImg, (tileImg.size[1] + rescaleFactor, 0))
+                wholeImage.save(os.path.join(self.saveDir, '%s_%d.png' % ('testing_recon', ii)))
+
+
     def run(self, data, maxFun = 300, whiten = False, normData = True, plotEvery = None):
         '''data should be one data point per COLUMN! (different)'''
 
@@ -332,6 +367,7 @@ class RICA(object):
         self.plotCostLog()
         self.plotWW(WW)
         self.plotActivations(WW, data)
+        self.plotReconstructions(WW, data)
 
 
 

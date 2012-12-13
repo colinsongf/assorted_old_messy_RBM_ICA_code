@@ -24,18 +24,19 @@ if __name__ == '__main__':
 
     data = loadFromPklGz('../data/atari/mspacmantrain_15_50000_3c.pkl.gz')
     data = data.T   # Make into one example per column
+    #data = data[:,:5000]      # HACK!!!!!!!!!
     
-    #hiddenISize = 20
-    #hiddenJSize = 20
-    #lambd = .05
-    #neighborhoodSize = 1
-    #print '\nChosen TICA parameters'
+    hiddenISize = 8
+    hiddenJSize = 8
+    lambd = .05
+    neighborhoodSize = 1.5
+    print '\nChosen TICA parameters'
     
-    hiddenISize = random.randint(4, 25+1)
-    hiddenJSize = random.randint(10, 30+1)
-    lambd = .1 * 2 ** random.randint(-5, 5+1)
-    neighborhoodSize = random.uniform(.1,3)
-    print '\nRandomly selected TICA parameters'
+    #hiddenISize = random.randint(4, 25+1)
+    #hiddenJSize = random.randint(10, 30+1)
+    #lambd = .1 * 2 ** random.randint(-5, 5+1)
+    #neighborhoodSize = random.uniform(.1,3)
+    #print '\nRandomly selected TICA parameters'
 
     for key in ['hiddenISize', 'hiddenJSize', 'lambd', 'neighborhoodSize']:
         print '  %20s: %s' % (key, locals()[key])
@@ -47,6 +48,6 @@ if __name__ == '__main__':
                 lambd = lambd,
                 epsilon = 1e-5,
                 saveDir = resman.rundir)
-    tica.run(data, plotEvery = 5, maxFun = 300, whiten = True)
+    tica.run(data, plotEvery = 5, maxFun = 300, whiten = False)
 
     resman.stop()

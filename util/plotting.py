@@ -36,7 +36,7 @@ def scale_all_rows_to_unit_interval(ndar,eps=1e-8):
 
 def tile_raster_images(X, img_shape, tile_shape, tile_spacing = (0,0), 
                        scale_rows_to_unit_interval = True, scale_colors_together = False,
-                       output_pixel_vals = True):
+                       output_pixel_vals = True, hilights = None):
     '''
     Transform an array with one flattened image per row, into an array in 
     which images are reshaped and layed out like tiles on a floor.
@@ -61,6 +61,8 @@ def tile_raster_images(X, img_shape, tile_shape, tile_spacing = (0,0),
     :param scale_rows_to_unit_interval: if the values need to be scaled before
     being plotted to [0,1] or not
 
+    :param hilights: list of hilights to apply to each tile. 
+
 
     :returns: array suitable for viewing as an image.  
     (See:`PIL.Image.fromarray`.)
@@ -74,6 +76,16 @@ def tile_raster_images(X, img_shape, tile_shape, tile_spacing = (0,0),
 
     isColor = len(img_shape) == 3
 
+    if hilights is not None:
+        assert hilights.shape[0] == X.shape[0]
+        if len(hilights.shape) == 1:
+            hilightIsColor = False
+        elif hilights.shape[1] == 3:
+            hilightIsColor = True
+        else:
+            raise Exception('expected hilights.shape to be (X,) or (X,3), but it is %s' % hilights.shape)
+        assert isColor == hilightIsColor
+
     #pdb.set_trace()
 
     # The expression below can be re-written in a more C style as 
@@ -84,7 +96,7 @@ def tile_raster_images(X, img_shape, tile_shape, tile_spacing = (0,0),
     #                tile_spacing[0]
     # out_shape[1] = (img_shape[1]+tile_spacing[1])*tile_shape[1] -
     #                tile_spacing[1]
-    out_shape = [(ishp + tsp) * tshp - tsp for ishp, tshp, tsp 
+    out_shape = [(ishp + tsp) * tshp for ishp, tshp, tsp 
                         in zip(img_shape, tile_shape, tile_spacing)]
 
     if isColor:
@@ -97,7 +109,7 @@ def tile_raster_images(X, img_shape, tile_shape, tile_spacing = (0,0),
         else:
             dt = X.dtype
         if str(dt) not in ('uint8', 'float32'):
-            raise Exception('color only worsk for uint8 or float32 dtype, not %s' % dt)
+            raise Exception('color only works for uint8 or float32 dtype, not %s' % dt)
 
         if scale_rows_to_unit_interval and scale_colors_together:
             X = scale_all_rows_to_unit_interval(X)
@@ -108,10 +120,13 @@ def tile_raster_images(X, img_shape, tile_shape, tile_spacing = (0,0),
              X[:,:,:,2].reshape(X.shape[0], img_shape[0] * img_shape[1]),
              None, #numpy.ones(X[:,0:nPerChannel].shape, dtype=dt), # hardcode complete opacity
              )
+        if hilights is not None:
+            hilights = (hilights[:,0], hilights[:,1], hilights[:,2], None)
 
 
     if isinstance(X, tuple):
         assert len(X) == 4
+        if hilights is None: hilights = (None, None, None, None)
         # Create an output numpy ndarray to store the image
         if output_pixel_vals:
             #out_array = numpy.zeros((out_shape[0], out_shape[1], 4), dtype='uint8')
@@ -146,7 +161,9 @@ def tile_raster_images(X, img_shape, tile_shape, tile_spacing = (0,0),
                 if isColor and scale_colors_together:
                     # already scaled whole rows
                     doScaleRows = False
-                out_array[:,:,i] = tile_raster_images(X[i], img_shape[0:2], tile_shape, tile_spacing, doScaleRows, False, output_pixel_vals)
+                out_array[:,:,i] = tile_raster_images(X[i], img_shape[0:2], tile_shape,
+                                                      tile_spacing, doScaleRows, False,
+                                                      output_pixel_vals, hilights[i])
         return out_array
 
     else:
@@ -179,9 +196,16 @@ def tile_raster_images(X, img_shape, tile_shape, tile_spacing = (0,0),
                     c = 1
                     if output_pixel_vals:
                         c = 255
+                    # Set slightly bigger region to hilight color
+                    if hilights is not None:
+                        out_array[
+                            tile_row * (H+Hs):tile_row*(H+Hs)+H+Hs,
+                            tile_col * (W+Ws):tile_col*(W+Ws)+W+Ws
+                            ] \
+                            = hilights[tile_row * tile_shape[1] + tile_col] * c
                     out_array[
-                        tile_row * (H+Hs):tile_row*(H+Hs)+H,
-                        tile_col * (W+Ws):tile_col*(W+Ws)+W
+                        tile_row * (H+Hs)+Hs/2:tile_row*(H+Hs)+H+Hs/2,
+                        tile_col * (W+Ws)+Ws/2:tile_col*(W+Ws)+W+Ws/2
                         ] \
                         = this_img * c
         return out_array
