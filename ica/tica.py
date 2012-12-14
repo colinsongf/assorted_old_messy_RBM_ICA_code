@@ -120,6 +120,20 @@ class TICA(RICA):
             self.HH = array(self.HH, dtype='float32')
 
 
+    def costAndLog(self, WW, data, plotEvery = None):
+        totalCost, poolingCost, reconstructionCost, grad = self.cost(WW, data, plotEvery = plotEvery)
+
+        # Log some statistics
+        thislog = array([poolingCost, reconstructionCost, totalCost])
+        if isinstance(self.costLog, ndarray):
+            self.costLog = vstack((self.costLog, thislog))
+        else:
+            self.costLog = thislog
+
+        print 'f =', totalCost, '|grad| =', linalg.norm(grad)
+
+        return totalCost, grad
+
     def cost(self, WW, data, plotEvery = None):
         '''Main method of TICA that differs from RICA.'''
 
@@ -182,23 +196,14 @@ class TICA(RICA):
         poolingCostGrad /= nDatapoints
         WGrad = reconstructionCostGrad + poolingCostGrad
 
-        # Log some statistics
-        thislog = array([poolingCost, reconstructionCost, totalCost])
-        if isinstance(self.costLog, ndarray):
-            self.costLog = vstack((self.costLog, thislog))
-        else:
-            self.costLog = thislog
-
         grad = l2RowScaledGrad(WWold, WW, WGrad)
         grad = grad.flatten()
 
-        print 'f =', totalCost, '|grad| =', linalg.norm(grad)
-
         if self.float32:
             # convert back to keep fortran happy
-            return totalCost, array(grad, dtype='float64')
+            return totalCost, poolingCost, reconstructionCost, array(grad, dtype='float64')
         else:
-            return totalCost, grad
+            return totalCost, poolingCost, reconstructionCost, grad
 
 
     def getXYNumTiles(self):
@@ -217,6 +222,11 @@ class TICA(RICA):
         if self.saveDir:
             pyplot.savefig(os.path.join(self.saveDir, 'cost.png'))
             pyplot.savefig(os.path.join(self.saveDir, 'cost.pdf'))
+
+
+    def getReconPlotString(self, costEtc):
+        totalCost, poolingCost, reconstructionCost, grad = costEtc
+        return 'R: %g P*%g: %g T %g' % (reconstructionCost, self.lambd, poolingCost, totalCost)
 
 
 

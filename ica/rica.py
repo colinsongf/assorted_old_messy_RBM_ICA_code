@@ -9,7 +9,7 @@ Jason Yosinski
 import pdb
 import os, sys, time
 from numpy import *
-from PIL import Image
+from PIL import Image, ImageFont, ImageDraw
 #from scipy.optimize.lbfgsb import fmin_l_bfgs_b
 from scipy.optimize import minimize
 
@@ -58,6 +58,23 @@ class RICA(object):
         self.nInputDim  = prod(self.imgShape)
         self.float32    = float32
         self.costLog    = None
+        self.pca        = None    # Used for whitening / unwhitening data
+
+
+    def costAndLog(self, WW, data, plotEvery = None):
+        cost, sparsityCost, reconstructionCost, grad = self.cost(WW, data, plotEvery = plotEvery)
+
+        thislog = array([sparsityCost, reconstructionCost, cost])
+        if isinstance(self.costLog, ndarray):
+            self.costLog = vstack((self.costLog, thislog))
+        else:
+            self.costLog = thislog
+
+        print 'f =', cost, '|grad| =', linalg.norm(grad)
+
+        # Return cost and grad per data point
+        return cost, grad
+
 
     def cost(self, WW, data, plotEvery = None):
         nInputDim = data.shape[0]
@@ -123,18 +140,9 @@ class RICA(object):
         sparsityCost /= nDatapoints
         reconstructionCost /= nDatapoints
         cost = sparsityCost + reconstructionCost
-        WGrad /= nDatapoints
+        #WGrad /= nDatapoints
 
-        thislog = array([sparsityCost, reconstructionCost, cost])
-        if isinstance(self.costLog, ndarray):
-            self.costLog = vstack((self.costLog, thislog))
-        else:
-            self.costLog = thislog
-
-        print 'f =', cost, '|grad| =', linalg.norm(grad)
-
-        # Return cost and grad per data point
-        return cost, grad
+        return cost, sparsityCost, reconstructionCost, grad
 
 
     def dataPrep(self, data, whiten, normData):
@@ -163,11 +171,11 @@ class RICA(object):
                         saveto = os.path.join(self.saveDir, 'dataCov_0raw.png'))
 
         if whiten:
-            pca = PCA(data.T)
-            dataWhite = pca.toZca(data.T, epsilon = 1e-6).T
+            self.pca = PCA(data.T)
+            dataWhite = self.pca.toZca(data.T, epsilon = 1e-6).T
 
             if self.saveDir:
-                pyplot.semilogy(pca.fracVar, 'o-')
+                pyplot.semilogy(self.pca.fracVar, 'o-')
                 pyplot.title('Fractional variance in each dimension')
                 pyplot.savefig(os.path.join(self.saveDir, 'fracVar.png'))
                 pyplot.savefig(os.path.join(self.saveDir, 'fracVar.pdf'))
@@ -224,14 +232,14 @@ class RICA(object):
 
         self.costLog = None
         startWall = time.time()
-        #xopt, fval, info = fmin_l_bfgs_b(lambda WW : self.cost(WW, data),
+        #xopt, fval, info = fmin_l_bfgs_b(lambda WW : self.costAndLog(WW, data),
         #                                 WW,
         #                                 fprime = None,   # function call returns value and gradient
         #                                 approx_grad = False,
         #                                 iprint = 1,
         #                                 factr = 1e3,
         #                                 maxfun = maxFun)
-        results = minimize(lambda WW : self.cost(WW, data, plotEvery),
+        results = minimize(lambda WW : self.costAndLog(WW, data, plotEvery),
                                     WW,
                                     jac = True,    # const function retuns both value and gradient
                                     method = 'L-BFGS-B',
@@ -318,15 +326,24 @@ class RICA(object):
             image.save(os.path.join(self.saveDir, 'hidden_act_random.png'))
 
 
-    def plotReconstructions(self, WW, data, number = 20):
+    def plotReconstructions(self, WW, data, number = 1000):
         '''Plots reconstructions for some randomly chosen data points.'''
 
         if self.saveDir:
+            dataIsWhitened = (self.pca is not None)
+            tileRescaleFactor  = 2
+            reconRescaleFactor = 3
+            font = ImageFont.load_default()
+
             hidden = dot(WW, data[:,:number])
             reconstruction = dot(WW.T, hidden)
             
             tilesX, tilesY = self.getXYNumTiles()
+            if dataIsWhitened:
+                dataOrig = self.pca.fromZca(data[:,:number].T, epsilon = 1e-6).T
+                reconstructionOrig = self.pca.fromZca(reconstruction[:,:number].T, epsilon = 1e-6).T
             for ii in xrange(number):
+                # Hilighted tiled image
                 hilightAmount = abs(hidden[:,ii])
                 hilightAmount -= hilightAmount.min()
                 hilightAmount /= hilightAmount.max() + 1e-6
@@ -337,20 +354,39 @@ class RICA(object):
                     tile_spacing=(2,2),
                     scale_colors_together = True,
                     hilights = hilights))
-                rawReconErr = array([data[:,ii], reconstruction[:,ii], reconstruction[:,ii]-data[:,ii]])
+                tileImg = tileImg.resize([x*tileRescaleFactor for x in tileImg.size])
+
+                # Input / Reconstruction image
+                if dataIsWhitened:
+                    rawReconErr = array([dataOrig[:,ii], data[:,ii], reconstruction[:,ii], reconstructionOrig[:,ii],
+                                         reconstruction[:,ii]-data[:,ii], reconstructionOrig[:,ii]-dataOrig[:,ii]])
+                else:
+                    rawReconErr = array([data[:,ii], reconstruction[:,ii],
+                                         reconstruction[:,ii]-data[:,ii]])
                 rawReconErrImg = Image.fromarray(tile_raster_images(
                     X = rawReconErr,
                     img_shape = self.imgShape, tile_shape = (rawReconErr.shape[0], 1),
                     tile_spacing=(1,1),
                     scale_colors_together = True))
-                rescaleFactor = 2
-                rawReconErrImg = rawReconErrImg.resize([x*rescaleFactor for x in rawReconErrImg.size])
-                size = (tileImg.size[0] + rawReconErrImg.size[0] + rescaleFactor,
-                        max(tileImg.size[1], rawReconErrImg.size[1]))
+                rawReconErrImg = rawReconErrImg.resize([x*reconRescaleFactor for x in rawReconErrImg.size])
+
+                # Combined
+                costEtc = self.cost(WW, data[:,ii:ii+1])
+                string = self.getReconPlotString(costEtc)
+                fontSize = font.font.getsize(string)
+                size = (max(tileImg.size[0] + rawReconErrImg.size[0] + reconRescaleFactor, fontSize[0]),
+                        max(tileImg.size[1], rawReconErrImg.size[1]) + fontSize[1])
                 wholeImage = Image.new('RGBA', size, (51, 51, 51))
                 wholeImage.paste(tileImg, (0, 0))
-                wholeImage.paste(rawReconErrImg, (tileImg.size[1] + rescaleFactor, 0))
-                wholeImage.save(os.path.join(self.saveDir, '%s_%d.png' % ('testing_recon', ii)))
+                wholeImage.paste(rawReconErrImg, (tileImg.size[1] + reconRescaleFactor, 0))
+                draw = ImageDraw.Draw(wholeImage)
+                draw.text(((size[0]-fontSize[0])/2, size[1]-fontSize[1]), string, font=font)
+                wholeImage.save(os.path.join(self.saveDir, '%s_%04d.png' % ('testing_recon', ii)))
+
+
+    def getReconPlotString(self, costEtc):
+        totalCost, sparsityCost, reconstructionCost, grad = costEtc
+        return 'R: %g S*%g: %g T %g' % (reconstructionCost, self.lambd, sparsityCost, totalCost)
 
 
     def run(self, data, maxFun = 300, whiten = False, normData = True, plotEvery = None):
@@ -361,7 +397,7 @@ class RICA(object):
         WW = self.runOptimization(data, maxFun, plotEvery)
 
         if self.saveDir:
-            saveToFile(os.path.join(self.saveDir, 'WW.pkl.gz'), WW)
+            saveToFile(os.path.join(self.saveDir, 'WW+pca.pkl.gz'), (WW, self.pca))
 
         # Make and save some plots
         self.plotCostLog()
@@ -384,6 +420,6 @@ if __name__ == '__main__':
                 epsilon = 1e-5,
                 float32 = False,
                 saveDir = resman.rundir)
-    rica.run(data, plotEvery = None, maxFun = 30)
+    rica.run(data, plotEvery = None, maxFun = 1, whiten = False)
 
     resman.stop()

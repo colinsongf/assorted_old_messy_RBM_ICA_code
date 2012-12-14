@@ -22,7 +22,8 @@ from util.dataLoaders import loadFromPklGz, saveToFile
 if __name__ == '__main__':
     resman.start('junk', diary = False)
 
-    data = loadFromPklGz('../data/atari/mspacmantrain_15_50000_3c.pkl.gz')
+    #data = loadFromPklGz('../data/atari/mspacman_train_15_50000_3c.pkl.gz')
+    data = loadFromPklGz('../data/atari/space_invaders_train_15_50000_3c.pkl.gz')
     data = data.T   # Make into one example per column
     #data = data[:,:5000]      # HACK!!!!!!!!!
     
