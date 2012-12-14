@@ -6,7 +6,7 @@ from numpy.linalg import norm
 
 
 
-class PCA_SVD:
+class PCA_SVD(object):
     def __init__(self, xx):
         '''
         PROBABLY DO NOT USE THIS VERSION
@@ -110,7 +110,7 @@ class PCA_SVD:
 
 
 
-class PCA:
+class PCA(object):
     def __init__(self, xx):
         '''
         Inspired by PCA in matplotlib.mlab
