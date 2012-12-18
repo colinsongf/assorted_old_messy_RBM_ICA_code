@@ -226,7 +226,7 @@ class TICA(RICA):
 
     def getReconPlotString(self, costEtc):
         totalCost, poolingCost, reconstructionCost, grad = costEtc
-        return 'R: %g P*%g: %g T %g' % (reconstructionCost, self.lambd, poolingCost, totalCost)
+        return 'R: %g P*%g: %g T: %g' % (reconstructionCost, self.lambd, poolingCost, totalCost)
 
 
 

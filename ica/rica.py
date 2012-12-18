@@ -326,7 +326,7 @@ class RICA(object):
             image.save(os.path.join(self.saveDir, 'hidden_act_random.png'))
 
 
-    def plotReconstructions(self, WW, data, number = 1000):
+    def plotReconstructions(self, WW, data, number = 200):
         '''Plots reconstructions for some randomly chosen data points.'''
 
         if self.saveDir:
@@ -345,9 +345,10 @@ class RICA(object):
             for ii in xrange(number):
                 # Hilighted tiled image
                 hilightAmount = abs(hidden[:,ii])
-                hilightAmount -= hilightAmount.min()
-                hilightAmount /= hilightAmount.max() + 1e-6
-                hilights = outer(hilightAmount, array([1,0,0]))
+                maxHilight = hilightAmount.max()
+                #hilightAmount -= hilightAmount.min()   # Don't push to 0
+                hilightAmount /= maxHilight + 1e-6
+                hilights = outer(hilightAmount, array([1,0,0]))  # Red
                 tileImg = Image.fromarray(tile_raster_images(
                     X = WW,
                     img_shape = self.imgShape, tile_shape = (tilesX,tilesY),
@@ -370,17 +371,27 @@ class RICA(object):
                     scale_colors_together = True))
                 rawReconErrImg = rawReconErrImg.resize([x*reconRescaleFactor for x in rawReconErrImg.size])
 
+                # Add Red activation limit
+                redString = '%g' % maxHilight
+                fontSize = font.font.getsize(redString)
+                size = (max(tileImg.size[0], fontSize[0]), tileImg.size[1] + fontSize[1])
+                tempImage = Image.new('RGBA', size, (51, 51, 51))
+                tempImage.paste(tileImg, (0, 0))
+                draw = ImageDraw.Draw(tempImage)
+                draw.text(((size[0]-fontSize[0])/2, size[1]-fontSize[1]), redString, font=font)
+                tileImg = tempImage
+
                 # Combined
                 costEtc = self.cost(WW, data[:,ii:ii+1])
-                string = self.getReconPlotString(costEtc)
-                fontSize = font.font.getsize(string)
+                costString = self.getReconPlotString(costEtc)
+                fontSize = font.font.getsize(costString)
                 size = (max(tileImg.size[0] + rawReconErrImg.size[0] + reconRescaleFactor, fontSize[0]),
                         max(tileImg.size[1], rawReconErrImg.size[1]) + fontSize[1])
                 wholeImage = Image.new('RGBA', size, (51, 51, 51))
                 wholeImage.paste(tileImg, (0, 0))
-                wholeImage.paste(rawReconErrImg, (tileImg.size[1] + reconRescaleFactor, 0))
+                wholeImage.paste(rawReconErrImg, (tileImg.size[0] + reconRescaleFactor, 0))
                 draw = ImageDraw.Draw(wholeImage)
-                draw.text(((size[0]-fontSize[0])/2, size[1]-fontSize[1]), string, font=font)
+                draw.text(((size[0]-fontSize[0])/2, size[1]-fontSize[1]), costString, font=font)
                 wholeImage.save(os.path.join(self.saveDir, '%s_%04d.png' % ('testing_recon', ii)))
 
 
