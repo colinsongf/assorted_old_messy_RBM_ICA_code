@@ -6,7 +6,7 @@ from numpy import *
 from matplotlib import pyplot
 from scipy.optimize import fmin_bfgs
 
-from rbm.ResultsManager import resman
+from GitResultsManager import resman
 from rbm.pca import PCA
 
 

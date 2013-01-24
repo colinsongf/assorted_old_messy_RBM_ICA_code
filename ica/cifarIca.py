@@ -11,7 +11,7 @@ import pdb
 from ica import testIca
 from rbm.utils import loadUpsonData
 from util.dataLoaders import loadCifarData, loadCifarDataMonochrome
-from rbm.ResultsManager import resman
+from GitResultsManager import resman
 
 
 

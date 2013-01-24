@@ -11,9 +11,9 @@ import os, sys, time
 from numpy import *
 from PIL import Image
 from scipy.optimize.lbfgsb import fmin_l_bfgs_b
+from GitResultsManager import resman, fmtSeconds
 
 from rica import RICA
-from util.ResultsManager import resman, fmtSeconds
 from util.plotting import tile_raster_images
 from util.dataLoaders import loadFromPklGz, saveToFile
 

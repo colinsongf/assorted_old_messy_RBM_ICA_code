@@ -8,7 +8,7 @@ Jason Yosinski
 
 from ica import testIca
 from rbm.utils import load_mnist_data
-from rbm.ResultsManager import resman
+from GitResultsManager import resman
 
 
 

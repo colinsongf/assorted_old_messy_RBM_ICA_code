@@ -14,7 +14,7 @@ from PIL import Image
 
 from sklearn.decomposition import FastICA
 
-from rbm.ResultsManager import resman
+from GitResultsManager import resman
 from rbm.pca import PCA
 from rbm.utils import tile_raster_images, load_mnist_data, saveToFile, looser
 

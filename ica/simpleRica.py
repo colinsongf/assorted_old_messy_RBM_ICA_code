@@ -11,7 +11,7 @@ import os, sys, time
 from numpy import *
 
 from rica import RICA
-from util.ResultsManager import resman
+from GitResultsManager import resman
 from util.dataLoaders import loadFromPklGz, saveToFile
 
 

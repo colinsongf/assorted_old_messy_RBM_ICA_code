@@ -13,7 +13,7 @@ from PIL import Image
 from scipy.optimize.lbfgsb import fmin_l_bfgs_b
 
 from tica import TICA
-from util.ResultsManager import resman, fmtSeconds
+from GitResultsManager import resman, fmtSeconds
 from util.plotting import tile_raster_images
 from util.dataLoaders import loadFromPklGz, saveToFile
 

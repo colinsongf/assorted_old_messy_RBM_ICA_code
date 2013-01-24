@@ -14,7 +14,7 @@ from scipy.optimize.lbfgsb import fmin_l_bfgs_b
 import pp
 
 from rica import RICA
-from util.ResultsManager import resman, fmtSeconds
+from GitResultsManager import resman, fmtSeconds
 from util.plotting import tile_raster_images
 from util.dataLoaders import loadFromPklGz, saveToFile
 
@@ -68,7 +68,7 @@ if __name__ == '__main__':
                      job_server.submit(ricaRun,
                                        args = (ii, resman),
                                        modules=('from rica import RICA',
-                                                'from util.ResultsManager import resman, fmtSeconds',
+                                                'from GitResultsManager import resman, fmtSeconds',
                                                 'from util.plotting import tile_raster_images',
                                                 'from util.dataLoaders import loadFromPklGz, saveToFile',
                                                 ),

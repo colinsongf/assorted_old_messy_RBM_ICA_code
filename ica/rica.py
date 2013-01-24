@@ -12,12 +12,12 @@ from numpy import *
 from PIL import Image, ImageFont, ImageDraw
 #from scipy.optimize.lbfgsb import fmin_l_bfgs_b
 from scipy.optimize import minimize
+from GitResultsManager import resman, fmtSeconds
 
 import matplotlib
 matplotlib.use('Agg') # plot with no display
 from matplotlib import pyplot
 
-from util.ResultsManager import resman, fmtSeconds
 from util.plotting import tile_raster_images, pil_imagesc
 from util.dataLoaders import loadFromPklGz, saveToFile
 from util.math import sigmoid

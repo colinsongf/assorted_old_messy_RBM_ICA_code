@@ -10,8 +10,8 @@ import pdb
 import os
 from numpy import *
 from matplotlib import pyplot
+from GitResultsManager import resman
 
-from util.ResultsManager import resman
 from util.dataLoaders import loadFromPklGz, saveToFile
 from rica import RICA, l2RowScaled, l2RowScaledGrad
 
@@ -198,6 +198,8 @@ class TICA(RICA):
 
         grad = l2RowScaledGrad(WWold, WW, WGrad)
         grad = grad.flatten()
+
+        pdb.set_trace()
 
         if self.float32:
             # convert back to keep fortran happy

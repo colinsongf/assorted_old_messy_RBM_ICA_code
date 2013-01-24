@@ -8,7 +8,7 @@ Jason Yosinski
 
 from ica import testIca
 from rbm.utils import loadUpsonData
-from rbm.ResultsManager import resman
+from GitResultsManager import resman
 
 
 
