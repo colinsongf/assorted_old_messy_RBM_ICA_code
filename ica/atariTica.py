@@ -45,10 +45,10 @@ if __name__ == '__main__':
     random.seed(0)
     tica = TICA(imgShape = (15, 15, 3),
                 hiddenLayerShape = (hiddenISize, hiddenJSize),
-                neighborhoodParams = ('gaussian', neighborhoodSize, 0),
+                neighborhoodParams = ('gaussian', neighborhoodSize, 0, 0),
                 lambd = lambd,
                 epsilon = 1e-5,
                 saveDir = resman.rundir)
-    tica.run(data, plotEvery = 5, maxFun = 300, whiten = False)
+    tica.run(data, plotEvery = 50, maxFun = 300, normData = True, whiten = True)
 
     resman.stop()

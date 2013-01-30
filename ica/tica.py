@@ -22,7 +22,7 @@ except ImportError:
 
 
 
-def neighborMatrix(hiddenLayerShape, neighborhoodSize, shrink = 0, gaussian = False):
+def neighborMatrix(hiddenLayerShape, neighborhoodSize, shrink = 0, gaussian = False, nPoolingIgnoredNeurons = 0):
     '''Generate the neighbor matrix H, a 4D tensor where for the original tensor:
     
         H_i,j,k,l = 1 if the pooled unit at i,j is connected to the hidden unit at k,l
@@ -35,6 +35,11 @@ def neighborMatrix(hiddenLayerShape, neighborhoodSize, shrink = 0, gaussian = Fa
     shrink: shrink each edge of the pooling units by this much vs. the
         hidden layer size. Just added to illustrate that the number of
         pooling neurons need not equal the number of hidden neurons.
+    nPoolingIgnoredNeurons: number of hidden neurons (starting at the
+       top-left and continuing down the first column, then second
+       column, and so on) to ignore when computing the pooled neuron
+       responses. If nPoolingIgnoredNeurons > 0, we simply set that
+       many corresponding entries in the neighborMatrix to 0.
     '''
     
     if shrink < 0:
@@ -45,6 +50,9 @@ def neighborMatrix(hiddenLayerShape, neighborhoodSize, shrink = 0, gaussian = Fa
     pooledLayerShape = (hiddenLayerShape[0]-2*shrink, hiddenLayerShape[1]-2*shrink)
     nHidden = prod(hiddenLayerShape)
     nPooled = prod(pooledLayerShape)
+
+    if nPoolingIgnoredNeurons < 0 or nPoolingIgnoredNeurons > nHidden:
+        raise Exception('Expected nPoolingIgnoredNeurons in [0, %d] but got %d' % (nHidden, nPoolingIgnoredNeurons))
 
     # Create the 4D neighborhood tensor.
     # ret_i,j,k,l = 1 if the pooled unit at i,j is connected to the hidden unit at k,l
@@ -78,6 +86,7 @@ def neighborMatrix(hiddenLayerShape, neighborhoodSize, shrink = 0, gaussian = Fa
                         ret[ii, jj, (ii+shrink+nnii) % hiddenLayerShape[0], (jj+shrink+nnjj) % hiddenLayerShape[1]] = 1
 
     ret = reshape(ret, (nPooled, nHidden))
+    ret[:,0:nPoolingIgnoredNeurons] = 0     # Ignore some number of hidden neurons
     ret = (ret.T / sum(ret, 1)).T     # Normalize to total weight 1 per pooling unit
     return ret
 
@@ -91,7 +100,7 @@ def fullNeighborMatrix(hiddenLayerShape, neighborhoodSize):
 class TICA(RICA):
     '''See RICA for constructor arguments.'''
 
-    def __init__(self, imgShape, lambd = .005, hiddenLayerShape = (10,10), neighborhoodParams = ('gaussian', 1.0, 0),
+    def __init__(self, imgShape, lambd = .005, hiddenLayerShape = (10,10), neighborhoodParams = ('gaussian', 1.0, 0, 0),
                  epsilon = 1e-5, saveDir = '', float32 = False):
         ''''''
         self.hiddenLayerShape = hiddenLayerShape
@@ -104,9 +113,10 @@ class TICA(RICA):
                                    saveDir = saveDir)
 
         # Pooling neighborhood params
-        if len(neighborhoodParams) != 3:
-            raise Exception('Expected tuple of length 3 for neighborhoodParams')
-        self.neighborhoodType, self.neighborhoodSize, self.shrink = neighborhoodParams
+        # ('type', size, shrink, ignore)
+        if len(neighborhoodParams) != 4:
+            raise Exception('Expected tuple of length 4 for neighborhoodParams')
+        self.neighborhoodType, self.neighborhoodSize, self.shrink, self.nPoolingIgnoredNeurons = neighborhoodParams
         self.neighborhoodType = self.neighborhoodType.lower()
         if self.neighborhoodType not in ('gaussian', 'flat'):
             raise Exception('Expected neighborhoodType to be gaussian or flat, but got "%s"' % repr(self.neighborhoodType))
@@ -114,7 +124,8 @@ class TICA(RICA):
 
         self.nPooled = (self.hiddenLayerShape[0] - self.shrink*2) * (self.hiddenLayerShape[1] - self.shrink*2)
         self.HH = neighborMatrix(self.hiddenLayerShape, self.neighborhoodSize,
-                                 shrink = self.shrink, gaussian = self.neighborhoodIsGaussian)
+                                 shrink = self.shrink, gaussian = self.neighborhoodIsGaussian,
+                                 nPoolingIgnoredNeurons = self.nPoolingIgnoredNeurons)
 
         if self.float32:
             self.HH = array(self.HH, dtype='float32')
@@ -198,8 +209,6 @@ class TICA(RICA):
 
         grad = l2RowScaledGrad(WWold, WW, WGrad)
         grad = grad.flatten()
-
-        pdb.set_trace()
 
         if self.float32:
             # convert back to keep fortran happy
