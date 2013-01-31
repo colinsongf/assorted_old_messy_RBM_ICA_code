@@ -1,10 +1,10 @@
 #! /usr/bin/env python
 
-
 import os, pdb, gzip
 from PIL import Image
 from numpy import *
 import cPickle as pickle
+from util.dataLoaders import saveToFile
 
 
 
@@ -37,10 +37,11 @@ def randomSampleMatrix(filterNames, Nw = 10, Nsamples = 10):
     # select random windows
     maxJ = size[0] - Nw
     maxI = size[1] - Nw
-    randomSamples = vstack((random.randint(0, Nw, Nsamples),
+    raise Exception('fix this next line!')
+    randomSamples = vstack((random.randint(0, Nw, Nsamples),      # <-- should be Nimages
                             random.randint(0, maxI+1, Nsamples),
                             random.randint(0, maxJ+1, Nsamples))).T
-    raise Exception('fix this next line!')
+    raise Exception('fix this next line (NOT row sort)!')
     randomSamples.sort(0)   # for efficient loading and unloading of images into memory. Re-randomize before returing
     
     imageMatrix = zeros((Nsamples, Nw * Nw), dtype = float32)
@@ -62,14 +63,6 @@ def randomSampleMatrix(filterNames, Nw = 10, Nsamples = 10):
     imageMatrix /= 255   # normalize to 0-1 range
     random.shuffle(imageMatrix)
     return imageMatrix
-
-
-
-def saveToFile(filename, obj):
-    ff = gzip.open(filename, 'wb')
-    pickle.dump(obj, ff, protocol = -1)
-    print 'saved to', filename
-    ff.close()
 
 
 
