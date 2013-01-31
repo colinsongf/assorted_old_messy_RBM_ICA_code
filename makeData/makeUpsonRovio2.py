@@ -114,6 +114,7 @@ def main():
         sav(flnm % ('test_%02d_50000_1c' % Nw),  rsm(testFilter, big-Nw, False, Nw = Nw, Nsamples = 50000))
 
     # color (same seeds as grayscale so same patches are selected)
+    #    Runs out of memory on largest: 40_50000_3c (test or train)
     for Nw in [2, 4, 8, 10, 15, 20, 28, 30, 40]:
         sav(flnm % ('train_%02d_50_3c' % Nw),    rsm(trainFilter,    Nw, True, Nw = Nw, Nsamples = 50))
         sav(flnm % ('test_%02d_50_3c' % Nw),     rsm(testFilter, big-Nw, True, Nw = Nw, Nsamples = 50))
