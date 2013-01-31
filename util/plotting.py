@@ -84,6 +84,22 @@ def tile_raster_images(X, img_shape, tile_shape, tile_spacing = (0,0),
             hilightIsColor = True
         else:
             raise Exception('expected hilights.shape to be (X,) or (X,3), but it is %s' % hilights.shape)
+
+        if not isColor and hilightIsColor:
+            # promote data to be color
+            promotedX = numpy.repeat(X, 3, axis=1)
+            promotedImgShape = (img_shape[0], img_shape[1], 3)
+            return tile_raster_images(promotedX, promotedImgShape, tile_shape, tile_spacing,
+                                      scale_rows_to_unit_interval, scale_colors_together,
+                                      output_pixel_vals, hilights)
+        if isColor and not hilightIsColor:
+            # promote hilight to be color
+            promotedHilight = tile(numpy.atleast_2d(hilights).T, (1,3))
+            return tile_raster_images(X, img_shape, tile_shape, tile_spacing,
+                                      scale_rows_to_unit_interval, scale_colors_together,
+                                      output_pixel_vals, promotedHilight)
+
+        # Now this must be true
         assert isColor == hilightIsColor
 
     #pdb.set_trace()
