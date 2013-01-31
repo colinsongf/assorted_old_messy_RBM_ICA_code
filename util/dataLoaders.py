@@ -2,10 +2,10 @@
 
 import cPickle as pickle
 import numpy
-from numpy import array, zeros
+from numpy import array, zeros, reshape
 import gzip
 import cPickle as pickle
-import pdb
+import ipdb
 
 
 
@@ -56,6 +56,18 @@ def loadCifarDataMonochrome(cifarDirectory):
 
     # no validation set,
     return [[train_set_x_mono, datasets[0][1]], datasets[1], [test_set_x_mono, datasets[2][1]]], classNames
+
+
+
+def loadCifarDataSubsets(cifarDirectory, size, topLeftCoords):
+    ''' Loads the CIFAR-10 dataset but chops it up into
+    len(topLeftCoords) windows of size SIZE, where this first window
+    is anchored at (ii,jj) = topLeftCoords[0], etc...'''
+
+    datasets, classNames = loadCifarData(cifarDirectory)
+
+    print 'Abandoned for now... pick up later, maybe'
+    ipdb.set_trace()
 
 
 
