@@ -24,7 +24,7 @@ if __name__ == '__main__':
 
     data = loadFromPklGz('../data/upson_rovio_2/train_10_50000_1c.pkl.gz')
     data = data.T   # Make into one example per column
-    data = data[:,:5000]      # HACK!!!!!!!!!
+    #data = data[:,:5000]      # HACK!!!!!!!!!
     
     nFeatures = 100
     lambd = .05
@@ -40,7 +40,7 @@ if __name__ == '__main__':
                 lambd = lambd,
                 epsilon = 1e-5,
                 saveDir = resman.rundir)
-    rica.run(data, maxFun = 100, whiten = True, plotEvery = 50)
+    rica.run(data, maxFun = 300, whiten = True, plotEvery = 50)
 
 
     resman.stop()
