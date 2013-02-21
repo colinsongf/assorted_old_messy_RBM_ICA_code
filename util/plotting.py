@@ -34,6 +34,16 @@ def scale_all_rows_to_unit_interval(ndar,eps=1e-8):
     return ndar
 
 
+def scale_some_rows_to_unit_interval(ndar, rowIdx, eps = 1e-8):
+    ''' Scales rows given by rowIdx in the 2D array ndar to be between 0 and 1'''
+    assert(len(ndar.shape) == 2)
+    ndar = ndar.copy()
+    for ii in rowIdx:
+        ndar[ii,:] -= ndar[ii,:].min()
+        ndar[ii,:] /= (ndar[ii,:].max() + 1e-8)
+    return ndar
+
+
 def tile_raster_images(X, img_shape, tile_shape, tile_spacing = (0,0), 
                        scale_rows_to_unit_interval = True, scale_colors_together = False,
                        output_pixel_vals = True, hilights = None):

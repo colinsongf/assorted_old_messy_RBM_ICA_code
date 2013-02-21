@@ -1,13 +1,13 @@
-#! /usr/bin/env ipythonwx
+#! /usr/bin/env ipython --gui=wx
 
 import os, pdb, gzip, sys
 import argparse
-from numpy import mgrid, array, ones, zeros, linspace, random
+from numpy import mgrid, array, ones, zeros, linspace, random, reshape
 from tvtk.api import tvtk
 
 from utils import loadFromFile
 from squaresRbm import loadPickledData
-from ResultsManager import resman
+from GitResultsManager import resman
 
 
 from mayavi import mlab

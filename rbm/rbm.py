@@ -22,8 +22,9 @@ rc('font',**{'size':8})
 #rc('font',**{'family':'sans-serif','sans-serif':['Helvetica'],'size':8})
 #rc('text', usetex=True)
 
-from utils import tile_raster_images, imagesc, load_mnist_data, saveToFile
-from ResultsManager import resman
+from util.plotting import tile_raster_images
+from utils import imagesc, load_mnist_data, saveToFile
+from GitResultsManager import resman
 from pca import PCA
 
 

@@ -4,7 +4,7 @@ import numpy, time, gzip, os, pdb
 import pickle, sys
 from numpy import *
 
-from ResultsManager import resman
+from GitResultsManager import resman
 from rbm import RBM, test_rbm
 
 
