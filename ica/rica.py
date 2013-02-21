@@ -18,7 +18,7 @@ import matplotlib
 matplotlib.use('Agg') # plot with no display
 from matplotlib import pyplot
 
-from util.plotting import tile_raster_images, pil_imagesc
+from util.plotting import tile_raster_images, pil_imagesc, scale_some_rows_to_unit_interval
 from util.dataLoaders import loadFromPklGz, saveToFile
 from util.math import sigmoid
 from rbm.pca import PCA
@@ -147,6 +147,8 @@ class RICA(object):
 
     def dataPrep(self, data, whiten, normData):
         if self.saveDir:
+            print 'data_raw plot'
+            #pdb.set_trace()  DEBUG?
             image = Image.fromarray(tile_raster_images(
                 X = data.T, img_shape = self.imgShape,
                 tile_shape = (20, 30), tile_spacing=(1,1),
@@ -340,6 +342,8 @@ class RICA(object):
             
             tilesX, tilesY = self.getXYNumTiles()
             if dataIsWhitened:
+                print 'recon plot'
+                #pdb.set_trace() DEBUG?
                 dataOrig = self.pca.fromZca(data[:,:number].T, epsilon = 1e-6).T
                 reconstructionOrig = self.pca.fromZca(reconstruction[:,:number].T, epsilon = 1e-6).T
             for ii in xrange(number):
@@ -361,14 +365,18 @@ class RICA(object):
                 if dataIsWhitened:
                     rawReconErr = array([dataOrig[:,ii], data[:,ii], reconstruction[:,ii], reconstructionOrig[:,ii],
                                          reconstruction[:,ii]-data[:,ii], reconstructionOrig[:,ii]-dataOrig[:,ii]])
+                    # manually scale only whitened data and diffs
+                    rawReconErr = scale_some_rows_to_unit_interval(rawReconErr, [1, 2, 4, 5])
                 else:
                     rawReconErr = array([data[:,ii], reconstruction[:,ii],
                                          reconstruction[:,ii]-data[:,ii]])
+                    # manually scale only diffs
+                    rawReconErr = scale_some_rows_to_unit_interval(rawReconErr, [2])
                 rawReconErrImg = Image.fromarray(tile_raster_images(
                     X = rawReconErr,
                     img_shape = self.imgShape, tile_shape = (rawReconErr.shape[0], 1),
                     tile_spacing=(1,1),
-                    scale_colors_together = True))
+                    scale_rows_to_unit_interval = False))
                 rawReconErrImg = rawReconErrImg.resize([x*reconRescaleFactor for x in rawReconErrImg.size])
 
                 # Add Red activation limit
@@ -392,7 +400,7 @@ class RICA(object):
                 wholeImage.paste(rawReconErrImg, (tileImg.size[0] + reconRescaleFactor, 0))
                 draw = ImageDraw.Draw(wholeImage)
                 draw.text(((size[0]-fontSize[0])/2, size[1]-fontSize[1]), costString, font=font)
-                wholeImage.save(os.path.join(self.saveDir, '%s_%04d.png' % ('testing_recon', ii)))
+                wholeImage.save(os.path.join(self.saveDir, '%s_%04d.png' % ('recon', ii)))
 
 
     def getReconPlotString(self, costEtc):
