@@ -17,6 +17,9 @@ import pdb
 import numpy
 import Image
 
+from mayavi import mlab
+from mayavi.mlab import points3d, contour3d, plot3d
+
 def scale_to_unit_interval(ndar,eps=1e-8):
     ''' Scales all values in the ndarray ndar to be between 0 and 1 '''
     ndar = ndar.copy()
@@ -248,4 +251,80 @@ def pil_imagesc(arr, epsilon = 1e-8, saveto = None):
     if saveto:
         image.save(saveto)
 
+
+
+cubeEdges = array([[0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 0, 0],
+                   [0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 1, 1, 0],
+                   [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 1, 1, 1, 1]])
+
+
+
+def plot3DShape(shape, Nw,
+                saveFilename = None, smoothed = False, visSimple = True,
+                plotThresh = 0, figSize = (300,300)):
+    '''Plots a 3D shape of size Nw x Nw x Nw inside a frame.'''
+
+    if type(Nw) is list or type(Nw) is tuple:
+        Nx,Ny,Nz = Nw
+    else:
+        Nx,Ny,Nz = Nw,Nw,Nw
+
+    indexX, indexY, indexZ = mgrid[0:Nx,0:Ny,0:Nz]
+    edges = (array([Nx,Ny,Nz]) * cubeEdges.T).T
     
+    fig = mlab.figure(0, size = figSize)
+    mlab.clf(fig)
+    fig.scene.interactor.interactor_style = tvtk.InteractorStyleTerrain()
+    plot3d(edges[0,:], edges[1,:], edges[2,:], color=(.5,.5,.5),
+           line_width = 0,
+           representation = 'wireframe',
+           opacity = 1)
+    
+    if smoothed:
+        #contour3d(reshape(shape, (Nx,Ny,Nz)), contours=[.5], color=(1,1,1))
+        contour3d(reshape(shape, (Ny,Nz,Nx)), contours=[.5], color=(1,1,1))
+        #contour3d(reshape(shape, (Nz,Nx,Ny)), contours=[.5], color=(1,1,1))
+    else:
+        print saveFilename
+        mn = shape.min()
+        mx = shape.max()
+        idx = (shape > plotThresh)
+        print mn, mx, sum(idx)
+        #pdb.set_trace()
+        if sum(idx) > 0:
+            if visSimple:
+                pts = points3d(indexX.flatten()[idx] + .5,
+                               indexY.flatten()[idx] + .5,
+                               indexZ.flatten()[idx] + .5,
+                               ones(sum(idx)) * .9,
+                               #((shape-mn) / (mx-mn) * .9)[idx],
+                               color = (1,1,1),
+                               mode = 'cube',
+                               scale_factor = 1.0)
+            else:
+                pts = points3d(indexX.flatten()[idx] + .5,
+                         indexY.flatten()[idx] + .5,
+                         indexZ.flatten()[idx] + .5,
+                         #ones(sum(idx)) * .9,
+                         ((shape-mn) / (mx-mn) * .9)[idx],
+                         colormap = 'bone',
+                         #color = (1,1,1),
+                         mode = 'cube',
+                         scale_factor = 1.0)
+            lut = pts.module_manager.scalar_lut_manager.lut.table.to_array()
+            tt = linspace(0, 255, 256)
+            lut[:, 0] = tt*0 + 255
+            lut[:, 1] = tt*0 + 255
+            lut[:, 2] = tt*0 + 255
+            lut[:, 3] = tt
+            pts.module_manager.scalar_lut_manager.lut.table = lut
+
+    #mlab.view(57.15, 75.55, 50.35, (7.5, 7.5, 7.5)) # nice view
+    #mlab.view(24, 74, 33, (5, 5, 5))      # Default older RBM
+    mlab.view(24, 88, 45, (5, 5, 10))      # Good for EF
+
+    mlab.draw()
+    
+    if saveFilename:
+        mlab.savefig(saveFilename)
+

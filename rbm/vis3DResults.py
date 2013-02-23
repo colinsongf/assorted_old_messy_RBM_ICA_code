@@ -8,76 +8,7 @@ from tvtk.api import tvtk
 from utils import loadFromFile
 from squaresRbm import loadPickledData
 from GitResultsManager import resman
-
-
-from mayavi import mlab
-from mayavi.mlab import points3d, contour3d, plot3d
-
-cubeEdges = array([[0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 0, 0],
-                   [0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 1, 1, 0],
-                   [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 1, 1, 1, 1]])
-
-
-def plot3DShape(shape, Nw,
-                saveFilename = None, smoothed = False, visSimple = True,
-                plotThresh = 0, figSize = (300,300)):
-    '''Plots a 3D shape of size Nw x Nw x Nw inside a frame.'''
-
-    indexX, indexY, indexZ = mgrid[0:Nw,0:Nw,0:Nw]
-    edges = cubeEdges * Nw
-    
-    fig = mlab.figure(0, size = figSize)
-    mlab.clf(fig)
-    fig.scene.interactor.interactor_style = tvtk.InteractorStyleTerrain()
-    plot3d(edges[0,:], edges[1,:], edges[2,:], color=(.5,.5,.5),
-           line_width = 0,
-           representation = 'wireframe',
-           opacity = 1)
-    
-    if smoothed:
-        contour3d(reshape(shape, (Nw,Nw,Nw)), contours=[.5], color=(1,1,1))
-    else:
-        print saveFilename
-        mn = shape.min()
-        mx = shape.max()
-        idx = (shape > plotThresh)
-        print mn, mx, sum(idx)
-        #pdb.set_trace()
-        if sum(idx) > 0:
-            if visSimple:
-                pts = points3d(indexX.flatten()[idx] + .5,
-                               indexY.flatten()[idx] + .5,
-                               indexZ.flatten()[idx] + .5,
-                               ones(sum(idx)) * .9,
-                               #((shape-mn) / (mx-mn) * .9)[idx],
-                               color = (1,1,1),
-                               mode = 'cube',
-                               scale_factor = 1.0)
-            else:
-                pts = points3d(indexX.flatten()[idx] + .5,
-                         indexY.flatten()[idx] + .5,
-                         indexZ.flatten()[idx] + .5,
-                         #ones(sum(idx)) * .9,
-                         ((shape-mn) / (mx-mn) * .9)[idx],
-                         colormap = 'bone',
-                         #color = (1,1,1),
-                         mode = 'cube',
-                         scale_factor = 1.0)
-            lut = pts.module_manager.scalar_lut_manager.lut.table.to_array()
-            tt = linspace(0, 255, 256)
-            lut[:, 0] = tt*0 + 255
-            lut[:, 1] = tt*0 + 255
-            lut[:, 2] = tt*0 + 255
-            lut[:, 3] = tt
-            pts.module_manager.scalar_lut_manager.lut.table = lut
-
-    #mlab.view(57.15, 75.55, 50.35, (7.5, 7.5, 7.5)) # nice view
-    mlab.view(24, 74, 33, (5, 5, 5))
-
-    mlab.draw()
-
-    if saveFilename:
-        mlab.savefig(saveFilename)
+from util.plotting import plot3DShape
 
 
 
