@@ -24,7 +24,7 @@ def visInput(data, labels):
     #idx = 9         # 9 is good to check chirality... but numbers not matching up.
     #blob = reshape(data[idx,:], (20,10,10))
 
-    nShow = max(data.shape[0], 50)
+    nShow = min(data.shape[0], 50)
     for ii in range(nShow):
         blob = data[ii,:]
         # rotate axes to x,y,z order
@@ -46,16 +46,30 @@ class IndepVoxelModel(object):
 
     def __init__(self, data):
         self.probability = data.mean(0)
-
+        self.dim = len(self.probability)
+        
     def generate(self):
-        return random.rand(len(self.probability)) < self.probability
+        return random.rand(self.dim) < self.probability
+
+    def nearby(self, data, howmany = .1):
+        idxMutate = random.choice(self.dim, int(howmany*self.dim), replace=False)
+        nMutate = len(idxMutate)
+        if nMutate == 0:
+            print 'WARNING: degenerate mutation'
+        data[idxMutate] = random.rand(nMutate) < self.probability[idxMutate]
+        return data
 
 
 
 def doIndepVoxelModel(data):
-    random.seed(0)
     model = IndepVoxelModel(data)
-    
+    #generateIndepVoxelModel(model, data)
+    mutateIndepVoxelModel(model, data)
+
+
+
+def generateIndepVoxelModel(model, data):
+    random.seed(0)
     nShow = 20
     for ii in range(nShow):
         blob = model.generate()
@@ -70,11 +84,30 @@ def doIndepVoxelModel(data):
 
 
 
+def mutateIndepVoxelModel(model, data):
+    for seed in range(1):
+        random.seed(seed)
+        blob = model.generate()
+
+        degreesPerFrame = 1
+        framesPerMutation = 8
+        for frame in range(450):
+            rot = frame * degreesPerFrame
+
+            plot3DShape(flat2XYZ(blob), smoothed = False, plotEdges = False, figSize = (800,800),
+                        rotAngle = rot,
+                        saveFilename = os.path.join(resman.rundir, 'IVM_s%03d_f%03d.png' % (seed, frame)))
+
+            if frame % framesPerMutation == 0:
+                blob = model.nearby(blob)
+
+
+
 def main():
     #labels, data = loadFromPklGz('../data/endlessforms/train_bool_50_0.pkl.gz')
     labels, data = loadFromPklGz('../data/endlessforms/train_bool_50000_0.pkl.gz')
     #labels, data = loadFromPklGz('../data/endlessforms/train_real_50_0.pkl.gz')
-    
+
     #visInput(data, labels)
     doIndepVoxelModel(data)
 

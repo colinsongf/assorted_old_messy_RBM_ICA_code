@@ -304,7 +304,6 @@ def plot3DShape(blob, saveFilename = None, smoothed = False, visSimple = True,
         blob = numpy.pad(blob, 1, 'constant', constant_values = (-1000,))
         contour3d(blob, extent=[0,10,0,10,0,20], contours=[.1], color=(1,1,1))
     else:
-        print saveFilename
         mn = blob.min()
         mx = blob.max()
         idx = (blob > plotThresh).flatten()
@@ -344,6 +343,7 @@ def plot3DShape(blob, saveFilename = None, smoothed = False, visSimple = True,
     mlab.draw()
     
     if saveFilename:
+        print saveFilename
         mlab.savefig(saveFilename)
 
 
