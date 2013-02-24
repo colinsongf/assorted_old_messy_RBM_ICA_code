@@ -26,18 +26,17 @@ def main():
     for ii in range(10):
         blob = data[ii,:]
 
-        #blob = reshape(blob, (10,20,10))
+        # rotate axes to x,y,z order
         blob = transpose(reshape(blob, (10,20,10)), (2, 0, 1))
         
-        print ii, getEFFindUrl('http://devj.cornell.endlessforms.com', labels[ii]), '\t', sum(blob > .1)
-        #contour3d(blob*1, contours=[.5], color=(1,1,1))
-        
-        #justPlotBoolArray(blob)
-        plot3DShape(blob, smoothed = True, plotEdges = False)
-        pdb.set_trace()
+        #print ii, getEFFindUrl('http://devj.cornell.endlessforms.com', labels[ii]), '\t', sum(blob > .1)
+        print ii, '\t', sum(blob > .1)
 
-
-    pdb.set_trace()
+        for rr in range(15):
+            rot = rr * 24
+            plot3DShape(blob, smoothed = True, plotEdges = False, figSize = (800,800),
+                        rotAngle = rot,
+                        saveFilename = os.path.join(resman.rundir, 'shape_%03d_rot%03d.png' % (ii, rot)))
 
 
 
@@ -45,4 +44,3 @@ if __name__ == '__main__':
     resman.start('junk', diary = False)
     main()
     resman.stop()
-    raw_input('enter to exit')

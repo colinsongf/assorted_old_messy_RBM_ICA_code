@@ -279,7 +279,7 @@ def plot3DShapeFromFlattened(blob, blobShape,
 
 
 def plot3DShape(blob, saveFilename = None, smoothed = False, visSimple = True,
-                plotThresh = 0, figSize = (300,300), plotEdges = True):
+                plotThresh = 0, figSize = (300,300), plotEdges = True, rotAngle = 24):
     '''Plots a 3D shape inside a frame.'''
 
     Nx,Ny,Nz = blob.shape
@@ -341,7 +341,7 @@ def plot3DShape(blob, saveFilename = None, smoothed = False, visSimple = True,
 
     #mlab.view(57.15, 75.55, 50.35, (7.5, 7.5, 7.5)) # nice view
     #mlab.view(24, 74, 33, (5, 5, 5))      # Default older RBM
-    mlab.view(24, 88, 45, (5, 5, 10))      # Good for EF
+    mlab.view(rotAngle, 88, 45, (5, 5, 10))      # Good for EF
 
     mlab.draw()
     
