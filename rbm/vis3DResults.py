@@ -3,12 +3,11 @@
 import os, pdb, gzip, sys
 import argparse
 from numpy import mgrid, array, ones, zeros, linspace, random, reshape
-from tvtk.api import tvtk
 
 from utils import loadFromFile
 from squaresRbm import loadPickledData
 from GitResultsManager import resman
-from util.plotting import plot3DShape
+from util.plotting import plot3DShapeFromFlattened
 
 
 
@@ -38,17 +37,17 @@ def main(dataFilename, rbmFilename,  rundir, smoothed = False, plotEvery = 1):
 
         if mode == 'data':
             thisShape = xx[ii,:]
-            plot3DShape(thisShape, Nw,
-                        os.path.join(rundir, 'data_%03d.png' % ii),
-                        smoothed = smoothed,
-                        figSize = figSize)
+            plot3DShapeFromFlattened(thisShape, Nw,
+                                     os.path.join(rundir, 'data_%03d.png' % ii),
+                                     smoothed = smoothed,
+                                     figSize = figSize)
         elif mode == 'filter':
             thisShape = rbm.W[:,ii]
-            plot3DShape(thisShape, Nw,
-                        os.path.join(rundir, 'filter_%03d.png' % ii),
-                        smoothed = smoothed,
-                        visSimple = False,
-                        figSize = figSize)
+            plot3DShapeFromFlattened(thisShape, Nw,
+                                     os.path.join(rundir, 'filter_%03d.png' % ii),
+                                     smoothed = smoothed,
+                                     visSimple = False,
+                                     figSize = figSize)
         else:
             # gibbs
             idx = random.randint(0, xx.shape[1])
@@ -65,11 +64,11 @@ def main(dataFilename, rbmFilename,  rundir, smoothed = False, plotEvery = 1):
 
             print ' ... plotting sample ', ii
             for jj in xrange(nSamples):
-                plot3DShape(samples[jj,:], Nw,
-                            os.path.join(rundir, 'sample_%02d_%05d.png' % (ii, jj)),
-                            smoothed = smoothed,
-                            plotThresh = .5,
-                            figSize = figSize)
+                plot3DShapeFromFlattened(samples[jj,:], Nw,
+                                         os.path.join(rundir, 'sample_%02d_%05d.png' % (ii, jj)),
+                                         smoothed = smoothed,
+                                         plotThresh = .5,
+                                         figSize = figSize)
 
 
 
