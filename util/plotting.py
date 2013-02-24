@@ -308,9 +308,7 @@ def plot3DShape(blob, saveFilename = None, smoothed = False, visSimple = True,
         mn = blob.min()
         mx = blob.max()
         idx = (blob > plotThresh).flatten()
-        pdb.set_trace()
-        print mn, mx, sum(idx)
-        pdb.set_trace()
+        #print mn, mx, sum(idx)
         if sum(idx) > 0:
             if visSimple:
                 pts = points3d(indexX.flatten()[idx] + .5,
