@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/env ipythonpl
 
 import pdb
 from numpy import array, dot, random, linalg, sqrt, asarray, cov, eye, sum, hstack

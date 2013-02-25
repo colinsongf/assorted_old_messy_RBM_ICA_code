@@ -25,6 +25,7 @@ globalVerboseCache = False              # Print info about hits or misses
 globalDisableCache = False              # Disable all caching
 
 
+__all__ = ['globalCacheDir', 'globalVerboseCache', 'globalDisableCache', 'memoize', 'cached']
 
 def memoize(function):
     '''Decorator to memoize function'''
@@ -45,8 +46,14 @@ def memoize(function):
             #print '  updating with function', function, 'hash', str(hash(function))
             #argsHash.update(str(hash(function)))
             #argsHash.update(function)
-            argsHash.update(function.func_name)
-            argsHash.update(marshal.dumps(function.func_code))
+            functionName = function.__name__    # a little more reliable than func_name
+            argsHash.update(functionName)
+            try:
+                argsHash.update(marshal.dumps(function.func_code))
+            except AttributeError:
+                # built in functions do not have func_code, but their
+                # code is unlikely to change anyway.
+                pass
 
             # Hash *args
             for arg in args:
@@ -78,7 +85,7 @@ def memoize(function):
 
             digest = argsHash.hexdigest()
 
-            cacheFilename    = '%s.%s.pkl.gz' % (digest[:16], function.func_name)
+            cacheFilename    = '%s.%s.pkl.gz' % (digest[:16], functionName)
             # get a unique filename that does not affect any random number generators
             cacheTmpFilename = '.%s-%06d.tmp' % (cacheFilename, datetime.now().microsecond)
             cachePath    = os.path.join(globalCacheDir, cacheFilename[:2], cacheFilename)
@@ -99,7 +106,7 @@ def memoize(function):
 
                 if globalVerboseCache:
                     print ' -> cache.py: cache miss (%.04fs to compute)' % elapsedWall
-                stats = {'func_name': function.func_name,
+                stats = {'functionName': functionName,
                          'timeWall': elapsedWall,
                          'timeCPU': elapsedCPU,
                          'saveDate': datetime.now(),
