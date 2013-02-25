@@ -301,13 +301,14 @@ def plot3DShape(blob, saveFilename = None, smoothed = False, visSimple = True,
 
     if smoothed:
         # Pad with zeros to close, large negative values to make edges sharp
+        bs1,bs2,bs3 = blob.shape
         blob = numpy.pad(blob, 1, 'constant', constant_values = (-1000,))
-        contour3d(blob, extent=[0,10,0,10,0,20], contours=[.1], color=(1,1,1))
+        contour3d(blob, extent=[0,bs1,0,bs2,0,bs3], contours=[.1], color=(1,1,1))
     else:
         mn = blob.min()
         mx = blob.max()
         idx = (blob > plotThresh).flatten()
-        #print mn, mx, sum(idx)
+        #print '  plot3DShape:', mn, mx, sum(idx)
         if sum(idx) > 0:
             if visSimple:
                 pts = points3d(indexX.flatten()[idx] + .5,

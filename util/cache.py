@@ -21,7 +21,7 @@ from misc import mkdir_p
 
 
 globalCacheDir     = '/tmp/pycache'     # Directory to use for caching
-globalVerboseCache = False              # Print info about hits or misses
+globalVerboseCache = True               # Print info about hits or misses
 globalDisableCache = False              # Disable all caching
 
 
@@ -40,6 +40,7 @@ def memoize(function):
     else:
 
         def wrapper(*args, **kwargs):
+            startHashWall = time.time()
             argsHash = hashlib.sha1()
 
             # Hash the function name and function code itself (a bit overconservative)
@@ -90,13 +91,15 @@ def memoize(function):
             cacheTmpFilename = '.%s-%06d.tmp' % (cacheFilename, datetime.now().microsecond)
             cachePath    = os.path.join(globalCacheDir, cacheFilename[:2], cacheFilename)
             cacheTmpPath = os.path.join(globalCacheDir, cacheFilename[:2], cacheTmpFilename)
+            elapsedHashWall = time.time() - startHashWall
 
             try:
                 start = time.time()
                 (stats,result) = loadFromPklGz(cachePath)
                 elapsedWall = time.time() - start
                 if globalVerboseCache:
-                    print ' -> cache.py: cache hit (%.04fs to load, saved %.04fs)' % (elapsedWall, stats['timeWall'] - elapsedWall)
+                    print (' -> cache.py: cache hit (%.04fs to load, saved %.04fs, %.04s hash overhead)'
+                           % (elapsedWall, stats['timeWall'] - elapsedWall, elapsedHashWall))
             except IOError:
                 startWall = time.time()
                 startCPU  = time.clock()
@@ -105,7 +108,7 @@ def memoize(function):
                 elapsedCPU  = time.clock() - startCPU
 
                 if globalVerboseCache:
-                    print ' -> cache.py: cache miss (%.04fs to compute)' % elapsedWall
+                    print ' -> cache.py: cache miss (%.04fs to compute, %.04s hash overhead)' % (elapsedWall, elapsedHashWall)
                 stats = {'functionName': functionName,
                          'timeWall': elapsedWall,
                          'timeCPU': elapsedCPU,
