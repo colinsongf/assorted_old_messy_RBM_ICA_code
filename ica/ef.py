@@ -285,10 +285,10 @@ def mutatePCAVoxelModel(model, data, mutateFn):
 
             plot3DShape(blob, smoothed = False, plotEdges = True, figSize = (800,800),
                         rotAngle = rot,
-                        saveFilename = os.path.join(resman.rundir, 'PVM_s%03d_f%03d_blocky.png' % (seed, frame)))
+                        saveFilename = os.path.join(resman.rundir, 'PVM_s%03d_f%05d_blocky.png' % (seed, frame)))
             plot3DShape(blob, smoothed = True, plotEdges = True, figSize = (800,800),
                         rotAngle = rot,
-                        saveFilename = os.path.join(resman.rundir, 'PVM_s%03d_f%03d_smooth.png' % (seed, frame)))
+                        saveFilename = os.path.join(resman.rundir, 'PVM_s%03d_f%05d_smooth.png' % (seed, frame)))
 
             if mutateFn == 'mutateFewDimensions':
                 if frame % framesPerMutation == 0:
