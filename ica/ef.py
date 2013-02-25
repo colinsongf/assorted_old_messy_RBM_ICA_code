@@ -243,8 +243,8 @@ def generatePCAVoxelModel(model, data):
     for ii in range(nShow):
         blob = model.generate(numDims = None)
         # rotate axes to x,y,z order
-        blob = flat2XYZ(blob, size = (2,10,20))
-        #blob = flat2XYZ(blob)
+        #blob = flat2XYZ(blob, size = (2,10,20))
+        blob = flat2XYZ(blob, size = (10,10,20))
 
         #print 'blob from', blob.min(), 'to', blob.max()
 
@@ -281,7 +281,8 @@ def mutatePCAVoxelModel(model, data, mutateFn):
         for frame in range(2000):
             rot = frame * degreesPerFrame
 
-            blob = flat2XYZ(blob, size = (2,10,20))
+            #blob = flat2XYZ(blob, size = (2,10,20))
+            blob = flat2XYZ(blob, size = (10,10,20))
 
             plot3DShape(blob, smoothed = False, plotEdges = True, figSize = (800,800),
                         rotAngle = rot,
