@@ -38,7 +38,13 @@ def flat2XYZ(blob, size=(10,10,20)):
 
 
 
-def visInput(data, labels):
+#############################
+#
+# Visualize Input
+#
+#############################
+
+def visInput(data, labels = None, efOrder = True):
     #shape = random.normal(0,1,3*3*3)
     #idx = 9         # 9 is good to check chirality... but numbers not matching up.
     #blob = reshape(data[idx,:], (20,10,10))
@@ -47,14 +53,18 @@ def visInput(data, labels):
     for ii in range(nShow):
         blob = data[ii,:]
         # rotate axes to x,y,z order
-        blob = flat2XYZ(blob)
-        
-        print ii, getEFFindUrl('http://devj.cornell.endlessforms.com', labels[ii]), '\t', sum(blob > .1)
-        #print ii, '\t', sum(blob > .1)
+        if efOrder:
+            blob = flat2XYZ(blob)
+        else:
+            blob = reshape(blob, (10,10,-1))
 
-        for rr in range(15):
+        if labels:
+            print ii, getEFFindUrl('http://devj.cornell.endlessforms.com', labels[ii]), '\t', sum(blob > .1)
+            #print ii, '\t', sum(blob > .1)
+
+        for rr in range(1,2):
             rot = rr * 24
-            plot3DShape(blob, smoothed = False, plotEdges = False, figSize = (800,800),
+            plot3DShape(blob, smoothed = False, plotEdges = True, figSize = (800,800),
                         rotAngle = rot,
                         saveFilename = os.path.join(resman.rundir, 'shape_%03d_rot%03d.png' % (ii, rot)))
 
@@ -231,7 +241,7 @@ def doPCAVoxelModel(data):
         pyplot.close()
 
     #pdb.set_trace()
-    #generatePCAVoxelModel(model, data)
+    generatePCAVoxelModel(model, data)
     #mutatePCAVoxelModel(model, data, mutateFn = 'mutateFewDimensions')
     #mutatePCAVoxelModel(model, data, mutateFn = 'mutateMetHast')
 
@@ -303,18 +313,26 @@ def mutatePCAVoxelModel(model, data, mutateFn):
 
 
 def main():
-    #labels, data = loadFromPklGz('../data/endlessforms/train_bool_50_0.pkl.gz')
-    #labels, data = loadFromPklGz('../data/endlessforms/train_bool_50000_0.pkl.gz')
-    labels, data = loadFromPklGz('../data/endlessforms/train_real_50000_0.pkl.gz')
-    #labels, data = loadFromPklGz('../data/endlessforms/train_real_50_0.pkl.gz')
+    useSimpleShapes = True
+
+    if useSimpleShapes:
+        labels = None
+        data = loadFromPklGz('../data/simple3DShapes/poisson_train_5000.pkl.gz')
+        #data = loadFromPklGz('../data/simple3DShapes/poisson_train_50000.pkl.gz')
+    else:
+        #labels, data = loadFromPklGz('../data/endlessforms/train_bool_50_0.pkl.gz')
+        #labels, data = loadFromPklGz('../data/endlessforms/train_bool_50000_0.pkl.gz')
+        labels, data = loadFromPklGz('../data/endlessforms/train_real_50000_0.pkl.gz')
+        #labels, data = loadFromPklGz('../data/endlessforms/train_real_50_0.pkl.gz')
+
 
     FAST_HACK = False
     if FAST_HACK:
         data = data[:,:400]
 
-    #visInput(data, labels)
+    visInput(data, labels, efOrder = not useSimpleShapes)
     #doIndepVoxelModel(data)
-    doPCAVoxelModel(data)
+    #doPCAVoxelModel(data)
 
 
 
