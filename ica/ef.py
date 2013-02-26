@@ -80,7 +80,8 @@ class IndepVoxelModel(object):
     '''Models each voxel independently'''
 
     def __init__(self, data):
-        self.probability = data.mean(0)
+        #self.probability = data.mean(0)         # Only for 0,1 values
+        self.probability = (data > .1).mean(0)   # for -1,1 values
         self.dim = len(self.probability)
         
     def generate(self):
@@ -96,30 +97,33 @@ class IndepVoxelModel(object):
 
 
 
-def doIndepVoxelModel(data):
+def doIndepVoxelModel(data, size, efOrder = True):
     model = IndepVoxelModel(data)
-    #generateIndepVoxelModel(model, data)
-    mutateIndepVoxelModel(model, data)
+    generateIndepVoxelModel(model, data, size, efOrder)
+    mutateIndepVoxelModel(model, data, size, efOrder)
 
 
 
-def generateIndepVoxelModel(model, data):
+def generateIndepVoxelModel(model, data, size, efOrder):
     random.seed(0)
-    nShow = 20
+    nShow = 50
     for ii in range(nShow):
         blob = model.generate()
         # rotate axes to x,y,z order
-        blob = flat2XYZ(blob)
+        if efOrder:
+            blob = flat2XYZ(blob)
+        else:
+            blob = reshape(blob, size)
 
-        for rr in range(15):
+        for rr in range(1,2):
             rot = rr * 24
-            plot3DShape(blob, smoothed = True, plotEdges = False, figSize = (800,800),
+            plot3DShape(blob, smoothed = False, plotEdges = True, figSize = (800,800),
                         rotAngle = rot,
-                        saveFilename = os.path.join(resman.rundir, 'IVM_%03d_rot%03d.png' % (ii, rot)))
+                        saveFilename = os.path.join(resman.rundir, 'IVMgen_%03d_rot%03d.png' % (ii, rot)))
 
 
 
-def mutateIndepVoxelModel(model, data):
+def mutateIndepVoxelModel(model, data, size, efOrder):
     for seed in range(1):
         random.seed(seed)
         blob = model.generate()
@@ -129,9 +133,14 @@ def mutateIndepVoxelModel(model, data):
         for frame in range(450):
             rot = frame * degreesPerFrame
 
-            plot3DShape(flat2XYZ(blob), smoothed = False, plotEdges = False, figSize = (800,800),
+            if efOrder:
+                blobPlot = flat2XYZ(blob)
+            else:
+                blobPlot = reshape(blob, size)
+            
+            plot3DShape(blobPlot, smoothed = False, plotEdges = True, figSize = (800,800),
                         rotAngle = rot,
-                        saveFilename = os.path.join(resman.rundir, 'IVM_s%03d_f%03d.png' % (seed, frame)))
+                        saveFilename = os.path.join(resman.rundir, 'IVMmut_s%03d_f%03d.png' % (seed, frame)))
 
             if frame % framesPerMutation == 0:
                 blob = model.nearby(blob)
@@ -230,7 +239,7 @@ class PCAVoxelModel(object):
 
 
 
-def doPCAVoxelModel(data):
+def doPCAVoxelModel(data, size, efOrder = True):
     model = PCAVoxelModel(data, dimsKeep = 15)
     
     if resman.rundir:
@@ -241,20 +250,24 @@ def doPCAVoxelModel(data):
         pyplot.close()
 
     #pdb.set_trace()
-    generatePCAVoxelModel(model, data)
+    generatePCAVoxelModel(model, data, size, efOrder = efOrder)
     #mutatePCAVoxelModel(model, data, mutateFn = 'mutateFewDimensions')
     #mutatePCAVoxelModel(model, data, mutateFn = 'mutateMetHast')
 
 
 
-def generatePCAVoxelModel(model, data):
+def generatePCAVoxelModel(model, data, size, efOrder):
     random.seed(0)
     nShow = 45
     for ii in range(nShow):
         blob = model.generate(numDims = None)
         # rotate axes to x,y,z order
         #blob = flat2XYZ(blob, size = (2,10,20))
-        blob = flat2XYZ(blob, size = (10,10,20))
+        #blob = flat2XYZ(blob, size = (10,10,20))
+        if efOrder:
+            blob = flat2XYZ(blob, size = size)
+        else:
+            blob = reshape(blob, size)
 
         #print 'blob from', blob.min(), 'to', blob.max()
 
@@ -265,10 +278,10 @@ def generatePCAVoxelModel(model, data):
             rot = rr * 1
             plot3DShape(blob, smoothed = False, plotEdges = True, figSize = (800,800),
                         rotAngle = rot,
-                        saveFilename = os.path.join(resman.rundir, 'PVM_%03d_rot%03d_blocky.png' % (ii, rot)))
+                        saveFilename = os.path.join(resman.rundir, 'PVMgen_%03d_rot%03d_blocky.png' % (ii, rot)))
             plot3DShape(blob, smoothed = True, plotEdges = True, figSize = (800,800),
                         rotAngle = rot,
-                        saveFilename = os.path.join(resman.rundir, 'PVM_%03d_rot%03d_smooth.png' % (ii, rot)))
+                        saveFilename = os.path.join(resman.rundir, 'PVMgen_%03d_rot%03d_smooth.png' % (ii, rot)))
 
 
 
@@ -296,10 +309,10 @@ def mutatePCAVoxelModel(model, data, mutateFn):
 
             plot3DShape(blob, smoothed = False, plotEdges = True, figSize = (800,800),
                         rotAngle = rot,
-                        saveFilename = os.path.join(resman.rundir, 'PVM_s%03d_f%05d_blocky.png' % (seed, frame)))
+                        saveFilename = os.path.join(resman.rundir, 'PVMmut_s%03d_f%05d_blocky.png' % (seed, frame)))
             plot3DShape(blob, smoothed = True, plotEdges = True, figSize = (800,800),
                         rotAngle = rot,
-                        saveFilename = os.path.join(resman.rundir, 'PVM_s%03d_f%05d_smooth.png' % (seed, frame)))
+                        saveFilename = os.path.join(resman.rundir, 'PVMmut_s%03d_f%05d_smooth.png' % (seed, frame)))
 
             if mutateFn == 'mutateFewDimensions':
                 if frame % framesPerMutation == 0:
@@ -308,7 +321,6 @@ def mutatePCAVoxelModel(model, data, mutateFn):
                 pc, blob = model.mutateMetHast(pc, proposalNoise = .025)
             else:
                 raise Exception('unknown mutateFn: %s' % repr(mutateFn))
-                    
 
 
 
@@ -317,22 +329,24 @@ def main():
 
     if useSimpleShapes:
         labels = None
-        data = loadFromPklGz('../data/simple3DShapes/poisson_train_5000.pkl.gz')
-        #data = loadFromPklGz('../data/simple3DShapes/poisson_train_50000.pkl.gz')
+        #data = loadFromPklGz('../data/simple3DShapes/poisson_train_5000.pkl.gz')
+        data = loadFromPklGz('../data/simple3DShapes/poisson_train_50000.pkl.gz')
     else:
         #labels, data = loadFromPklGz('../data/endlessforms/train_bool_50_0.pkl.gz')
         #labels, data = loadFromPklGz('../data/endlessforms/train_bool_50000_0.pkl.gz')
         labels, data = loadFromPklGz('../data/endlessforms/train_real_50000_0.pkl.gz')
         #labels, data = loadFromPklGz('../data/endlessforms/train_real_50_0.pkl.gz')
 
+    size = (10,10,20)
 
     FAST_HACK = False
     if FAST_HACK:
         data = data[:,:400]
-
-    visInput(data, labels, efOrder = not useSimpleShapes)
-    #doIndepVoxelModel(data)
-    #doPCAVoxelModel(data)
+        size = (10,10,4)
+        
+    #visInput(data, labels, efOrder = not useSimpleShapes)
+    doIndepVoxelModel(data, size, efOrder = not useSimpleShapes)
+    #doPCAVoxelModel(data, size, efOrder = not useSimpleShapes)
 
 
 
