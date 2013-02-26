@@ -12,14 +12,17 @@ from makeUpsonRovio1 import saveToFile
 
 
 
-def paintCube(indexX, indexY, indexZ, bounds):
+def paintCube(indexX, indexY, indexZ, bounds, asBool = False):
     '''bounds is 2x3'''
 
     xx = logical_and(indexX >= bounds[0,0], indexX <= bounds[1,0])
     yy = logical_and(indexY >= bounds[0,1], indexY <= bounds[1,1])
     zz = logical_and(indexZ >= bounds[0,2], indexZ <= bounds[1,2])
-    
-    return array(logical_and(logical_and(xx, yy), zz), dtype = float32)
+
+    if asBool:
+        return array(logical_and(logical_and(xx, yy), zz))
+    else:
+        return array(logical_and(logical_and(xx, yy), zz), dtype = float32)
 
 
 

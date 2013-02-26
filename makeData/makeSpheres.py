@@ -12,8 +12,11 @@ from makeUpsonRovio1 import saveToFile
 
 
 
-def paintSphere(img, indexX, indexY, indexZ, locX, locY, locZ, radius):
-    return array(((indexX-locX)**2 + (indexY-locY)**2 + (indexZ-locZ)**2) < radius**2, dtype = float32)
+def paintSphere(img, indexX, indexY, indexZ, locX, locY, locZ, radius, asBool = False):
+    if asBool:
+        return array(((indexX-locX)**2 + (indexY-locY)**2 + (indexZ-locZ)**2) < radius**2)
+    else:
+        return array(((indexX-locX)**2 + (indexY-locY)**2 + (indexZ-locZ)**2) < radius**2, dtype = float32)
 
 
 
