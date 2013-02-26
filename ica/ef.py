@@ -240,7 +240,7 @@ class PCAVoxelModel(object):
 
 
 def doPCAVoxelModel(data, size, efOrder = True):
-    model = PCAVoxelModel(data, dimsKeep = 15)
+    model = PCAVoxelModel(data, dimsKeep = 30)
     
     if resman.rundir:
         pyplot.semilogy(model.pca.fracVar, 'o-')
@@ -251,8 +251,8 @@ def doPCAVoxelModel(data, size, efOrder = True):
 
     #pdb.set_trace()
     generatePCAVoxelModel(model, data, size, efOrder = efOrder)
-    #mutatePCAVoxelModel(model, data, mutateFn = 'mutateFewDimensions')
-    #mutatePCAVoxelModel(model, data, mutateFn = 'mutateMetHast')
+    mutatePCAVoxelModel(model, data, size, mutateFn = 'mutateFewDimensions', efOrder = efOrder)
+    mutatePCAVoxelModel(model, data, size, mutateFn = 'mutateMetHast', efOrder = efOrder)
 
 
 
@@ -274,7 +274,7 @@ def generatePCAVoxelModel(model, data, size, efOrder):
         #continue
         #pdb.set_trace()
 
-        for rr in range(180):
+        for rr in range(24,25):
             rot = rr * 1
             plot3DShape(blob, smoothed = False, plotEdges = True, figSize = (800,800),
                         rotAngle = rot,
@@ -285,8 +285,15 @@ def generatePCAVoxelModel(model, data, size, efOrder):
 
 
 
-def mutatePCAVoxelModel(model, data, mutateFn):
-    for seed in range(10):
+def mutatePCAVoxelModel(model, data, size, mutateFn, efOrder):
+    if mutateFn == 'mutateFewDimensions':
+        tag = 'Few'
+    elif mutateFn == 'mutateMetHast':
+        tag = 'MH'
+    else:
+        raise Exception('unknown mutateFn: %s' % repr(mutateFn))
+    
+    for seed in range(5):
         random.seed(seed)
         blob = 0
         tries = 100
@@ -301,26 +308,26 @@ def mutatePCAVoxelModel(model, data, mutateFn):
 
         degreesPerFrame = 1
         framesPerMutation = 1
-        for frame in range(2000):
+        for frame in range(720):
             rot = frame * degreesPerFrame
 
-            #blob = flat2XYZ(blob, size = (2,10,20))
-            blob = flat2XYZ(blob, size = (10,10,20))
+            if efOrder:
+                blob = flat2XYZ(blob, size)
+            else:
+                blob = reshape(blob, size)
 
             plot3DShape(blob, smoothed = False, plotEdges = True, figSize = (800,800),
                         rotAngle = rot,
-                        saveFilename = os.path.join(resman.rundir, 'PVMmut_s%03d_f%05d_blocky.png' % (seed, frame)))
+                        saveFilename = os.path.join(resman.rundir, 'PVMmut%s_s%03d_f%05d_blocky.png' % (tag, seed, frame)))
             plot3DShape(blob, smoothed = True, plotEdges = True, figSize = (800,800),
                         rotAngle = rot,
-                        saveFilename = os.path.join(resman.rundir, 'PVMmut_s%03d_f%05d_smooth.png' % (seed, frame)))
+                        saveFilename = os.path.join(resman.rundir, 'PVMmut%s_s%03d_f%05d_smooth.png' % (tag, seed, frame)))
 
             if mutateFn == 'mutateFewDimensions':
                 if frame % framesPerMutation == 0:
-                    pc, blob = model.mutateFewDimensions(pc, howmany = 3)
-            elif mutateFn == 'mutateMetHast':
-                pc, blob = model.mutateMetHast(pc, proposalNoise = .025)
+                    pc, blob = model.mutateFewDimensions(pc, howmany = 1)
             else:
-                raise Exception('unknown mutateFn: %s' % repr(mutateFn))
+                pc, blob = model.mutateMetHast(pc, proposalNoise = .025)
 
 
 
@@ -343,10 +350,10 @@ def main():
     if FAST_HACK:
         data = data[:,:400]
         size = (10,10,4)
-        
+    
     #visInput(data, labels, efOrder = not useSimpleShapes)
-    doIndepVoxelModel(data, size, efOrder = not useSimpleShapes)
-    #doPCAVoxelModel(data, size, efOrder = not useSimpleShapes)
+    #doIndepVoxelModel(data, size, efOrder = not useSimpleShapes)
+    doPCAVoxelModel(data, size, efOrder = not useSimpleShapes)
 
 
 
