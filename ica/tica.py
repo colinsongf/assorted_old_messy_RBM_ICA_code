@@ -6,7 +6,7 @@ Research code
 Jason Yosinski
 '''
 
-import pdb
+import ipdb as pdb
 import os
 from numpy import *
 from matplotlib import pyplot
@@ -147,6 +147,8 @@ class TICA(RICA):
 
     def cost(self, WW, data, plotEvery = None):
         '''Main method of TICA that differs from RICA.'''
+
+        #pdb.set_trace()
 
         nInputDim = data.shape[0]
         nDatapoints = data.shape[1]

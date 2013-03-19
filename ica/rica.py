@@ -6,7 +6,7 @@ Research code
 Jason Yosinski
 '''
 
-import pdb
+import ipdb as pdb
 import os, sys, time
 from numpy import *
 from PIL import Image, ImageFont, ImageDraw
@@ -21,6 +21,7 @@ from matplotlib import pyplot
 from util.plotting import tile_raster_images, pil_imagesc, scale_some_rows_to_unit_interval
 from util.dataLoaders import loadFromPklGz, saveToFile
 from util.math import sigmoid
+from util.cache import cached
 from rbm.pca import PCA
 
 
@@ -48,15 +49,17 @@ def l2RowScaledGrad(xx, yy, outerDeriv):
 
 
 class RICA(object):
-    def __init__(self, imgShape, lambd = .005, nFeatures = 800, epsilon = 1e-5, float32 = False, saveDir = ''):
+    def __init__(self, imgShape, lambd = .005, nFeatures = 800, epsilon = 1e-5,
+                 float32 = False, saveDir = '', doPlots = True):
         self.lambd      = lambd
         self.nFeatures  = nFeatures
         self.epsilon    = epsilon
         self.saveDir    = saveDir
         self.imgShape   = imgShape
-        self.imgIsColor = len(imgShape) > 2
+        self.imgIsColor = hasattr(imgShape, '__len__') and len(imgShape) > 2
         self.nInputDim  = prod(self.imgShape)
         self.float32    = float32
+        self.doPlots    = doPlots
         self.costLog    = None
         self.pca        = None    # Used for whitening / unwhitening data
 
@@ -146,7 +149,7 @@ class RICA(object):
 
 
     def dataPrep(self, data, whiten, normData):
-        if self.saveDir:
+        if self.saveDir and self.doPlots:
             print 'data_raw plot'
             #pdb.set_trace()  DEBUG?
             image = Image.fromarray(tile_raster_images(
@@ -169,10 +172,13 @@ class RICA(object):
                 image.save(os.path.join(self.saveDir, 'data_raw_rescale_indiv.png'))
 
         if self.saveDir:
-            pil_imagesc(cov(data),
-                        saveto = os.path.join(self.saveDir, 'dataCov_0raw.png'))
+            #cv = cached(cov, data)
+            cv = cov(data)
+            pil_imagesc(cv, saveto = os.path.join(self.saveDir, 'dataCov_0raw.png'))
 
         if whiten:
+            #self.pca = cached(PCA, data.T)
+            #dataWhite = cached(self.pca.toZca, data.T, epsilon = 1e-6).T
             self.pca = PCA(data.T)
             dataWhite = self.pca.toZca(data.T, epsilon = 1e-6).T
 
@@ -185,7 +191,7 @@ class RICA(object):
 
             data = dataWhite
 
-            if self.saveDir:
+            if self.saveDir and self.doPlots:
                 image = Image.fromarray(tile_raster_images(
                     X = data.T, img_shape = self.imgShape,
                     tile_shape = (20, 30), tile_spacing=(1,1),
@@ -242,10 +248,18 @@ class RICA(object):
         #                                 factr = 1e3,
         #                                 maxfun = maxFun)
         results = minimize(lambda WW : self.costAndLog(WW, data, plotEvery),
-                                    WW,
-                                    jac = True,    # const function retuns both value and gradient
-                                    method = 'L-BFGS-B',
-                                    options = {'maxiter': maxFun, 'disp': True})
+                           WW,
+                           jac = True,    # const function retuns both value and gradient
+                           method = 'L-BFGS-B',
+                           options = {'maxiter': maxFun, 'disp': True})
+        #results = cached(minimize,
+        #                 self.costAndLog,
+        #                 WW,
+        #                 (data, plotEvery),
+        #                 jac = True,    # const function retuns both value and gradient
+        #                 method = 'L-BFGS-B',
+        #                 options = {'maxiter': maxFun, 'disp': True})
+        
         fval = results['fun']
         wallSeconds = time.time() - startWall
         print 'Optimization results:'
@@ -328,7 +342,7 @@ class RICA(object):
             image.save(os.path.join(self.saveDir, 'hidden_act_random.png'))
 
 
-    def plotReconstructions(self, WW, data, number = 200):
+    def plotReconstructions(self, WW, data, number = 50):
         '''Plots reconstructions for some randomly chosen data points.'''
 
         if self.saveDir:
@@ -420,9 +434,11 @@ class RICA(object):
 
         # Make and save some plots
         self.plotCostLog()
-        self.plotWW(WW)
+        if self.doPlots:
+            self.plotWW(WW)
         self.plotActivations(WW, data)
-        self.plotReconstructions(WW, data)
+        if self.doPlots:
+            self.plotReconstructions(WW, data)
 
 
 
@@ -434,11 +450,11 @@ if __name__ == '__main__':
     
     random.seed(0)
     rica = RICA(imgShape = (16, 16),
-                nFeatures = 400,
+                nFeatures = 50,
                 lambd = .05,
                 epsilon = 1e-5,
                 float32 = False,
                 saveDir = resman.rundir)
-    rica.run(data, plotEvery = None, maxFun = 1, whiten = False)
+    rica.run(data, plotEvery = None, maxFun = 5, whiten = True)
 
     resman.stop()
