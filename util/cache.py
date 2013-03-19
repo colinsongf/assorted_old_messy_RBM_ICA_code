@@ -47,10 +47,13 @@ class PersistentHasher(object):
     def update(self, obj, level = 0):
         '''A smarter, more persistent verison of hashlib.update'''
         if isinstance(obj, types.BuiltinFunctionType):
-            # function name is sufficient for builtin functions:
+            # Function name is sufficient for builtin functions.
+            # Built in functions do not have func_code, but their code
+            # is unlikely to change anyway.
             self.hashAlg.update(obj.__name__)
         elif isinstance(obj, types.FunctionType):
-            # for user defined functions, hash name and code
+            # For user defined functions, hash the function name and
+            # function code itself (a bit overconservative)
             self.hashAlg.update(obj.__name__)
             self.hashAlg.update(marshal.dumps(obj.func_code))
         elif type(obj) is ndarray:
@@ -85,6 +88,13 @@ class PersistentHasher(object):
             self._printStatus(level, repr(type(obj)))
 
 
+        # Maybe useful for some other types:
+        #        elif type(arg) is dict:
+        #            for k,v in sorted(arg.items()):
+        #                argsHash.update(k)
+        #                argsHash.update(pickle.dumps(v, -1))
+
+
     def hexdigest(self):
         return self.hashAlg.hexdigest()
 
@@ -112,90 +122,14 @@ def memoize(function):
         def wrapper(*args, **kwargs):
             startHashWall = time.time()
 
+            # Hash the function, its args, and its kwargs
             hasher = PersistentHasher()
-
-            # Hash the function name and function code itself (a bit overconservative)
-            #print '  updating with function', function, 'hash', str(hash(function))
-            #argsHash.update(str(hash(function)))
-            #argsHash.update(function)
-
             hasher.update(function)
-
-            functionName = function.__name__    # a little more reliable than func_name
-
-            #pdb.set_trace()
-            #
-            #functionName = function.__name__    # a little more reliable than func_name
-            #counter = 0
-            #if globalCacheVerbose > 1:
-            #    print 'AT',counter,'HASH IS',argsHash.hexdigest()[:4]; counter+=1
-            #argsHash.update(functionName)
-            #try:
-            #    argsHash.update(marshal.dumps(function.func_code))
-            #except AttributeError:
-            #    # built in functions do not have func_code, but their
-            #    # code is unlikely to change anyway. Check for built
-            #    # in functions by checking their repr:
-            #    # 
-            #    # repr(len)
-            #    # '<built-in function len>'
-            #    if not '<built-in function' in repr(function):
-            #        raise
-
             hasher.update(args)
-            
-            # Hash *args
-            #for arg in args:
-            #    if globalCacheVerbose > 1:
-            #        print 'AT',counter,'HASH IS',argsHash.hexdigest()[:4]; counter+=1
-            #        #pdb.set_trace()
-            #        print 'HERE (to hash functions)!!!'
-            #    try:
-            #        argsHash.update(str(hash(arg)))
-            #        #print '  updating with arg hash', str(hash(arg))
-            #    except TypeError:
-            #        if type(arg) is ndarray:
-            #            argsHash.update(arg)
-            #        elif type(arg) is dict:
-            #            for k,v in sorted(arg.items()):
-            #                argsHash.update(k)
-            #                argsHash.update(pickle.dumps(v, -1))
-            #            #print '  updating with ndarray', arg
-            #            #argsHash.update(pickle.dumps(arg, -1))  # another option
-            #        elif type(arg) is tuple:  # Very messy now...
-            #            for v in arg:
-            #                if type(v) is ndarray:
-            #                    argsHash.update(v)
-            #                else:
-            #                    argsHash.update(str(hash(v)))
-            #        else:
-            #            raise
-
             hasher.update(kwargs)
 
-            ## Hash **kwargs
-            #for key,value in sorted(kwargs.items()):
-            #    if globalCacheVerbose > 1:
-            #        print 'AT',counter,'HASH IS',argsHash.hexdigest()[:4]; counter+=1
-            #    argsHash.update(key)
-            #    #print '  updating with kwarg key', key
-            #    try:
-            #        argsHash.update(str(hash(value)))
-            #        #print '  updating with kwarg value hash', str(hash(value))
-            #    except TypeError:
-            #        if type(value) is ndarray:
-            #            argsHash.update(value)
-            #        elif type(value) is dict:
-            #            for k,v in sorted(value.items()):
-            #                argsHash.update(k)
-            #                argsHash.update(pickle.dumps(v, -1))
-            #            #print '  updating with kwarg ndarray', value
-            #            #argsHash.update(pickle.dumps(value, -1))  # another option
-            #        else:
-            #            raise
-
-            #if globalCacheVerbose > 1:
-            #    print 'DONE HASH IS',argsHash.hexdigest()[:4]; counter+=1
+            # Check cache for previous result
+            functionName = function.__name__    # a little more reliable than func_name
             digest = hasher.hexdigest()
 
             cacheFilename    = '%s.%s.pkl.gz' % (digest[:16], functionName)
