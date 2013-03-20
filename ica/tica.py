@@ -145,8 +145,14 @@ class TICA(RICA):
 
         return totalCost, grad
 
-    def cost(self, WW, data, plotEvery = None):
-        '''Main method of TICA that differs from RICA.'''
+    def cost(self, WW, data, plotEvery = None, returnFull = False):
+        '''Main method of TICA that differs from RICA.
+
+        if returnFull:
+            returns totalCost, poolingCost, reconstructionCost, grad, hidden, reconDiff
+        else:
+            returns totalCost, poolingCost, reconstructionCost, grad
+        '''
 
         #pdb.set_trace()
 
@@ -195,7 +201,7 @@ class TICA(RICA):
             print 'slow way'
             print poolingCostGrad[:4,:4]
 
-        # fast way?
+        # fast way
         Ha = dot(self.HH.T, 1/absPooledActivations)
         poolingCostGrad = self.lambd * dot(hidden * Ha, data.T)
         #print 'fast way'
@@ -214,7 +220,10 @@ class TICA(RICA):
 
         if self.float32:
             # convert back to keep fortran happy
-            return totalCost, poolingCost, reconstructionCost, array(grad, dtype='float64')
+            grad = array(grad, dtype='float64')
+
+        if returnFull:
+            return totalCost, poolingCost, reconstructionCost, grad, hidden, reconDiff
         else:
             return totalCost, poolingCost, reconstructionCost, grad
 

@@ -31,8 +31,7 @@ def whiten1f(xx):
 
 
 
-def l2RowScaled(xx):
-    epsilon = 1e-5;
+def l2RowScaled(xx, epsilon = 1e-5):
     return (xx.T / sqrt(sum(xx**2,1) + epsilon)).T
 
 
@@ -172,8 +171,8 @@ class RICA(object):
                 image.save(os.path.join(self.saveDir, 'data_raw_rescale_indiv.png'))
 
         if self.saveDir:
-            #cv = cached(cov, data)
-            cv = cov(data)
+            cv = cached(cov, data)
+            #cv = cov(data)
             pil_imagesc(cv, saveto = os.path.join(self.saveDir, 'dataCov_0raw.png'))
 
         if whiten:
@@ -424,6 +423,8 @@ class RICA(object):
 
     def run(self, data, maxFun = 300, whiten = False, normData = True, plotEvery = None):
         '''data should be one data point per COLUMN! (different)'''
+
+        #pdb.set_trace()
 
         data = self.dataPrep(data, whiten = whiten, normData = normData)
 

@@ -10,10 +10,9 @@ import pdb
 import os, sys, time
 from numpy import *
 from PIL import Image
-from scipy.optimize.lbfgsb import fmin_l_bfgs_b
 
 from tica import TICA
-from GitResultsManager import resman, fmtSeconds
+from GitResultsManager import resman
 from util.plotting import tile_raster_images
 from util.dataLoaders import loadFromPklGz, saveToFile
 

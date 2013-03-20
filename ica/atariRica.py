@@ -10,8 +10,7 @@ import pdb
 import os, sys, time
 from numpy import *
 from PIL import Image
-from scipy.optimize.lbfgsb import fmin_l_bfgs_b
-from GitResultsManager import resman, fmtSeconds
+from GitResultsManager import resman
 
 from rica import RICA
 from util.plotting import tile_raster_images
