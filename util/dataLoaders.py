@@ -84,3 +84,13 @@ def loadFromPklGz(filename):
     with gzip.open(filename, 'rb') as ff:
         ret = pickle.load(ff)
     return ret
+
+
+
+def loadAtariData(filename):
+    '''Loads Atari '''
+
+    data = loadFromPklGz(filename)
+    data = data.T   # Make into one example per column
+    return data
+

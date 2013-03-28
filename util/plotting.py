@@ -1,16 +1,12 @@
 #! /usr/bin/env python
 
 '''
-[JBY] Utilities for learning.
-Some stuff copied from https://github.com/lisa-lab/DeepLearningTutorials/blob/master/code/utils.py
-'''
+Research code
 
-''' This file contains different utility functions that are not connected 
-in anyway to the networks presented in the tutorials, but rather help in 
-processing the outputs into a more understandable way. 
+Jason Yosinski
 
-For example ``tile_raster_images`` helps in generating a easy to grasp 
-image from a set of samples or weights.
+Utilities for learning. Some stuff copied from
+https://github.com/lisa-lab/DeepLearningTutorials/blob/master/code/utils.py
 '''
 
 import pdb
@@ -23,6 +19,12 @@ from mayavi.mlab import points3d, contour3d, plot3d
 from tvtk.api import tvtk
 
 
+
+#########################
+#
+# Images
+#
+#########################
 
 def scale_to_unit_interval(ndar,eps=1e-8):
     ''' Scales all values in the ndarray ndar to be between 0 and 1 '''
@@ -256,6 +258,12 @@ def pil_imagesc(arr, epsilon = 1e-8, saveto = None):
         image.save(saveto)
 
 
+
+#########################
+#
+# 3D Shapes
+#
+#########################
 
 cubeEdges = array([[0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 0, 0],
                    [0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 1, 1, 0],

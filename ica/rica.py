@@ -22,7 +22,6 @@ from util.plotting import tile_raster_images, pil_imagesc, scale_some_rows_to_un
 from util.dataLoaders import loadFromPklGz, saveToFile
 from util.math import sigmoid
 from util.cache import cached
-from rbm.pca import PCA
 
 
 
@@ -60,7 +59,13 @@ class RICA(object):
         self.float32    = float32
         self.doPlots    = doPlots
         self.costLog    = None
-        self.pca        = None    # Used for whitening / unwhitening data
+        #self.pca        = None    # Used for whitening / unwhitening data    #########
+
+        # Initialize weights WW
+        self.WWshape = (self.nFeatures, self.nInputDim)
+        WW = random.normal(0, 1, self.WWshape)
+        WW = (WW.T / sqrt(sum(WW ** 2, 1))).T
+        self.WW = WW.flatten()
 
 
     def costAndLog(self, WW, data, plotEvery = None):
@@ -148,82 +153,12 @@ class RICA(object):
 
 
     def dataPrep(self, data, whiten, normData):
-        if self.saveDir and self.doPlots:
-            print 'data_raw plot'
-            #pdb.set_trace()  DEBUG?
-            image = Image.fromarray(tile_raster_images(
-                X = data.T, img_shape = self.imgShape,
-                tile_shape = (20, 30), tile_spacing=(1,1),
-                scale_rows_to_unit_interval = False))
-            image.save(os.path.join(self.saveDir, 'data_raw.png'))
-            image = Image.fromarray(tile_raster_images(
-                X = data.T, img_shape = self.imgShape,
-                tile_shape = (20, 30), tile_spacing=(1,1),
-                scale_rows_to_unit_interval = True,
-                scale_colors_together = True))
-            image.save(os.path.join(self.saveDir, 'data_raw_rescale.png'))
-            if self.imgIsColor:
-                image = Image.fromarray(tile_raster_images(
-                    X = data.T, img_shape = self.imgShape,
-                    tile_shape = (20, 30), tile_spacing=(1,1),
-                    scale_rows_to_unit_interval = True,
-                    scale_colors_together = False))
-                image.save(os.path.join(self.saveDir, 'data_raw_rescale_indiv.png'))
-
-        if self.saveDir:
-            cv = cached(cov, data)
-            #cv = cov(data)
-            pil_imagesc(cv, saveto = os.path.join(self.saveDir, 'dataCov_0raw.png'))
-
-        if whiten:
-            #self.pca = cached(PCA, data.T)
-            #dataWhite = cached(self.pca.toZca, data.T, epsilon = 1e-6).T
-            self.pca = PCA(data.T)
-            dataWhite = self.pca.toZca(data.T, epsilon = 1e-6).T
-
-            if self.saveDir:
-                pyplot.semilogy(self.pca.fracVar, 'o-')
-                pyplot.title('Fractional variance in each dimension')
-                pyplot.savefig(os.path.join(self.saveDir, 'fracVar.png'))
-                pyplot.savefig(os.path.join(self.saveDir, 'fracVar.pdf'))
-                pyplot.close()
-
-            data = dataWhite
-
-            if self.saveDir and self.doPlots:
-                image = Image.fromarray(tile_raster_images(
-                    X = data.T, img_shape = self.imgShape,
-                    tile_shape = (20, 30), tile_spacing=(1,1),
-                    scale_rows_to_unit_interval = True,
-                    scale_colors_together = True))
-                image.save(os.path.join(self.saveDir, 'data_white_rescale.png'))
-                if self.imgIsColor:
-                    image = Image.fromarray(tile_raster_images(
-                        X = data.T, img_shape = self.imgShape,
-                        tile_shape = (20, 30), tile_spacing=(1,1),
-                        scale_rows_to_unit_interval = True,
-                        scale_colors_together = False))
-                    image.save(os.path.join(self.saveDir, 'data_white_rescale_indiv.png'))
-
-        if self.saveDir:
-            pil_imagesc(cov(data),
-                        saveto = os.path.join(self.saveDir, 'dataCov_1prenorm.png'))
-        if normData:
-            # Project each patch to the unit ball
-            patchNorms = sqrt(sum(data**2, 0) + (1e-8))
-            data = data / patchNorms
-        if self.saveDir:
-            pil_imagesc(cov(data),
-                        saveto = os.path.join(self.saveDir, 'dataCov_2postnorm.png'))
-
+        raise Exception('Use other methods now')
+        # deleted
         return data
 
 
     def runOptimization(self, data, maxFun, plotEvery):
-        # Initialize weights WW
-        WW = random.randn(self.nFeatures, self.nInputDim)
-        WW = (WW.T / sqrt(sum(WW ** 2, 1))).T
-        WW = WW.flatten()
 
         # Convert to float32 to be faster, if desired
         if self.float32:
@@ -421,14 +356,14 @@ class RICA(object):
         return 'R: %g S*%g: %g T %g' % (reconstructionCost, self.lambd, sparsityCost, totalCost)
 
 
-    def run(self, data, maxFun = 300, whiten = False, normData = True, plotEvery = None):
+    def learn(self, data, maxFun = 300, whiten = False, normData = True, plotEvery = None):
         '''data should be one data point per COLUMN! (different)'''
 
         #pdb.set_trace()
 
-        data = self.dataPrep(data, whiten = whiten, normData = normData)
-
-        WW = self.runOptimization(data, maxFun, plotEvery)
+        # HERE plotWW first
+        self.WW = self.runOptimization(data, maxFun, plotEvery)
+        # HERE and again at end
 
         if self.saveDir:
             saveToFile(os.path.join(self.saveDir, 'WW+pca.pkl.gz'), (WW, self.pca))
@@ -456,6 +391,6 @@ if __name__ == '__main__':
                 epsilon = 1e-5,
                 float32 = False,
                 saveDir = resman.rundir)
-    rica.run(data, plotEvery = None, maxFun = 5, whiten = True)
+    rica.learn(data, plotEvery = None, maxFun = 5, whiten = True)
 
     resman.stop()
