@@ -1,0 +1,100 @@
+Some timing information:
+#  kernprof.py -l testPca.py
+#  python -m line_profiler testPca.py.lprof 
+
+
+
+jason@kronk [~/s/deep_learning/ica] $ python -m line_profiler atariTica.py.lprof
+Timer unit: 1e-06 s
+
+File: ./tica.py
+Function: cost at line 150
+Total time: 294.33 s
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+   150                                               @profile
+   151                                               def cost(self, WW, data, plotEvery = None, returnFull = False):
+   152                                                   '''Main method of TICA that differs from RICA.
+   153
+   154                                                   if returnFull:
+   155                                                       returns totalCost, poolingCost, reconstructionCost, grad, hidden, reconDiff
+   156                                                   else:
+   157                                                       returns totalCost, poolingCost, reconstructionCost, grad
+   158                                                   '''
+   159
+   160                                                   #pdb.set_trace()
+   161
+   162       104          622      6.0      0.0          nInputs = data.shape[0]
+   163       104          186      1.8      0.0          nDatapoints = data.shape[1]
+   164       104          808      7.8      0.0          if self.nInputs != nInputs:
+   165                                                       raise Exception('Expected shape %s = %d dimensional input, but got %d' % (repr(self.imgShape), self.nInputs, nInputs))
+   166
+   167       104          156      1.5      0.0          if self.float32:
+   168                                                       WW = array(WW, dtype='float32')
+   169
+   170                                                   # NOTE: Flattening and reshaping is in C order in numpy but Fortran order in Matlab. This should not matter.
+   171       104          725      7.0      0.0          WW = WW.reshape(self.nHidden, nInputs)
+   172       104          136      1.3      0.0          WWold = WW
+   173       104       468561   4505.4      0.2          WW = l2RowScaled(WW)
+   174
+   175       104          713      6.9      0.0          numEvals = 0 if self.costLog is None else self.costLog.shape[0]
+   176       104          151      1.5      0.0          if plotEvery and numEvals % plotEvery == 0:
+   177                                                       self.plotWW(WW, filePrefix = 'intermed_WW_%04d' % numEvals)
+   178
+   179                                                   # Forward Prop
+   180       104      7141503  68668.3      2.4          hidden = dot(WW, data)
+   181       104     90364879 868893.1     30.7          reconstruction = dot(WW.T, hidden)
+   182
+   183                                                   # Reconstruction cost
+   184       104       142960   1374.6      0.0          reconDiff = reconstruction - data
+   185       104        79079    760.4      0.0          reconstructionCost = sum(reconDiff ** 2)
+   186
+   187                                                   # L2 Pooling / Sparsity cost
+   188       104      7943895  76383.6      2.7          absPooledActivations = sqrt(self.epsilon + dot(self.HH, hidden ** 2))
+   189       104        11300    108.7      0.0          poolingTerm = absPooledActivations.sum()
+   190       104          909      8.7      0.0          poolingCost = self.lambd * poolingTerm
+   191
+   192                                                   # Gradient of reconstruction cost term
+   193       104     74939922 720576.2     25.5          RxT = dot(reconDiff, data.T)
+   194       104     18323452 176187.0      6.2          reconstructionCostGrad = 2 * dot(RxT + RxT.T, WW.T).T
+   195
+   196                                                   # Gradient of sparsity / pooling term
+   197       104          702      6.8      0.0          SLOW_WAY = False
+   198       104          161      1.5      0.0          if SLOW_WAY:
+   199                                                       poolingCostGrad = zeros(WW.shape)
+   200                                                       for ii in range(nDatapoints):
+   201                                                           for jj in range(self.HH.shape[0]):
+   202                                                               poolingCostGrad += outer(1/absPooledActivations[jj, ii] * data[:,ii], (hidden[:,ii] * self.HH[jj,:])).T
+   203                                                       poolingCostGrad *= self.lambd
+   204                                                       print 'slow way'
+   205                                                       print poolingCostGrad[:4,:4]
+   206
+   207                                                   # fast way
+   208       104     48803182 469261.4     16.6          Ha = dot(self.HH.T, 1/absPooledActivations)
+   209       104     44581515 428668.4     15.1          poolingCostGrad = self.lambd * dot(hidden * Ha, data.T)
+   210                                                   #print 'fast way'
+   211                                                   #print poolingCostGrad[:4,:4]
+   212
+   213                                                   # Total cost and gradient per training example
+   214       104         2284     22.0      0.0          poolingCost /= nDatapoints
+   215       104          310      3.0      0.0          reconstructionCost /= nDatapoints
+   216       104          236      2.3      0.0          totalCost = reconstructionCost + poolingCost
+   217       104        96153    924.5      0.0          reconstructionCostGrad /= nDatapoints
+   218       104        96624    929.1      0.0          poolingCostGrad /= nDatapoints
+   219       104       236356   2272.7      0.1          WGrad = reconstructionCostGrad + poolingCostGrad
+   220
+   221       104       966389   9292.2      0.3          grad = l2RowScaledGrad(WWold, WW, WGrad)
+   222       104       124963   1201.6      0.0          grad = grad.flatten()
+   223
+   224       104          813      7.8      0.0          if self.float32:
+   225                                                       # convert back to keep fortran happy
+   226                                                       grad = array(grad, dtype='float64')
+   227
+   228       104          167      1.6      0.0          if returnFull:
+   229                                                       return totalCost, poolingCost, reconstructionCost, grad, hidden, reconDiff
+   230                                                   else:
+   231       104          212      2.0      0.0              return totalCost, poolingCost, reconstructionCost, grad
+
+
+
