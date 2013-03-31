@@ -15,6 +15,7 @@ import time
 from numpy import *
 import cPickle as pickle
 import types
+import inspect
 
 from dataLoaders import loadFromPklGz, saveToFile
 from misc import mkdir_p
@@ -64,7 +65,9 @@ class PersistentHasher(object):
             self.hashAlg.update(self.salt + 'dict')
             for key,val in sorted(obj.items()):
                 self.hashAlg.update(str(hash(key)))
-                self.update(val, level = level + 1)  # recursive call            
+                self.update(val, level = level + 1)  # recursive call
+        elif inspect.isclass(obj):
+            raise Exception('Hashing whole classes not supported yet (have not implemented reliable way to hash all methods)')
         else:
             # Just try to hash it
             try:

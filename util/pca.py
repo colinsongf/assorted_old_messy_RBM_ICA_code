@@ -4,6 +4,8 @@ import pdb
 from numpy import array, dot, random, linalg, sqrt, asarray, cov, eye, sum, hstack
 from numpy.linalg import norm
 
+from cache import cached
+
 
 
 class PCA(object):
@@ -43,12 +45,14 @@ class PCA(object):
 
         self.mu          = xx.mean(axis=0)
         centeredXX       = self.center(xx)
-        self.sigma       = dot(centeredXX.T, centeredXX) / self.nn
+        #self.sigma       = dot(centeredXX.T, centeredXX) / self.nn
+        self.sigma       = cached(dot, centeredXX.T, centeredXX) / self.nn
 
         # Columns of UU are the eigenvectors of self.sigma, i.e. the
         # principle components. UU and VV are transpose of each other;
         # we don't use VV. ss is the diagonal of the true S matrix.
-        self.UU, self.ss, self.VV = linalg.svd(self.sigma, full_matrices = False)
+        #self.UU, self.ss, self.VV = linalg.svd(self.sigma, full_matrices = False)
+        self.UU, self.ss, self.VV = cached(linalg.svd, self.sigma, full_matrices = False)
 
         self.var = self.ss / float(self.nn)
         self.std = sqrt(self.var)
