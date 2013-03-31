@@ -100,17 +100,19 @@ def fullNeighborMatrix(hiddenLayerShape, neighborhoodSize):
 class TICA(RICA):
     '''See RICA for constructor arguments.'''
 
-    def __init__(self, imgShape, lambd = .005, hiddenLayerShape = (10,10), neighborhoodParams = ('gaussian', 1.0, 0, 0),
-                 epsilon = 1e-5, saveDir = '', float32 = False):
+    def __init__(self, nInputs, lambd = .005, hiddenLayerShape = (10,10), neighborhoodParams = ('gaussian', 1.0, 0, 0),
+                 epsilon = 1e-5, saveDir = '', float32 = False, initWW = True):
         ''''''
         self.hiddenLayerShape = hiddenLayerShape
+        self.nHidden = prod(self.hiddenLayerShape)
         
-        super(TICA, self).__init__(imgShape = imgShape,
+        super(TICA, self).__init__(nInputs = nInputs,
+                                   nOutputs = self.nHidden,
                                    lambd = lambd,
-                                   nFeatures = prod(self.hiddenLayerShape),
                                    epsilon = epsilon,
                                    float32 = float32,
-                                   saveDir = saveDir)
+                                   saveDir = saveDir,
+                                   initWW = initWW)
 
         # Pooling neighborhood params
         # ('type', size, shrink, ignore)
@@ -156,16 +158,16 @@ class TICA(RICA):
 
         #pdb.set_trace()
 
-        nInputDim = data.shape[0]
+        nInputs = data.shape[0]
         nDatapoints = data.shape[1]
-        if self.nInputDim != nInputDim:
-            raise Exception('Expected shape %s = %d dimensional input, but got %d' % (repr(self.imgShape), self.nInputDim, nInputDim))
+        if self.nInputs != nInputs:
+            raise Exception('Expected shape %s = %d dimensional input, but got %d' % (repr(self.imgShape), self.nInputs, nInputs))
 
         if self.float32:
             WW = array(WW, dtype='float32')
         
         # NOTE: Flattening and reshaping is in C order in numpy but Fortran order in Matlab. This should not matter.
-        WW = WW.reshape(self.nFeatures, nInputDim)
+        WW = WW.reshape(self.nHidden, nInputs)
         WWold = WW
         WW = l2RowScaled(WW)
 
