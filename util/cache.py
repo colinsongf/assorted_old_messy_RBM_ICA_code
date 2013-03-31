@@ -22,7 +22,10 @@ from misc import mkdir_p
 
 
 
-globalCacheDir     = '/tmp/pycache'     # Directory to use for caching
+# Directory to use for caching
+#globalCacheDir     = '/tmp/pycache'
+globalCacheDir     = os.path.join(os.path.expanduser("~"), '.pycache')    # symlink to local disk if desired
+
 globalCacheVerbose = 2                  # 0: print nothing. 1: Print info about hits or misses. 2: print filenames. 3: print hash steps
 globalDisableCache = False              # Set to True to disable all caching
 
