@@ -13,7 +13,7 @@ def main():
     for Nsamples in (50, 500, 5000, 50000):
         for Nw in (2, 3, 4, 6, 10, 15, 20, 25, 28):
             for color in (True, False):
-                for seed,string in ((0, 'train'), (123.456, 'test')):
+                for seed,string in ((0, 'train'), (123456, 'test')):
                     random.seed(seed)
                     nColors = (3 if color else 1)
                     size = (Nw * Nw * nColors, Nsamples)
