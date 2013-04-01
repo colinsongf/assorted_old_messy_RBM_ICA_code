@@ -23,6 +23,7 @@ class PCAWhiteningDataNormalizer(object):
         self.pca = PCA(data.T)
 
         if saveDir:
+            pyplot.figure()
             pyplot.semilogy(self.pca.fracVar, 'o-')
             pyplot.title('Fractional variance in each dimension')
             pyplot.savefig(os.path.join(saveDir, 'fracVar.png'))

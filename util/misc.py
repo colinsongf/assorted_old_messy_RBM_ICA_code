@@ -25,12 +25,17 @@ class Stopwatch(object):
     def elapsed(self):
         return time.time() - self._start
 
-stopwatch = Stopwatch()
+globalStopwatch = Stopwatch()
 
-def pt(st):
+def makePt(st, stopwatch = None):
     '''Prepend the time since the start of the run to the given string'''
 
+    if string is None:
+        stopwatch = globalStopwatch
+    
     return '%05.3f_%s' % (stopwatch.elapsed(), st)
+
+pt = lambda st : makePt(st)
 
 
 
@@ -42,9 +47,23 @@ class Counter(object):
         self._count += 1
         return self._count
 
-counter = Counter()
+globalCounter = Counter()
 
-def pc(st):
+def makePc(st, counter = None):
     '''Prepend a counter since the start of the run to the given string'''
 
+    if counter is None:
+        counter = globalCounter
+    
     return '%03d_%s' % (counter.count(), st)
+
+class MakePc(object):
+    def __init__(self, counter = None):
+        if counter is None:
+            counter = globalCounter
+        self.counter = counter
+
+    def __call__(self, st):
+        return '%03d_%s' % (self.counter.count(), st)
+    
+pc = lambda st : makePc(st)

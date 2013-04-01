@@ -11,6 +11,7 @@ import os, sys, time
 from numpy import *
 from PIL import Image
 from GitResultsManager import resman
+from IPython.parallel import Client
 
 from tica import TICA
 from visualize import plotImageData, plotCov, printDataStats, plotImageRicaWW, plotRicaActivations, plotRicaReconstructions
@@ -20,9 +21,25 @@ from util.misc import pt, pc
 
 
 
-def runTest(rundir, childdir, params):
-    import time
+#from IPython.parallel import require
+#@require(util.misc)
+def runTest(args):
+    testId, rundir, childdir, params, cwd = args
+    
+    import time, os
+    os.chdir(cwd)
+    from numpy import *
     from GitResultsManager import GitResultsManager
+    #raise Exception('cwd is %s' % os.getcwd())
+    from tica import TICA
+    from util.misc import MakePc, Counter
+    from visualize import plotImageData, plotCov, printDataStats, plotImageRicaWW, plotRicaActivations, plotRicaReconstructions
+    from util.dataPrep import PCAWhiteningDataNormalizer
+    from util.dataLoaders import loadAtariData, loadRandomData, saveToFile
+    #counter = Counter()
+    #pc = lambda st : makePc(st, counter = counter)
+    pc = MakePc(Counter())
+    
     childResman = GitResultsManager()
     childResman.start(childOfRunDir = rundir, description = childdir, diary = False)
     
@@ -39,9 +56,9 @@ def runTest(rundir, childdir, params):
     epsilon            = 1e-5
     maxFuncCalls       = params['maxFuncCalls']
     randSeed           = params['randSeed']
-    #dataCrop           = 5000
+    dataCrop           = 1000
 
-    dataLoader         = params['dataLoader']
+    dataLoader         = locals().get(params['dataLoader'])  # Convert string to actual function
     dataPath           = params['dataPath']
     imgShape           = params['imgShape']
 
@@ -97,11 +114,11 @@ def runTest(rundir, childdir, params):
                 epsilon            = epsilon,
                 saveDir            = saveDir)
 
-    beginTotalCost, beginPoolingCost, beginReconstructionCost, grad = self.cost(WW, data)
+    beginTotalCost, beginPoolingCost, beginReconstructionCost, grad = tica.cost(tica.WW, data)
 
     tic = time.time()
     tica.learn(dataWhite, maxFun = maxFuncCalls)
-    execTime = time.time()
+    execTime = time.time() - tic
     saveToFile(os.path.join(saveDir, 'tica.pkl.gz'), tica)    # save learned model
 
     plotImageRicaWW(tica.WW, imgShape, saveDir, tileShape = hiddenLayerShape, prefix = pc('WW_iterFinal'))
@@ -110,7 +127,7 @@ def runTest(rundir, childdir, params):
                             tileShape = hiddenLayerShape, prefix = pc('recon_iterFinal'),
                             number = 20)
 
-    endTotalCost, endPoolingCost, endReconstructionCost, grad = self.cost(WW, data)
+    endTotalCost, endPoolingCost, endReconstructionCost, grad = tica.cost(tica.WW, data)
 
     print 'beginTotalCost, beginPoolingCost, beginReconstructionCost, endTotalCost, endPoolingCost, endReconstructionCost, execTime ='
     print [beginTotalCost, beginPoolingCost, beginReconstructionCost, endTotalCost, endPoolingCost, endReconstructionCost, execTime]
@@ -123,18 +140,25 @@ def runTest(rundir, childdir, params):
                'execTime': execTime}
     childResman.stop()
 
-    return results
+    return testId, params, results
 
 
 
 def main():
     resman.start('junk', diary = False)
 
-    resultsFilename = os.path.join(resman.rundir, 'allResults.pkl.gz'))
+    client = Client()
+    print 'IPython worker ids:', client.ids
+    balview = client.load_balanced_view()
+
+    resultsFilename = os.path.join(resman.rundir, 'allResults.pkl.gz')
     
     NN = 2
     allResults = [[None,None] for ii in range(NN)]
 
+    experiments = []
+    cwd = os.getcwd()
+    useIpython = True
     for ii in range(NN):
         params = {}
         random.seed(ii)
@@ -150,25 +174,44 @@ def main():
         params['imgShape'] = (params['dataWidth'], params['dataWidth'], 3)   # use color
 
         paramsRand = params.copy()
-        paramsRand['dataLoader'] = loadRandomData
-        paramsRand['dataPath'] = '../data/random/randomu01_train_%d_50000_3c.pkl.gz' % paramsRand['dataWidth']
-        resultsRand = runTest(resman.rundir, '%03d_rand' % ii, paramsRand)
-
-        allResults[ii][0] = {'params': paramsRand, 'results': resultsRand}
-        tmpFilename = os.path.join(saveDir, '.tmp.%f' % time.time())
-        saveToFile(tmpFilename, allResults)
-        os.rename(tmpFilename, resultsFilename)
+        paramsRand['dataLoader'] = 'loadRandomData'
+        paramsRand['dataPath'] = '../data/random/randomu01_train_%02d_50000_3c.pkl.gz' % paramsRand['dataWidth']
 
         paramsData = params.copy()
-        paramsData['dataLoader'] = loadAtariData
-        paramsData['dataPath'] = '../data/atari/space_invaders_train_15_50000_3c.pkl.gz')
-        runTest(resman.rundir, '%03d_data' % ii, paramsData)
-        
-        allResults[ii][1] = {'params': paramsData, 'results': resultsData}
-        tmpFilename = os.path.join(saveDir, '.tmp.%f' % time.time())
+        paramsData['dataLoader'] = 'loadAtariData'
+        paramsData['dataPath'] = '../data/atari/space_invaders_train_%02d_50000_3c.pkl.gz' % paramsData['dataWidth']
+
+        if not useIpython:
+            resultsRand = runTest(resman.rundir, '%05d_rand' % ii, paramsRand)
+
+            allResults[ii][0] = {'params': paramsRand, 'results': resultsRand}
+            tmpFilename = os.path.join(resman.rundir, '.tmp.%f.pkl.gz' % time.time())
+            saveToFile(tmpFilename, allResults)
+            os.rename(tmpFilename, resultsFilename)
+
+            resultsData = runTest(resman.rundir, '%05d_data' % ii, paramsData)
+
+            allResults[ii][1] = {'params': paramsData, 'results': resultsData}
+            tmpFilename = os.path.join(resman.rundir, '.tmp.%f.pkl.gz' % time.time())
+            saveToFile(tmpFilename, allResults)
+            os.rename(tmpFilename, resultsFilename)
+        else:
+            experiments.append(((ii, 0), resman.rundir, '%05d_rand' % ii, paramsRand, cwd))
+            experiments.append(((ii, 1), resman.rundir, '%05d_data' % ii, paramsData, cwd))
+
+
+    # Start all jobs
+    jobMap = balview.map_async(runTest, experiments, ordered = False)
+    #jobMap = balview.map_async(runTest, range(10), ordered = False)
+    for ii, returnValues in enumerate(jobMap):
+        testId, params, results = returnValues
+        print ii, 'Job', testId, 'finished.'
+        allResults[testId[0]][testId[1]] = {'params': params, 'results': results}
+        tmpFilename = os.path.join(resman.rundir, '.tmp.%f.pkl.gz' % time.time())
         saveToFile(tmpFilename, allResults)
         os.rename(tmpFilename, resultsFilename)
 
+    print 'Finished all jobs.'
     resman.stop()
     
 

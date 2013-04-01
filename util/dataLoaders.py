@@ -100,6 +100,5 @@ def loadRandomData(filename):
     '''Loads Random Data'''
 
     data = loadFromPklGz(filename)
-    data = data.T   # Make into one example per column
     return data
 
