@@ -15,13 +15,17 @@ import time
 from numpy import *
 import cPickle as pickle
 import types
+import inspect
 
 from dataLoaders import loadFromPklGz, saveToFile
 from misc import mkdir_p
 
 
 
-globalCacheDir     = '/tmp/pycache'     # Directory to use for caching
+# Directory to use for caching
+#globalCacheDir     = '/tmp/pycache'
+globalCacheDir     = os.path.join(os.path.expanduser("~"), '.pycache')    # symlink to local disk if desired
+
 globalCacheVerbose = 2                  # 0: print nothing. 1: Print info about hits or misses. 2: print filenames. 3: print hash steps
 globalDisableCache = False              # Set to True to disable all caching
 
@@ -64,7 +68,9 @@ class PersistentHasher(object):
             self.hashAlg.update(self.salt + 'dict')
             for key,val in sorted(obj.items()):
                 self.hashAlg.update(str(hash(key)))
-                self.update(val, level = level + 1)  # recursive call            
+                self.update(val, level = level + 1)  # recursive call
+        elif inspect.isclass(obj):
+            raise Exception('Hashing whole classes not supported yet (have not implemented reliable way to hash all methods)')
         else:
             # Just try to hash it
             try:

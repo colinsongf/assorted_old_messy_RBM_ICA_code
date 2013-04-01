@@ -1,19 +1,15 @@
 #! /usr/bin/env python
 
 '''
-[JBY] Utilities for learning.
-Some stuff copied from https://github.com/lisa-lab/DeepLearningTutorials/blob/master/code/utils.py
+Research code
+
+Jason Yosinski
+
+Utilities for learning. Some stuff copied from
+https://github.com/lisa-lab/DeepLearningTutorials/blob/master/code/utils.py
 '''
 
-''' This file contains different utility functions that are not connected 
-in anyway to the networks presented in the tutorials, but rather help in 
-processing the outputs into a more understandable way. 
-
-For example ``tile_raster_images`` helps in generating a easy to grasp 
-image from a set of samples or weights.
-'''
-
-import pdb
+import ipdb as pdb
 import numpy
 from numpy import mgrid, array, ones, zeros, linspace, random, reshape
 import Image
@@ -24,31 +20,64 @@ from tvtk.api import tvtk
 
 
 
-def scale_to_unit_interval(ndar,eps=1e-8):
-    ''' Scales all values in the ndarray ndar to be between 0 and 1 '''
-    ndar = ndar.copy()
-    ndar -= ndar.min()
-    ndar *= 1.0 / (ndar.max()+eps)
-    return ndar
+#########################
+#
+# Images
+#
+#########################
+
+def scale_to_unit_interval(arr,eps=1e-8):
+    ''' Scales all values in the arrray arr to be between 0 and 1 '''
+    arr = arr.copy()
+    arr -= arr.min()
+    arr *= 1.0 / (arr.max()+eps)
+    return arr
 
 
-def scale_all_rows_to_unit_interval(ndar,eps=1e-8):
-    ''' Scales each row in the 2D array ndar to be between 0 and 1 '''
-    assert(len(ndar.shape) == 2)
-    ndar = ndar.copy()
-    ndar = (ndar.T - ndar.min(axis=1)).T
-    ndar = (ndar.T / (ndar.max(axis=1)+eps)).T
-    return ndar
+def scale_all_rows_to_unit_interval(arr,eps=1e-8):
+    ''' Scales each row in the 2D array arr to be between 0 and 1 '''
+    assert(len(arr.shape) == 2)
+    arr = arr.copy()
+    arr = (arr.T - arr.min(axis=1)).T
+    arr = (arr.T / (arr.max(axis=1)+eps)).T
+    return arr
 
 
-def scale_some_rows_to_unit_interval(ndar, rowIdx, eps = 1e-8):
-    ''' Scales rows given by rowIdx in the 2D array ndar to be between 0 and 1'''
-    assert(len(ndar.shape) == 2)
-    ndar = ndar.copy()
+def scale_some_rows_to_unit_interval(arr, rowIdx, eps = 1e-8):
+    ''' Scales rows given by rowIdx in the 2D array arr to be between 0 and 1'''
+    assert(len(arr.shape) == 2)
+    arr = arr.copy()
     for ii in rowIdx:
-        ndar[ii,:] -= ndar[ii,:].min()
-        ndar[ii,:] /= (ndar[ii,:].max() + 1e-8)
-    return ndar
+        arr[ii,:] -= arr[ii,:].min()
+        arr[ii,:] /= (arr[ii,:].max() + 1e-8)
+    return arr
+
+
+def scale_rows_together_to_unit_interval(arr, rowIdx, eps = 1e-8, anchor0 = True):
+    ''' Scales rows given by rowIdx in the 2D array arr to be between
+    0 and 1. If anchor0 is True, fix an input value of 0 to be output
+    exactly in the middle of the range (.5)'''
+    
+    assert(len(arr.shape) == 2)
+    arr = arr.copy()
+
+    if not rowIdx:
+        print 'WARNING: blank rowIdx. Doing nothing.'
+        return
+
+    usemin = arr[rowIdx,:].min()
+    usemax = arr[rowIdx,:].max()
+    if anchor0:
+        maxabs = max(usemax, -usemin, 1e-8)
+        for ii in rowIdx:
+            arr[ii,:] /= maxabs
+            arr[ii,:] += .5
+    else:
+        for ii in rowIdx:
+            arr[ii,:] -= usemin
+            arr[ii,:] /= max(usemax - usemin, 1e-8)
+    return arr
+
 
 
 def tile_raster_images(X, img_shape, tile_shape, tile_spacing = (0,0), 
@@ -256,6 +285,12 @@ def pil_imagesc(arr, epsilon = 1e-8, saveto = None):
         image.save(saveto)
 
 
+
+#########################
+#
+# 3D Shapes
+#
+#########################
 
 cubeEdges = array([[0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 0, 0],
                    [0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 1, 1, 0],
