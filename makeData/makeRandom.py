@@ -18,7 +18,7 @@ def main():
                     nColors = (3 if color else 1)
                     size = (Nw * Nw * nColors, Nsamples)
                     xx = random.uniform(0, 1, size)
-                    saveToFile('../data/random/randomu01_%s_%d_%d_%dc.pkl.gz' % (string, Nw, Nsamples, nColors), xx)
+                    saveToFile('../data/random/randomu01_%s_%02d_%d_%dc.pkl.gz' % (string, Nw, Nsamples, nColors), xx)
 
 
 
