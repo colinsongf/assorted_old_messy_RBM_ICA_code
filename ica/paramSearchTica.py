@@ -14,34 +14,36 @@ from GitResultsManager import resman
 
 from tica import TICA
 from visualize import plotImageData, plotCov, printDataStats, plotImageRicaWW, plotRicaActivations, plotRicaReconstructions
-from util.dataLoaders import loadAtariData, saveToFile
+from util.dataLoaders import loadAtariData, loadRandomData, saveToFile
 from util.dataPrep import PCAWhiteningDataNormalizer
 from util.misc import pt, pc
 
 
 
-def main():
-    d
-
-
-
-if __name__ == '__main__':
-    resman.start('spaceinv_paramsearch', diary = True)
-    saveDir = resman.rundir
+def runTest(rundir, childdir, params):
+    import time
+    from GitResultsManager import GitResultsManager
+    childResman = GitResultsManager()
+    childResman.start(childOfRunDir = rundir, description = childdir, diary = False)
+    
+    saveDir = childResman.rundir
 
     dataCrop = None
     #########################
     # Parameters
     #########################
-    hiddenISize        = 20
-    hiddenJSize        = 20
-    neighborhoodParams = ('gaussian', 2.0, 0, 0)
-    lambd              = 1.5
+    hiddenISize        = params['hiddenISize']
+    hiddenJSize        = params['hiddenJSize']
+    neighborhoodParams = ('gaussian', params['neighborhoodSize'], 0, 0)
+    lambd              = params['lambd']
     epsilon            = 1e-5
-    maxFuncCalls       = 3
-    randSeed           = 0
-    dataCrop           = 5000
+    maxFuncCalls       = params['maxFuncCalls']
+    randSeed           = params['randSeed']
+    #dataCrop           = 5000
 
+    dataLoader         = params['dataLoader']
+    dataPath           = params['dataPath']
+    imgShape           = params['imgShape']
 
     hiddenLayerShape = (hiddenISize, hiddenJSize)
 
@@ -51,21 +53,24 @@ if __name__ == '__main__':
 
     # Load data
     #data = loadAtariData('../data/atari/mspacman_train_15_50000_3c.pkl.gz'); imgShape = (15,15,3)
-    data = loadAtariData('../data/atari/space_invaders_train_15_50000_3c.pkl.gz'); imgShape = (15,15,3)
+    #data = loadAtariData('../data/atari/space_invaders_train_15_50000_3c.pkl.gz'); imgShape = (15,15,3)
+    data = dataLoader(dataPath)
     if dataCrop:
-        print 'Warning: Cropping data from %d examples to only %d for debug' % (data.shape[1], dataCrop)
+        print '\nWARNING: Cropping data from %d examples to only %d for debug\n' % (data.shape[1], dataCrop)
         data = data[:,:dataCrop]
     nInputs = data.shape[0]
     isColor = len(imgShape) > 2
 
     print '\nParameters:'
-    for key in ['nInputs', 'hiddenISize', 'hiddenJSize', 'neighborhoodParams', 'lambd', 'epsilon', 'maxFuncCalls', 'randSeed', 'dataCrop']:
+    for key in ['nInputs', 'hiddenISize', 'hiddenJSize', 'neighborhoodParams', 'lambd', 'epsilon', 'maxFuncCalls', 'randSeed', 'dataCrop', 'dataLoader', 'dataPath', 'imgShape']:
         print '  %20s: %s' % (key, locals()[key])
     print
 
-    # Visualize before prep
-    plotImageData(data, imgShape, saveDir, pc('data_raw'))
-    plotCov(data, saveDir, pc('data_raw'))
+    skipVis = True
+    if not skipVis:
+        # Visualize before prep
+        plotImageData(data, imgShape, saveDir, pc('data_raw'))
+        plotCov(data, saveDir, pc('data_raw'))
     printDataStats(data)
     
     # Whiten with PCA
@@ -73,9 +78,10 @@ if __name__ == '__main__':
     dataWhite, junk = whiteningStage.raw2normalized(data)
     dataOrig        = whiteningStage.normalized2raw(dataWhite)
 
-    # Visualize after prep
-    plotImageData(dataWhite, imgShape, saveDir, pc('data_white'))
-    plotCov(dataWhite, saveDir, pc('data_white'))
+    if not skipVis:
+        # Visualize after prep
+        plotImageData(dataWhite, imgShape, saveDir, pc('data_white'))
+        plotCov(dataWhite, saveDir, pc('data_white'))
     printDataStats(dataWhite)
 
 
@@ -91,17 +97,80 @@ if __name__ == '__main__':
                 epsilon            = epsilon,
                 saveDir            = saveDir)
 
-    plotImageRicaWW(tica.WW, imgShape, saveDir, tileShape = hiddenLayerShape, prefix = pc('WW_iter0'))
-    plotRicaActivations(tica.WW, dataWhite, saveDir, prefix = pc('activations_iter0'))
-    plotRicaReconstructions(tica, dataWhite, imgShape, saveDir, unwhitener = whiteningStage.normalized2raw,
-                            tileShape = hiddenLayerShape, prefix = pc('recon_iter0'))
-    
+    beginTotalCost, beginPoolingCost, beginReconstructionCost, grad = self.cost(WW, data)
+
+    tic = time.time()
     tica.learn(dataWhite, maxFun = maxFuncCalls)
+    execTime = time.time()
     saveToFile(os.path.join(saveDir, 'tica.pkl.gz'), tica)    # save learned model
 
     plotImageRicaWW(tica.WW, imgShape, saveDir, tileShape = hiddenLayerShape, prefix = pc('WW_iterFinal'))
     plotRicaActivations(tica.WW, dataWhite, saveDir, prefix = pc('activations_iterFinal'))
     plotRicaReconstructions(tica, dataWhite, imgShape, saveDir, unwhitener = whiteningStage.normalized2raw,
-                            tileShape = hiddenLayerShape, prefix = pc('recon_iterFinal'))
+                            tileShape = hiddenLayerShape, prefix = pc('recon_iterFinal'),
+                            number = 20)
+
+    endTotalCost, endPoolingCost, endReconstructionCost, grad = self.cost(WW, data)
+
+    print 'beginTotalCost, beginPoolingCost, beginReconstructionCost, endTotalCost, endPoolingCost, endReconstructionCost, execTime ='
+    print [beginTotalCost, beginPoolingCost, beginReconstructionCost, endTotalCost, endPoolingCost, endReconstructionCost, execTime]
+    results = {'beginTotalCost': beginTotalCost,
+               'beginPoolingCost': beginPoolingCost,
+               'beginReconstructionCost': beginReconstructionCost,
+               'endTotalCost': endTotalCost,
+               'endPoolingCost': endPoolingCost,
+               'endReconstructionCost': endReconstructionCost,
+               'execTime': execTime}
+    childResman.stop()
+
+    return results
+
+
+
+def main():
+    resman.start('junk', diary = False)
+
+    resultsFilename = os.path.join(resman.rundir, 'allResults.pkl.gz'))
     
+    NN = 2
+    allResults = [[None,None] for ii in range(NN)]
+
+    for ii in range(NN):
+        params = {}
+        random.seed(ii)
+        params['hiddenISize'] = random.choice((2, 4, 6, 8, 10, 15, 20))
+        params['hiddenJSize'] = params['hiddenISize']
+        params['neighborhoodSize'] = random.choice((.1, .3, .5, .7, 1.0, 1.5, 2.0, 2.5, 3.5, 5.0))
+        lambd = exp(random.uniform(log(.0001), log(10)))   # Uniform in log space
+        params['lambd'] = round(lambd, 1-int(floor(log10(lambd))))  # Just keep two significant figures
+        params['randSeed'] = ii
+        params['maxFuncCalls'] = 2
+        #params['dataWidth'] = random.choice((2, 3, 4, 6, 10, 15, 20, 25, 28))
+        params['dataWidth'] = random.choice((2, 4, 10))   # just quick
+        params['imgShape'] = (params['dataWidth'], params['dataWidth'], 3)   # use color
+
+        paramsRand = params.copy()
+        paramsRand['dataLoader'] = loadRandomData
+        paramsRand['dataPath'] = '../data/random/randomu01_train_%d_50000_3c.pkl.gz' % paramsRand['dataWidth']
+        resultsRand = runTest(resman.rundir, '%03d_rand' % ii, paramsRand)
+
+        allResults[ii][0] = {'params': paramsRand, 'results': resultsRand}
+        tmpFilename = os.path.join(saveDir, '.tmp.%f' % time.time())
+        saveToFile(tmpFilename, allResults)
+        os.rename(tmpFilename, resultsFilename)
+
+        paramsData = params.copy()
+        paramsData['dataLoader'] = loadAtariData
+        paramsData['dataPath'] = '../data/atari/space_invaders_train_15_50000_3c.pkl.gz')
+        runTest(resman.rundir, '%03d_data' % ii, paramsData)
+        
+        allResults[ii][1] = {'params': paramsData, 'results': resultsData}
+        tmpFilename = os.path.join(saveDir, '.tmp.%f' % time.time())
+        saveToFile(tmpFilename, allResults)
+        os.rename(tmpFilename, resultsFilename)
+
     resman.stop()
+    
+
+if __name__ == '__main__':
+    main()

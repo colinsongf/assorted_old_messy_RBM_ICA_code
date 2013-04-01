@@ -88,7 +88,16 @@ def loadFromPklGz(filename):
 
 
 def loadAtariData(filename):
-    '''Loads Atari '''
+    '''Loads Atari Data'''
+
+    data = loadFromPklGz(filename)
+    data = data.T   # Make into one example per column
+    return data
+
+
+
+def loadRandomData(filename):
+    '''Loads Random Data'''
 
     data = loadFromPklGz(filename)
     data = data.T   # Make into one example per column
