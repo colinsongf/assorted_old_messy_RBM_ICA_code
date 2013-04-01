@@ -107,10 +107,20 @@ def main():
         saveToFile(name + 'train_02_50000_1c.pkl.gz', randomSampleMatrix(path, trainFilter, Nw = 02, Nsamples = 50000, color = False))
         saveToFile(name + 'test_02_50000_1c.pkl.gz',  randomSampleMatrix(path, testFilter,  Nw = 02, Nsamples = 50000, color = False))
 
+        saveToFile(name + 'train_03_50_1c.pkl.gz',    randomSampleMatrix(path, trainFilter, Nw = 03, Nsamples = 50, color = False))
+        saveToFile(name + 'test_03_50_1c.pkl.gz',     randomSampleMatrix(path, testFilter,  Nw = 03, Nsamples = 50, color = False))
+        saveToFile(name + 'train_03_50000_1c.pkl.gz', randomSampleMatrix(path, trainFilter, Nw = 03, Nsamples = 50000, color = False))
+        saveToFile(name + 'test_03_50000_1c.pkl.gz',  randomSampleMatrix(path, testFilter,  Nw = 03, Nsamples = 50000, color = False))
+
         saveToFile(name + 'train_04_50_1c.pkl.gz',    randomSampleMatrix(path, trainFilter, Nw = 04, Nsamples = 50, color = False))
         saveToFile(name + 'test_04_50_1c.pkl.gz',     randomSampleMatrix(path, testFilter,  Nw = 04, Nsamples = 50, color = False))
         saveToFile(name + 'train_04_50000_1c.pkl.gz', randomSampleMatrix(path, trainFilter, Nw = 04, Nsamples = 50000, color = False))
         saveToFile(name + 'test_04_50000_1c.pkl.gz',  randomSampleMatrix(path, testFilter,  Nw = 04, Nsamples = 50000, color = False))
+
+        saveToFile(name + 'train_06_50_1c.pkl.gz',    randomSampleMatrix(path, trainFilter, Nw = 06, Nsamples = 50, color = False))
+        saveToFile(name + 'test_06_50_1c.pkl.gz',     randomSampleMatrix(path, testFilter,  Nw = 06, Nsamples = 50, color = False))
+        saveToFile(name + 'train_06_50000_1c.pkl.gz', randomSampleMatrix(path, trainFilter, Nw = 06, Nsamples = 50000, color = False))
+        saveToFile(name + 'test_06_50000_1c.pkl.gz',  randomSampleMatrix(path, testFilter,  Nw = 06, Nsamples = 50000, color = False))
 
         saveToFile(name + 'train_10_50_1c.pkl.gz',    randomSampleMatrix(path, trainFilter, Nw = 10, Nsamples = 50, color = False))
         saveToFile(name + 'test_10_50_1c.pkl.gz',     randomSampleMatrix(path, testFilter,  Nw = 10, Nsamples = 50, color = False))
@@ -121,6 +131,16 @@ def main():
         saveToFile(name + 'test_15_50_1c.pkl.gz',     randomSampleMatrix(path, testFilter,  Nw = 15, Nsamples = 50, color = False))
         saveToFile(name + 'train_15_50000_1c.pkl.gz', randomSampleMatrix(path, trainFilter, Nw = 15, Nsamples = 50000, color = False))
         saveToFile(name + 'test_15_50000_1c.pkl.gz',  randomSampleMatrix(path, testFilter,  Nw = 15, Nsamples = 50000, color = False))
+
+        saveToFile(name + 'train_20_50_1c.pkl.gz',    randomSampleMatrix(path, trainFilter, Nw = 20, Nsamples = 50, color = False))
+        saveToFile(name + 'test_20_50_1c.pkl.gz',     randomSampleMatrix(path, testFilter,  Nw = 20, Nsamples = 50, color = False))
+        saveToFile(name + 'train_20_50000_1c.pkl.gz', randomSampleMatrix(path, trainFilter, Nw = 20, Nsamples = 50000, color = False))
+        saveToFile(name + 'test_20_50000_1c.pkl.gz',  randomSampleMatrix(path, testFilter,  Nw = 20, Nsamples = 50000, color = False))
+
+        saveToFile(name + 'train_25_50_1c.pkl.gz',    randomSampleMatrix(path, trainFilter, Nw = 25, Nsamples = 50, color = False))
+        saveToFile(name + 'test_25_50_1c.pkl.gz',     randomSampleMatrix(path, testFilter,  Nw = 25, Nsamples = 50, color = False))
+        saveToFile(name + 'train_25_50000_1c.pkl.gz', randomSampleMatrix(path, trainFilter, Nw = 25, Nsamples = 50000, color = False))
+        saveToFile(name + 'test_25_50000_1c.pkl.gz',  randomSampleMatrix(path, testFilter,  Nw = 25, Nsamples = 50000, color = False))
 
         saveToFile(name + 'train_28_50_1c.pkl.gz',    randomSampleMatrix(path, trainFilter, Nw = 28, Nsamples = 50, color = False))
         saveToFile(name + 'test_28_50_1c.pkl.gz',     randomSampleMatrix(path, testFilter,  Nw = 28, Nsamples = 50, color = False))
@@ -133,10 +153,20 @@ def main():
         saveToFile(name + 'train_02_50000_3c.pkl.gz', randomSampleMatrix(path, trainFilter, Nw = 02, Nsamples = 50000, color = True))
         saveToFile(name + 'test_02_50000_3c.pkl.gz',  randomSampleMatrix(path, testFilter,  Nw = 02, Nsamples = 50000, color = True))
 
+        saveToFile(name + 'train_03_50_3c.pkl.gz',    randomSampleMatrix(path, trainFilter, Nw = 03, Nsamples = 50, color = True))
+        saveToFile(name + 'test_03_50_3c.pkl.gz',     randomSampleMatrix(path, testFilter,  Nw = 03, Nsamples = 50, color = True))
+        saveToFile(name + 'train_03_50000_3c.pkl.gz', randomSampleMatrix(path, trainFilter, Nw = 03, Nsamples = 50000, color = True))
+        saveToFile(name + 'test_03_50000_3c.pkl.gz',  randomSampleMatrix(path, testFilter,  Nw = 03, Nsamples = 50000, color = True))
+
         saveToFile(name + 'train_04_50_3c.pkl.gz',    randomSampleMatrix(path, trainFilter, Nw = 04, Nsamples = 50, color = True))
         saveToFile(name + 'test_04_50_3c.pkl.gz',     randomSampleMatrix(path, testFilter,  Nw = 04, Nsamples = 50, color = True))
         saveToFile(name + 'train_04_50000_3c.pkl.gz', randomSampleMatrix(path, trainFilter, Nw = 04, Nsamples = 50000, color = True))
         saveToFile(name + 'test_04_50000_3c.pkl.gz',  randomSampleMatrix(path, testFilter,  Nw = 04, Nsamples = 50000, color = True))
+
+        saveToFile(name + 'train_06_50_3c.pkl.gz',    randomSampleMatrix(path, trainFilter, Nw = 06, Nsamples = 50, color = True))
+        saveToFile(name + 'test_06_50_3c.pkl.gz',     randomSampleMatrix(path, testFilter,  Nw = 06, Nsamples = 50, color = True))
+        saveToFile(name + 'train_06_50000_3c.pkl.gz', randomSampleMatrix(path, trainFilter, Nw = 06, Nsamples = 50000, color = True))
+        saveToFile(name + 'test_06_50000_3c.pkl.gz',  randomSampleMatrix(path, testFilter,  Nw = 06, Nsamples = 50000, color = True))
 
         saveToFile(name + 'train_10_50_3c.pkl.gz',    randomSampleMatrix(path, trainFilter, Nw = 10, Nsamples = 50, color = True))
         saveToFile(name + 'test_10_50_3c.pkl.gz',     randomSampleMatrix(path, testFilter,  Nw = 10, Nsamples = 50, color = True))
@@ -147,6 +177,16 @@ def main():
         saveToFile(name + 'test_15_50_3c.pkl.gz',     randomSampleMatrix(path, testFilter,  Nw = 15, Nsamples = 50, color = True))
         saveToFile(name + 'train_15_50000_3c.pkl.gz', randomSampleMatrix(path, trainFilter, Nw = 15, Nsamples = 50000, color = True))
         saveToFile(name + 'test_15_50000_3c.pkl.gz',  randomSampleMatrix(path, testFilter,  Nw = 15, Nsamples = 50000, color = True))
+
+        saveToFile(name + 'train_20_50_3c.pkl.gz',    randomSampleMatrix(path, trainFilter, Nw = 20, Nsamples = 50, color = True))
+        saveToFile(name + 'test_20_50_3c.pkl.gz',     randomSampleMatrix(path, testFilter,  Nw = 20, Nsamples = 50, color = True))
+        saveToFile(name + 'train_20_50000_3c.pkl.gz', randomSampleMatrix(path, trainFilter, Nw = 20, Nsamples = 50000, color = True))
+        saveToFile(name + 'test_20_50000_3c.pkl.gz',  randomSampleMatrix(path, testFilter,  Nw = 20, Nsamples = 50000, color = True))
+
+        saveToFile(name + 'train_25_50_3c.pkl.gz',    randomSampleMatrix(path, trainFilter, Nw = 25, Nsamples = 50, color = True))
+        saveToFile(name + 'test_25_50_3c.pkl.gz',     randomSampleMatrix(path, testFilter,  Nw = 25, Nsamples = 50, color = True))
+        saveToFile(name + 'train_25_50000_3c.pkl.gz', randomSampleMatrix(path, trainFilter, Nw = 25, Nsamples = 50000, color = True))
+        saveToFile(name + 'test_25_50000_3c.pkl.gz',  randomSampleMatrix(path, testFilter,  Nw = 25, Nsamples = 50000, color = True))
 
         saveToFile(name + 'train_28_50_3c.pkl.gz',    randomSampleMatrix(path, trainFilter, Nw = 28, Nsamples = 50, color = True))
         saveToFile(name + 'test_28_50_3c.pkl.gz',     randomSampleMatrix(path, testFilter,  Nw = 28, Nsamples = 50, color = True))
