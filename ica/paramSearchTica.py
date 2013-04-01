@@ -38,7 +38,7 @@ def reliablyRunTest(args):
     from paramSearchTica import runTest
 
     childResman = GitResultsManager()
-    childResman.start(childOfRunDir = rundir, description = childdir, diary = True)
+    childResman.start(childOfRunDir = rundir, description = childdir, diary = False)  # Turn off for now :(
     saveDir = childResman.rundir
     
     tries = 0
@@ -188,6 +188,10 @@ def runTest(saveDir, params):
                'endReconstructionCost': endReconstructionCost,
                'execTime': execTime}
 
+    # Save locally just in case of exception in main program
+    myResults = {'params': params, 'results': results}
+    saveToFile(os.path.join(saveDir, 'myresults.pkl.gz'), myResults)
+    
     return results
 
 
@@ -261,6 +265,7 @@ def main():
         tmpFilename = os.path.join(resman.rundir, '.tmp.%f.pkl.gz' % time.time())
         saveToFile(tmpFilename, allResults)
         os.rename(tmpFilename, resultsFilename)
+        #pdb.set_trace()
 
     print 'Finished all jobs.'
     resman.stop()
