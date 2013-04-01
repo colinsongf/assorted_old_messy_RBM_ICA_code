@@ -24,12 +24,15 @@ from util.misc import pt, pc
 #from IPython.parallel import require
 #@require(util.misc)
 def runTest(args):
-    testId, rundir, childdir, params, cwd = args
+    testId, rundir, childdir, params, cwd, display = args
     
-    import time, os
+    import time, os, sys
     os.chdir(cwd)
+    os.putenv('DISPLAY', display)   # needed on Xanthus
     from numpy import *
     from GitResultsManager import GitResultsManager
+    #raise Exception('path is %s' % sys.path)
+    #raise Exception('version is %s' % sys.version_info)
     #raise Exception('cwd is %s' % os.getcwd())
     from tica import TICA
     from util.misc import MakePc, Counter
@@ -147,7 +150,8 @@ def runTest(args):
 def main():
     resman.start('junk', diary = False)
 
-    client = Client()
+    client = Client(profile='ssh')
+    #client = Client()
     print 'IPython worker ids:', client.ids
     balview = client.load_balanced_view()
 
@@ -158,6 +162,7 @@ def main():
 
     experiments = []
     cwd = os.getcwd()
+    disp = os.environ['DISPLAY']
     useIpython = True
     for ii in range(NN):
         params = {}
@@ -196,8 +201,8 @@ def main():
             saveToFile(tmpFilename, allResults)
             os.rename(tmpFilename, resultsFilename)
         else:
-            experiments.append(((ii, 0), resman.rundir, '%05d_rand' % ii, paramsRand, cwd))
-            experiments.append(((ii, 1), resman.rundir, '%05d_data' % ii, paramsData, cwd))
+            experiments.append(((ii, 0), resman.rundir, '%05d_rand' % ii, paramsRand, cwd, disp))
+            experiments.append(((ii, 1), resman.rundir, '%05d_data' % ii, paramsData, cwd, disp))
 
 
     # Start all jobs

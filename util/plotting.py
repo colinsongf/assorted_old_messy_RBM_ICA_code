@@ -12,7 +12,7 @@ https://github.com/lisa-lab/DeepLearningTutorials/blob/master/code/utils.py
 import ipdb as pdb
 import numpy
 from numpy import mgrid, array, ones, zeros, linspace, random, reshape
-import Image
+from PIL import Image
 
 
 
