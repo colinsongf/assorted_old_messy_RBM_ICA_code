@@ -216,6 +216,7 @@ class RICA(object):
         # plot sparsity/reconstruction costs over time
         costs = self.costLog
         self.costLog = None
+        pyplot.figure()
         pyplot.plot(costs[:,0], 'b-', costs[:,1], 'r-')
         pyplot.hold(True)
         pyplot.plot(costs[:,2], '--', color = (.7,0,.7,1))
@@ -224,6 +225,7 @@ class RICA(object):
         if self.saveDir:
             pyplot.savefig(os.path.join(self.saveDir, 'cost.png'))
             pyplot.savefig(os.path.join(self.saveDir, 'cost.pdf'))
+        pyplot.close()
 
 
     def getReconPlotString(self, costEtc):
