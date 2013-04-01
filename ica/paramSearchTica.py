@@ -44,7 +44,7 @@ def runTest(args):
     pc = MakePc(Counter())
     
     childResman = GitResultsManager()
-    childResman.start(childOfRunDir = rundir, description = childdir, diary = False)
+    childResman.start(childOfRunDir = rundir, description = childdir, diary = True)
     
     saveDir = childResman.rundir
 
@@ -148,7 +148,7 @@ def runTest(args):
 
 
 def main():
-    resman.start('junk', diary = False)
+    resman.start('junk', diary = True)
 
     client = Client(profile='ssh')
     #client = Client()
