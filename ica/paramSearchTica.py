@@ -23,12 +23,63 @@ from util.misc import pt, pc
 
 #from IPython.parallel import require
 #@require(util.misc)
-def runTest(args):
+def reliablyRunTest(args):
+    import os
+    import time
+    import traceback
+    from GitResultsManager import GitResultsManager, hostname
+    from numpy import random
+
     testId, rundir, childdir, params, cwd, display = args
     
-    import time, os, sys
     os.chdir(cwd)
     os.putenv('DISPLAY', display)   # needed on Xanthus
+
+    from paramSearchTica import runTest
+
+    childResman = GitResultsManager()
+    childResman.start(childOfRunDir = rundir, description = childdir, diary = True)
+    saveDir = childResman.rundir
+    
+    tries = 0
+    myHostname = hostname()
+    results = {}
+    results['failures'] = []
+    results['host'] = myHostname
+    success = False
+    maxTries = 10
+    while not success and tries < maxTries:
+        tic = time.time()
+        tries += 1
+        print 'reliablyRunTest: Attempt %d' % tries
+        try:
+            runResults = runTest(saveDir, params)
+            success = True
+        except Exception, err:
+            print ('reliablyRunTest: FAILURE: runTest on host %s failed on try %d after %f seconds. Error was:'
+                   % (myHostname, tries, time.time()-tic))
+            tb = traceback.format_exc()
+            print tb
+            results['failures'].append(tb)
+            minSleep = 1.5**tries
+            maxSleep = 1.5**(tries+1)
+            sleepTime = random.uniform(minSleep, maxSleep)
+            print 'Sleeping for %.2f seconds.' % sleepTime
+            time.sleep(sleepTime)
+    results['success'] = success
+    if success:
+        results.update(runResults)
+    else:
+        print 'reliablyRunTest: Giving up after %d tries' % tries
+
+    childResman.stop()
+
+    return testId, params, results
+
+
+def runTest(saveDir, params):
+
+    import time, os, sys
     from numpy import *
     from GitResultsManager import GitResultsManager
     #raise Exception('path is %s' % sys.path)
@@ -43,11 +94,6 @@ def runTest(args):
     #pc = lambda st : makePc(st, counter = counter)
     pc = MakePc(Counter())
     
-    childResman = GitResultsManager()
-    childResman.start(childOfRunDir = rundir, description = childdir, diary = True)
-    
-    saveDir = childResman.rundir
-
     dataCrop = None
     #########################
     # Parameters
@@ -141,9 +187,8 @@ def runTest(args):
                'endPoolingCost': endPoolingCost,
                'endReconstructionCost': endReconstructionCost,
                'execTime': execTime}
-    childResman.stop()
 
-    return testId, params, results
+    return results
 
 
 
@@ -157,7 +202,7 @@ def main():
 
     resultsFilename = os.path.join(resman.rundir, 'allResults.pkl.gz')
     
-    NN = 2000
+    NN = 5000
     allResults = [[None,None] for ii in range(NN)]
 
     experiments = []
@@ -174,8 +219,9 @@ def main():
         params['lambd'] = round(lambd, 1-int(floor(log10(lambd))))  # Just keep two significant figures
         params['randSeed'] = ii
         params['maxFuncCalls'] = 300
-        params['dataWidth'] = random.choice((2, 3, 4, 6, 10, 15, 20, 25, 28))
         #params['dataWidth'] = random.choice((2, 4, 10))   # just quick
+        #params['dataWidth'] = random.choice((2, 3, 4, 6, 10, 15, 20, 25, 28))
+        params['dataWidth'] = random.choice((2, 3, 4, 6, 10, 15, 20))  # 25 and 28 are incomplete
         params['imgShape'] = (params['dataWidth'], params['dataWidth'], 3)   # use color
 
         paramsRand = params.copy()
@@ -187,14 +233,14 @@ def main():
         paramsData['dataPath'] = '../data/atari/space_invaders_train_%02d_50000_3c.pkl.gz' % paramsData['dataWidth']
 
         if not useIpython:
-            resultsRand = runTest(resman.rundir, '%05d_rand' % ii, paramsRand)
+            resultsRand = reliablyRunTest(resman.rundir, '%05d_rand' % ii, paramsRand)
 
             allResults[ii][0] = {'params': paramsRand, 'results': resultsRand}
             tmpFilename = os.path.join(resman.rundir, '.tmp.%f.pkl.gz' % time.time())
             saveToFile(tmpFilename, allResults)
             os.rename(tmpFilename, resultsFilename)
 
-            resultsData = runTest(resman.rundir, '%05d_data' % ii, paramsData)
+            resultsData = reliablyRunTest(resman.rundir, '%05d_data' % ii, paramsData)
 
             allResults[ii][1] = {'params': paramsData, 'results': resultsData}
             tmpFilename = os.path.join(resman.rundir, '.tmp.%f.pkl.gz' % time.time())
@@ -206,8 +252,8 @@ def main():
 
 
     # Start all jobs
-    jobMap = balview.map_async(runTest, experiments, ordered = False)
-    #jobMap = balview.map_async(runTest, range(10), ordered = False)
+    jobMap = balview.map_async(reliablyRunTest, experiments, ordered = False)
+    #jobMap = balview.map_async(reliablyRunTest, range(10), ordered = False)
     for ii, returnValues in enumerate(jobMap):
         testId, params, results = returnValues
         print ii, 'Job', testId, 'finished.'
