@@ -59,7 +59,7 @@ def runTest(args):
     epsilon            = 1e-5
     maxFuncCalls       = params['maxFuncCalls']
     randSeed           = params['randSeed']
-    dataCrop           = 1000
+    #dataCrop           = 1000
 
     dataLoader         = locals().get(params['dataLoader'])  # Convert string to actual function
     dataPath           = params['dataPath']
@@ -157,7 +157,7 @@ def main():
 
     resultsFilename = os.path.join(resman.rundir, 'allResults.pkl.gz')
     
-    NN = 2
+    NN = 2000
     allResults = [[None,None] for ii in range(NN)]
 
     experiments = []
@@ -173,9 +173,9 @@ def main():
         lambd = exp(random.uniform(log(.0001), log(10)))   # Uniform in log space
         params['lambd'] = round(lambd, 1-int(floor(log10(lambd))))  # Just keep two significant figures
         params['randSeed'] = ii
-        params['maxFuncCalls'] = 2
-        #params['dataWidth'] = random.choice((2, 3, 4, 6, 10, 15, 20, 25, 28))
-        params['dataWidth'] = random.choice((2, 4, 10))   # just quick
+        params['maxFuncCalls'] = 300
+        params['dataWidth'] = random.choice((2, 3, 4, 6, 10, 15, 20, 25, 28))
+        #params['dataWidth'] = random.choice((2, 4, 10))   # just quick
         params['imgShape'] = (params['dataWidth'], params['dataWidth'], 3)   # use color
 
         paramsRand = params.copy()
