@@ -96,6 +96,15 @@ def loadAtariData(filename):
 
 
 
+def loadUpsonData(filename):
+    '''Loads Upson Data'''
+
+    data = loadFromPklGz(filename)
+    data = data.T   # Make into one example per column
+    return data
+
+
+
 def loadRandomData(filename):
     '''Loads Random Data'''
 

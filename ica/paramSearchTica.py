@@ -15,7 +15,7 @@ from IPython.parallel import Client
 
 from tica import TICA
 from visualize import plotImageData, plotCov, printDataStats, plotImageRicaWW, plotRicaActivations, plotRicaReconstructions
-from util.dataLoaders import loadAtariData, loadRandomData, saveToFile
+from util.dataLoaders import loadAtariData, loadUpsonData, loadRandomData, saveToFile
 from util.dataPrep import PCAWhiteningDataNormalizer
 from util.misc import pt, pc
 
@@ -38,7 +38,7 @@ def reliablyRunTest(args):
     from paramSearchTica import runTest
 
     childResman = GitResultsManager()
-    childResman.start(childOfRunDir = rundir, description = childdir, diary = False)  # Turn off for now :(
+    childResman.start(childOfRunDir = rundir, description = childdir, diary = True)  # Turn off for now :(
     saveDir = childResman.rundir
     
     tries = 0
@@ -89,7 +89,7 @@ def runTest(saveDir, params):
     from util.misc import MakePc, Counter
     from visualize import plotImageData, plotCov, printDataStats, plotImageRicaWW, plotRicaActivations, plotRicaReconstructions
     from util.dataPrep import PCAWhiteningDataNormalizer
-    from util.dataLoaders import loadAtariData, loadRandomData, saveToFile
+    from util.dataLoaders import loadAtariData, loadUpsonData, loadRandomData, saveToFile
     #counter = Counter()
     #pc = lambda st : makePc(st, counter = counter)
     pc = MakePc(Counter())
@@ -206,7 +206,7 @@ def main():
 
     resultsFilename = os.path.join(resman.rundir, 'allResults.pkl.gz')
     
-    NN = 5000
+    NN = 1000
     allResults = [[None,None] for ii in range(NN)]
 
     experiments = []
@@ -223,18 +223,25 @@ def main():
         params['lambd'] = round(lambd, 1-int(floor(log10(lambd))))  # Just keep two significant figures
         params['randSeed'] = ii
         params['maxFuncCalls'] = 300
-        #params['dataWidth'] = random.choice((2, 4, 10))   # just quick
+        #params['dataWidth'] = random.choice((2, 4))   # just quick
         #params['dataWidth'] = random.choice((2, 3, 4, 6, 10, 15, 20, 25, 28))
         params['dataWidth'] = random.choice((2, 3, 4, 6, 10, 15, 20))  # 25 and 28 are incomplete
-        params['imgShape'] = (params['dataWidth'], params['dataWidth'], 3)   # use color
+        params['nColors'] = random.choice((1, 3))
+        params['isColor'] = (params['nColors'] == 3)
+        params['imgShape'] = ((params['dataWidth'], params['dataWidth'], 3)
+                              if params['isColor'] else
+                              (params['dataWidth'], params['dataWidth']))
 
         paramsRand = params.copy()
         paramsRand['dataLoader'] = 'loadRandomData'
         paramsRand['dataPath'] = '../data/random/randomu01_train_%02d_50000_3c.pkl.gz' % paramsRand['dataWidth']
 
         paramsData = params.copy()
-        paramsData['dataLoader'] = 'loadAtariData'
-        paramsData['dataPath'] = '../data/atari/space_invaders_train_%02d_50000_3c.pkl.gz' % paramsData['dataWidth']
+        #paramsData['dataLoader'] = 'loadAtariData'
+        #paramsData['dataPath'] = '../data/atari/space_invaders_train_%02d_50000_3c.pkl.gz' % paramsData['dataWidth']
+        paramsData['dataLoader'] = 'loadUpsonData'
+        paramsData['dataPath'] = ('../data/upson_rovio_2/train_%02d_50000_%dc.pkl.gz'
+                                  % (paramsData['dataWidth'], paramsData['nColors']))
 
         if not useIpython:
             resultsRand = reliablyRunTest(resman.rundir, '%05d_rand' % ii, paramsRand)
