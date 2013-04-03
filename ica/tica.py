@@ -161,7 +161,7 @@ class TICA(RICA):
         nInputs = data.shape[0]
         nDatapoints = data.shape[1]
         if self.nInputs != nInputs:
-            raise Exception('Expected shape %s = %d dimensional input, but got %d' % (repr(self.imgShape), self.nInputs, nInputs))
+            raise Exception('Expected %d dimensional input, but got %d' % (self.nInputs, nInputs))
 
         if self.float32:
             WW = array(WW, dtype='float32')

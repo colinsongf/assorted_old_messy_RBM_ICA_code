@@ -87,7 +87,7 @@ class RICA(object):
         nInputs = data.shape[0]
         nDatapoints = data.shape[1]
         if self.nInputs != nInputs:
-            raise Exception('Expected shape %s = %d dimensional input, but got %d' % (repr(self.imgShape), self.nInputs, nInputs))
+            raise Exception('Expected %d dimensional input, but got %d' % (self.nInputs, nInputs))
 
         # NOTE: Flattening and reshaping is in C order in numpy but Fortran order in Matlab. This should not matter.
         WW = WW.reshape(self.nOutputs, nInputs)
