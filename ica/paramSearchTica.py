@@ -14,9 +14,9 @@ from GitResultsManager import resman
 from IPython.parallel import Client
 
 from tica import TICA
-from visualize import plotImageData, plotCov, printDataStats, plotImageRicaWW, plotRicaActivations, plotRicaReconstructions
+from visualize import plotImageData, plotCov, plotImageRicaWW, plotRicaActivations, plotRicaReconstructions
 from util.dataLoaders import loadAtariData, loadUpsonData, loadRandomData, saveToFile
-from util.dataPrep import PCAWhiteningDataNormalizer
+from util.dataPrep import PCAWhiteningDataNormalizer, printDataStats
 from util.misc import pt, pc
 
 

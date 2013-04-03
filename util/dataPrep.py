@@ -13,13 +13,12 @@ from util.cache import cached
 class PCAWhiteningDataNormalizer(object):
     '''Uses PCA to white data and optionally project points to the unit ball.'''
 
-    def __init__(self, data, unitNorm = True, saveDir = None):
+    def __init__(self, data, saveDir = None):
         '''Create DataPrepPCA object.
         data: 1 example per column
         saveDir: If set to a string DIR, saves DIR/fracVar.{png,pdf}
         '''
 
-        self.unitNorm = unitNorm
         self.pca = PCA(data.T)
 
         if saveDir:
@@ -31,7 +30,7 @@ class PCAWhiteningDataNormalizer(object):
             pyplot.close()
 
 
-    def raw2normalized(self, data):
+    def raw2normalized(self, data, unitNorm = True):
         '''Projects points from raw space to normalized space.
         returns: (data, extra), where extra may be extra information needed to project back from normalized -> raw
         '''
@@ -56,7 +55,7 @@ class PCAWhiteningDataNormalizer(object):
         #if saveDir:
         #    pil_imagesc(cov(data),
         #                saveto = os.path.join(saveDir, 'dataCov_1prenorm.png'))
-        if self.unitNorm:
+        if unitNorm:
             # Project each patch to the unit ball
             patchNorms = sqrt(sum(data**2, 0) + (1e-8))
             data = data / patchNorms
@@ -78,8 +77,16 @@ class PCAWhiteningDataNormalizer(object):
 
 
 
+def printDataStats(data):
+    print 'Current data: %d data points of dimension %d.' % (data.shape[1], data.shape[0]),
+    print 'Min %f, Mean %f, Max %f' % (data.min(), data.mean(), data.max())
+
+
+
 def main():
     pass
+
+
 
 if __name__ == '__main__':
     main()

@@ -53,12 +53,6 @@ def plotCov(data, saveDir = None, prefix = 'imgdata'):
 
 
 
-def printDataStats(data):
-    print 'Current data: %d data points of dimension %d.' % (data.shape[1], data.shape[0]),
-    print 'Min %f, Mean %f, Max %f' % (data.min(), data.mean(), data.max())
-
-
-
 def getTileShape(number):
     tilesX = int(sqrt(number * 2./3))
     tilesY = number / tilesX
