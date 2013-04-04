@@ -105,6 +105,7 @@ def runTest(saveDir, params):
     epsilon            = 1e-5
     maxFuncCalls       = params['maxFuncCalls']
     randSeed           = params['randSeed']
+    whiten             = params['whiten']
     #dataCrop           = 1000
 
     dataLoader         = locals().get(params['dataLoader'])  # Convert string to actual function
@@ -128,27 +129,29 @@ def runTest(saveDir, params):
     isColor = len(imgShape) > 2
 
     print '\nParameters:'
-    for key in ['nInputs', 'hiddenISize', 'hiddenJSize', 'neighborhoodParams', 'lambd', 'epsilon', 'maxFuncCalls', 'randSeed', 'dataCrop', 'dataLoader', 'dataPath', 'imgShape']:
+    for key in ['nInputs', 'hiddenISize', 'hiddenJSize', 'neighborhoodParams', 'lambd', 'epsilon', 'maxFuncCalls', 'randSeed', 'dataCrop', 'dataLoader', 'dataPath', 'imgShape', 'whiten']:
         print '  %20s: %s' % (key, locals()[key])
     print
 
     skipVis = True
-    if not skipVis:
-        # Visualize before prep
-        plotImageData(data, imgShape, saveDir, pc('data_raw'))
-        plotCov(data, saveDir, pc('data_raw'))
-    printDataStats(data)
-    
-    # Whiten with PCA
-    whiteningStage = PCAWhiteningDataNormalizer(data, unitNorm = True, saveDir = saveDir)
-    dataWhite, junk = whiteningStage.raw2normalized(data)
-    dataOrig        = whiteningStage.normalized2raw(dataWhite)
+    if whiten:
+        if not skipVis:
+            # Visualize before prep
+            plotImageData(data, imgShape, saveDir, pc('data_raw'))
+            plotCov(data, saveDir, pc('data_raw'))
+        printDataStats(data)
+
+        # Whiten with PCA
+        whiteningStage = PCAWhiteningDataNormalizer(data, unitNorm = True, saveDir = saveDir)
+        dataWhite, junk = whiteningStage.raw2normalized(data)
+        dataOrig        = whiteningStage.normalized2raw(dataWhite)
+        data = dataWhite
 
     if not skipVis:
         # Visualize after prep
-        plotImageData(dataWhite, imgShape, saveDir, pc('data_white'))
-        plotCov(dataWhite, saveDir, pc('data_white'))
-    printDataStats(dataWhite)
+        plotImageData(data, imgShape, saveDir, pc('data_white'))
+        plotCov(data, saveDir, pc('data_white'))
+    printDataStats(data)
 
 
     #########################
@@ -166,13 +169,15 @@ def runTest(saveDir, params):
     beginTotalCost, beginPoolingCost, beginReconstructionCost, grad = tica.cost(tica.WW, data)
 
     tic = time.time()
-    tica.learn(dataWhite, maxFun = maxFuncCalls)
+    tica.learn(data, maxFun = maxFuncCalls)
     execTime = time.time() - tic
     saveToFile(os.path.join(saveDir, 'tica.pkl.gz'), tica)    # save learned model
 
     plotImageRicaWW(tica.WW, imgShape, saveDir, tileShape = hiddenLayerShape, prefix = pc('WW_iterFinal'))
-    plotRicaActivations(tica.WW, dataWhite, saveDir, prefix = pc('activations_iterFinal'))
-    plotRicaReconstructions(tica, dataWhite, imgShape, saveDir, unwhitener = whiteningStage.normalized2raw,
+    plotRicaActivations(tica.WW, data, saveDir, prefix = pc('activations_iterFinal'))
+    unwhitener = whiteningStage.normalized2raw if whiten else None
+    plotRicaReconstructions(tica, data, imgShape, saveDir,
+                            unwhitener = unwhitener,
                             tileShape = hiddenLayerShape, prefix = pc('recon_iterFinal'),
                             number = 20)
 
@@ -231,17 +236,20 @@ def main():
         params['imgShape'] = ((params['dataWidth'], params['dataWidth'], 3)
                               if params['isColor'] else
                               (params['dataWidth'], params['dataWidth']))
+        params['whiten'] = False    # Just false for Space Invaders dataset...
 
         paramsRand = params.copy()
         paramsRand['dataLoader'] = 'loadRandomData'
-        paramsRand['dataPath'] = '../data/random/randomu01_train_%02d_50000_3c.pkl.gz' % paramsRand['dataWidth']
+        paramsRand['dataPath'] = ('../data/random/randomu01_train_%02d_50000_%dc.pkl.gz'
+                                  % (paramsRand['dataWidth'], paramsRand['nColors']))
 
         paramsData = params.copy()
-        #paramsData['dataLoader'] = 'loadAtariData'
-        #paramsData['dataPath'] = '../data/atari/space_invaders_train_%02d_50000_3c.pkl.gz' % paramsData['dataWidth']
-        paramsData['dataLoader'] = 'loadUpsonData'
-        paramsData['dataPath'] = ('../data/upson_rovio_2/train_%02d_50000_%dc.pkl.gz'
+        paramsData['dataLoader'] = 'loadAtariData'
+        paramsData['dataPath'] = ('../data/atari/space_invaders_train_%02d_50000_%dc.pkl.gz'
                                   % (paramsData['dataWidth'], paramsData['nColors']))
+        #paramsData['dataLoader'] = 'loadUpsonData'
+        #paramsData['dataPath'] = ('../data/upson_rovio_2/train_%02d_50000_%dc.pkl.gz'
+        #                          % (paramsData['dataWidth'], paramsData['nColors']))
 
         if not useIpython:
             resultsRand = reliablyRunTest(resman.rundir, '%05d_rand' % ii, paramsRand)
