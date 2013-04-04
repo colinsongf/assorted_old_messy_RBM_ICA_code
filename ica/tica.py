@@ -230,6 +230,29 @@ class TICA(RICA):
             return totalCost, poolingCost, reconstructionCost, grad
 
 
+    def getRepresentation(self, data):
+        '''Assumes data is one example per column. Returns '''
+        #pdb.set_trace()
+
+        nInputs = data.shape[0]
+        if self.nInputs != nInputs:
+            raise Exception('Expected %d dimensional input, but got %d' % (self.nInputs, nInputs))
+        if self.float32:
+            WW = array(self.WW, dtype='float32')
+        else:
+            WW = self.WW
+        
+        # NOTE: Flattening and reshaping is in C order in numpy but Fortran order in Matlab. This should not matter.
+        WW = WW.reshape(self.nHidden, nInputs)
+        WW = l2RowScaled(WW)
+
+        # Forward Prop
+        hidden = dot(WW, data)
+        absPooledActivations = sqrt(self.epsilon + dot(self.HH, hidden ** 2))
+
+        return hidden, absPooledActivations
+
+
     def getXYNumTiles(self):
         return self.hiddenLayerShape
 
