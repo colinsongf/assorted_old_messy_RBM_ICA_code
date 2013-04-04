@@ -21,7 +21,7 @@ from util.dataLoaders import loadAtariData, loadUpsonData, loadRandomData, saveT
 from makeData.makeUpsonRovio2 import randomSampleMatrix, trainFilter, testFilter
 
 
-@profile
+
 def main():
     #resman.start('junk', diary = False)
 
