@@ -105,6 +105,16 @@ def loadUpsonData(filename):
 
 
 
+def loadUpsonData3(filename):
+    '''Loads Upson Data from the upson_rovio_3 dataset (with labels)'''
+
+    data,labels,labelStrings = loadFromPklGz(filename)
+    data = data.T   # Make into one example per column
+    labels = labels.T
+    return data, labels, labelStrings
+
+
+
 def loadRandomData(filename):
     '''Loads Random Data'''
 
