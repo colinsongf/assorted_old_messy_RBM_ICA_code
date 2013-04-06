@@ -15,7 +15,7 @@ from IPython.parallel import Client
 
 from tica import TICA
 from visualize import plotImageData, plotCov, plotImageRicaWW, plotRicaActivations, plotRicaReconstructions
-from util.dataLoaders import loadAtariData, loadUpsonData, loadRandomData, saveToFile
+from util.dataLoaders import loadAtariData, loadUpsonData, loadUpsonData3, loadRandomData, saveToFile
 from util.dataPrep import PCAWhiteningDataNormalizer, printDataStats
 from util.misc import pt, pc
 
@@ -87,14 +87,13 @@ def runTest(saveDir, params):
     #raise Exception('cwd is %s' % os.getcwd())
     from tica import TICA
     from util.misc import MakePc, Counter
-    from visualize import plotImageData, plotCov, printDataStats, plotImageRicaWW, plotRicaActivations, plotRicaReconstructions
-    from util.dataPrep import PCAWhiteningDataNormalizer
-    from util.dataLoaders import loadAtariData, loadUpsonData, loadRandomData, saveToFile
+    from visualize import plotImageData, plotCov, plotImageRicaWW, plotRicaActivations, plotRicaReconstructions
+    from util.dataPrep import PCAWhiteningDataNormalizer, printDataStats
+    from util.dataLoaders import loadAtariData, loadUpsonData, loadUpsonData3, loadRandomData, saveToFile
     #counter = Counter()
     #pc = lambda st : makePc(st, counter = counter)
     pc = MakePc(Counter())
     
-    dataCrop = None
     #########################
     # Parameters
     #########################
@@ -106,7 +105,7 @@ def runTest(saveDir, params):
     maxFuncCalls       = params['maxFuncCalls']
     randSeed           = params['randSeed']
     whiten             = params['whiten']
-    #dataCrop           = 1000
+    dataCrop           = params['dataCrop']
 
     dataLoader         = locals().get(params['dataLoader'])  # Convert string to actual function
     dataPath           = params['dataPath']
@@ -121,7 +120,14 @@ def runTest(saveDir, params):
     # Load data
     #data = loadAtariData('../data/atari/mspacman_train_15_50000_3c.pkl.gz'); imgShape = (15,15,3)
     #data = loadAtariData('../data/atari/space_invaders_train_15_50000_3c.pkl.gz'); imgShape = (15,15,3)
-    data = dataLoader(dataPath)
+    loaded = dataLoader(dataPath)
+    if type(loaded) is tuple:
+        data, labels, labelStrings = loaded
+        print 'Data has labels:', labelStrings
+    else:
+        data = loaded
+        labels, labelStrings = None, None
+        print 'Data does not have labels.'
     if dataCrop:
         print '\nWARNING: Cropping data from %d examples to only %d for debug\n' % (data.shape[1], dataCrop)
         data = data[:,:dataCrop]
@@ -142,9 +148,10 @@ def runTest(saveDir, params):
         printDataStats(data)
 
         # Whiten with PCA
-        whiteningStage = PCAWhiteningDataNormalizer(data, unitNorm = True, saveDir = saveDir)
-        dataWhite, junk = whiteningStage.raw2normalized(data)
-        dataOrig        = whiteningStage.normalized2raw(dataWhite)
+        whiteningStage = PCAWhiteningDataNormalizer(data, saveDir = saveDir)
+        dataWhite, junk = whiteningStage.raw2normalized(data, unitNorm = True)
+        #dataOrig        = whiteningStage.normalized2raw(dataWhite)
+        dataOrig = data
         data = dataWhite
 
     if not skipVis:
@@ -202,12 +209,14 @@ def runTest(saveDir, params):
 
 
 def main():
-    resman.start('junk', diary = True)
+    resman.start('junk', diary = False)
 
-    client = Client(profile='ssh')
-    #client = Client()
-    print 'IPython worker ids:', client.ids
-    balview = client.load_balanced_view()
+    useIpython = True
+    if useIpython:
+        client = Client(profile='ssh')
+        #client = Client()
+        print 'IPython worker ids:', client.ids
+        balview = client.load_balanced_view()
 
     resultsFilename = os.path.join(resman.rundir, 'allResults.pkl.gz')
     
@@ -217,7 +226,6 @@ def main():
     experiments = []
     cwd = os.getcwd()
     disp = os.environ['DISPLAY']
-    useIpython = True
     for ii in range(NN):
         params = {}
         random.seed(ii)
@@ -237,7 +245,8 @@ def main():
                               if params['isColor'] else
                               (params['dataWidth'], params['dataWidth']))
         params['whiten'] = False    # Just false for Space Invaders dataset...
-
+        params['dataCrop'] = None       # Set to None to not crop data...
+        
         paramsRand = params.copy()
         paramsRand['dataLoader'] = 'loadRandomData'
         paramsRand['dataPath'] = ('../data/random/randomu01_train_%02d_50000_%dc.pkl.gz'

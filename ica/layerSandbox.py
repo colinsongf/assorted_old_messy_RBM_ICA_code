@@ -78,7 +78,6 @@ def main():
     # dimensions, approximate for odd).  Example: pooled size is
     # 15x15, downsample to 8x8, stack with four neighbors for a total
     # of 8x8x4 = 256 (instead of 225) dimensions.
-    print 'TODO: LCN'
     hiddenSize = myres['params']['hiddenISize']
     if pooled.shape[0] != hiddenSize**2:
         raise Exception('Expected pooled layer to be %dx%d, but it is length %d'
