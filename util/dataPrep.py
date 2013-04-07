@@ -6,7 +6,7 @@ from matplotlib import pyplot
 from numpy import *
 
 from util.pca import PCA
-from util.cache import cached
+from util.cache import cached, PersistentHasher
 
 
 
@@ -74,6 +74,17 @@ class PCAWhiteningDataNormalizer(object):
         '''Projects points from raw space to normalized space.'''
 
         return self.pca.fromZca(data.T, epsilon = 1e-6).T
+
+
+    def __hash__(self):
+        hasher = PersistentHasher()
+        hasher.update('PCAWhiteningDataNormalizer')
+        hasher.update(self.pca)
+        return int(hasher.hexdigest(), 16)
+
+
+    def __cmp__(self, other):
+        return self.__hash__() - other.__hash__()
 
 
 

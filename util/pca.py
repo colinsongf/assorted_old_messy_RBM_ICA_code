@@ -4,7 +4,7 @@ import pdb
 from numpy import array, dot, random, linalg, sqrt, asarray, cov, eye, sum, hstack
 from numpy.linalg import norm
 
-from cache import cached
+from cache import cached, PersistentHasher
 
 
 
@@ -203,6 +203,26 @@ class PCA(object):
 
         return cc + self.mu
 
+
+    def __hash__(self):
+        hasher = PersistentHasher()
+        hasher.update('PCA')
+        hasher.update(self.nn)
+        hasher.update(self.mm)
+        hasher.update(self.mu)
+        hasher.update(self.sigma)
+        hasher.update(self.UU)
+        hasher.update(self.ss)
+        hasher.update(self.VV)
+        hasher.update(self.var)
+        hasher.update(self.std)
+        hasher.update(self.fracVar)
+        hasher.update(self.fracStd)
+        return int(hasher.hexdigest(), 16)
+
+
+    def __cmp__(self, other):
+        return self.__hash__() - other.__hash__()
 
 
 def testPca(PcaClass = 'specify a class to use'):

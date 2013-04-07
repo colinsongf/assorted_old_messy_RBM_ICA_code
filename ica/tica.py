@@ -13,6 +13,7 @@ from matplotlib import pyplot
 from GitResultsManager import resman
 
 from util.dataLoaders import loadFromPklGz, saveToFile
+from util.cache import PersistentHasher
 from rica import RICA, l2RowScaled, l2RowScaledGrad
 
 try:
@@ -276,6 +277,32 @@ class TICA(RICA):
     def getReconPlotString(self, costEtc):
         totalCost, poolingCost, reconstructionCost, grad = costEtc
         return 'R: %g P*%g: %g T: %g' % (reconstructionCost, self.lambd, poolingCost, totalCost)
+
+
+    def __hash__(self):
+        hasher = PersistentHasher()
+        hasher.update('TICA')
+        hasher.update(self.nInputs)
+        hasher.update(self.nOutputs)
+        hasher.update(self.lambd)
+        hasher.update(self.epsilon)
+        hasher.update(self.float32)
+        hasher.update(self.WWshape)
+        hasher.update(self.WW)
+        hasher.update(self.hiddenLayerShape)
+        hasher.update(self.nHidden)
+        hasher.update(self.neighborhoodType)
+        hasher.update(self.neighborhoodSize)
+        hasher.update(self.shrink)
+        hasher.update(self.nPoolingIgnoredNeurons)
+        hasher.update(self.neighborhoodIsGaussian)
+        hasher.update(self.nPooled)
+        hasher.update(self.HH)
+        return int(hasher.hexdigest(), 16)
+        #return int(hasher.hexdigest()[:7], 16)  # only 7 hex digits fit into an int
+
+    def __cmp__(self, other):
+        return self.__hash__() - other.__hash__()
 
 
 

@@ -13,31 +13,85 @@ from PIL import Image
 from GitResultsManager import resman
 from IPython.parallel import Client
 
-from tica import neighborMatrix
+from tica import neighborMatrix, TICA
 #from visualize import plotImageData, plotCov, plotImageRicaWW, plotRicaActivations, plotRicaReconstructions
 from util.dataLoaders import loadAtariData, loadUpsonData, loadRandomData, saveToFile, loadFromPklGz
+from util.cache import cached
 #from util.dataPrep import PCAWhiteningDataNormalizer, printDataStats
 #from util.misc import pt, pc
-from makeData.makeUpsonRovio2 import randomSampleMatrix, trainFilter, testFilter
+from makeData.makeUpsonRovio3 import randomSampleMatrixWithLabels, trainFilter, testFilter, exploreFilter
 
 
 
-def main():
+class StackedTICA(object):
+    '''Contains one or more TICA objects'''
+
+    def __init__(self, layer1Tica, layer1Whitener, layer1DataPath, isColor, saveDir):
+        ''''''
+        self.l1dataPath = layer1DataPath      # path to image directories
+        self.l1whitener = layer1Whitener
+        self.isColor    = isColor
+        self.ticas      = [layer1Tica]
+        self.saveDir    = saveDir
+
+    def learnNextLayer(self, params):
+        nLayers = len(self.ticas)
+        print 'StackedTica currently has %d layers, learning next' % nLayers
+
+        # TODO: only works for one extra layer!
+        Nw = 10
+        Nwshift = 5
+        Nsamples = 1000
+        
+        nextLayerData = cached(makeNewData, self.ticas[-1], self.l1whitener, seed = 0,
+                               isColor = self.isColor, Nw = Nw, Nwshift = Nwshift,
+                               Nsamples = Nsamples)
+
+        pdb.set_trace()
+
+        if params['dataCrop']:
+            print '\nWARNING: Cropping data from %d examples to only %d for debug\n' % (nextLayerData.shape[1], params['dataCrop'])
+            nextLayerData = nextLayerData[:,:params['dataCrop']]
+        
+        if params['hiddenISize'] != params['hiddenJSize']:
+            raise Exception('hiddenISize and hiddenJSize must be the same')
+        neighborhoodParams = ('gaussian', params['neighborhoodSize'], 0, 0)
+
+        if self.saveDir:
+            layerLogDir = os.path.join(self.saveDir, 'layer_%02d' % (nLayers+1))
+            os.makedirs(layerLogDir)
+        else:
+            layerLogDir = ''
+        nextTica = TICA(nInputs            = nextLayerData.shape[0],
+                        hiddenLayerShape   = (params['hiddenISize'], params['hiddenJSize']),
+                        neighborhoodParams = neighborhoodParams,
+                        lambd              = params['lambd'],
+                        epsilon            = 1e-5,
+                        saveDir            = layerLogDir)
+
+        tic = time.time()
+        nextTica.learn(nextLayerData, maxFun = params['maxFuncCalls'])
+        execTime = time.time() - tic
+        if layerLogDir:
+            saveToFile(os.path.join(layerLogDir, 'tica.pkl.gz'), nextTica)    # save learned model
+
+
+
+def makeNewData(tica, layer1Whitener, seed, isColor, Nw, Nwshift, Nsamples):
+    '''
+    Nw like 10 for 10x10 patches
+    Nwshift like 5 for 10x10 -> 15x15 patches'''
     #resman.start('junk', diary = False)
 
     tic = time.time()
     
-    tica  = loadFromPklGz('results/130402_033310_44cc757_master_psearchTica_UP/00022_data/tica.pkl.gz')
-    myres = loadFromPklGz('results/130402_033310_44cc757_master_psearchTica_UP/00022_data/myresults.pkl.gz')
+    #tica  = loadFromPklGz('results/130402_033310_44cc757_master_psearchTica_UP/00022_data/tica.pkl.gz')
+    #myres = loadFromPklGz('results/130402_033310_44cc757_master_psearchTica_UP/00022_data/myresults.pkl.gz')
     # myres['params']['dataPath'] is '../data/upson_rovio_2/train_10_50000_1c.pkl.gz'
-    whitener = loadFromPklGz('../data/upson_rovio_2/white/train_10_50000_1c.whitener.pkl.gz')
+    #layer1Whitener = loadFromPklGz('../data/upson_rovio_2/white/train_10_50000_1c.whitener.pkl.gz')
 
-    seed = 0
-    isColor = False
-    Nw = 10
-    Nw5  = Nw/2
-    Nw15 = int(Nw * 1.5)
-    Nsamples = 1000
+    #seed = seed
+    #isColor = isColor
 
     nColors = 3 if isColor else 1
 
@@ -45,26 +99,29 @@ def main():
         raise Exception('only works for even patch sizes')
     if isColor:
         raise Exception('no colors yet....')
-    if myres['params']['hiddenISize'] != myres['params']['hiddenJSize']:
+    hiddenISize, hiddenJSize = tica.hiddenLayerShape
+    if hiddenISize != hiddenJSize:
         raise Exception('representation embedding must be square (for now)')
+    hiddenSize = hiddenISize
     
     # Sample 1.5x larger windows (e.g. 15 px on a side). This is for
     # patches that overlap half with their
     # neighbors. largeSamples.shape is (Nsamples, Nw15^2)
-    largeSamples = randomSampleMatrix(trainFilter, seed, isColor, Nw = Nw15, Nsamples = Nsamples)
-
+    NwLarge = Nw + Nwshift
+    largeSampleMatrix, labelMatrix, labelStrings = cached(randomSampleMatrixWithLabels, trainFilter, seed, isColor, Nw = NwLarge, Nsamples = Nsamples)
+    
     # Sample each corner of the 1.5x patch (e.g. 4 patches 10px on a
     # side). Color order is [ii_r ii_g ii_b ii+1_r ii+1_g ii+1_b ...]
     stackedSmallSamples = zeros((4*Nsamples, Nw*Nw))
     counter = 0
     for largeIdx in xrange(Nsamples):
-        largePatch = reshape(largeSamples[largeIdx,:], (Nw15,Nw15))
+        largePatch = reshape(largeSampleMatrix[largeIdx,:], (NwLarge, NwLarge))
         for ii in (0,1):
             for jj in (0,1):
-                stackedSmallSamples[counter,:] = largePatch[(ii*Nw5):(ii*Nw5+Nw), (jj*Nw5):(jj*Nw5+Nw)].flatten()
+                stackedSmallSamples[counter,:] = largePatch[(ii*Nwshift):(ii*Nwshift+Nw), (jj*Nwshift):(jj*Nwshift+Nw)].flatten()
                 counter += 1
 
-    dataWhite,junk = whitener.raw2normalized(stackedSmallSamples.T)
+    dataWhite,junk = layer1Whitener.raw2normalized(stackedSmallSamples.T)
     # dataWhite.shape = (Nw^2, 4*Nsamples). Now with one example per COLUMN!
 
     # Represent (pooled is one example per COLUMN)
@@ -78,7 +135,6 @@ def main():
     # dimensions, approximate for odd).  Example: pooled size is
     # 15x15, downsample to 8x8, stack with four neighbors for a total
     # of 8x8x4 = 256 (instead of 225) dimensions.
-    hiddenSize = myres['params']['hiddenISize']
     if pooled.shape[0] != hiddenSize**2:
         raise Exception('Expected pooled layer to be %dx%d, but it is length %d'
                         % (hiddenSize, hiddenSize, pooled.shape[0]))
@@ -104,19 +160,44 @@ def main():
         offset = smallIdx % 4
         nextLayerInput[(offset*downsampleSizeSq):((offset+1)*downsampleSizeSq),col] = yy[:,smallIdx]
 
-
-
-
-
     print 'time: %f seconds' % (time.time()-tic)
     
-    print 'HERE!'
-    print 'Next: sample four windows, whiten, push through tica, pool, and subsample.'
-    
-    #pdb.set_trace()
+    return nextLayerInput
 
-    #resman.stop()
-    
+
+
+def main():
+    resman.start('junk', diary = False)
+
+    #l1tica  = loadFromPklGz('results/130402_033310_44cc757_master_psearchTica_UP/00022_data/tica.pkl.gz')
+    l1tica  = loadFromPklGz('results/130406_184751_3d90386_rapidhacks_upson3_1c_l1/tica.pkl.gz')   # 1c Upson3
+    #layer1Whitener = loadFromPklGz('../data/upson_rovio_2/white/train_10_50000_1c.whitener.pkl.gz')
+    layer1Whitener = loadFromPklGz('../data/upson_rovio_3/white/train_10_50000_1c.whitener.pkl.gz')
+
+    stackedTica = StackedTICA(l1tica, layer1Whitener, '../data/upson_rovio_3/imgfiles/', False,
+                              saveDir = resman.rundir)
+
+    params = {}
+    params['hiddenISize'] = 15
+    params['hiddenJSize'] = params['hiddenISize']
+    params['neighborhoodSize'] = 1.0
+    params['lambd'] = .026
+    params['randSeed'] = 0
+    #params['dataWidth'] = 10
+    #params['nColors'] = 1
+    #params['isColor'] = (params['nColors'] == 3)
+    #params['imgShape'] = ((params['dataWidth'], params['dataWidth'], 3)
+    #                      if params['isColor'] else
+    #                      (params['dataWidth'], params['dataWidth']))
+    params['maxFuncCalls'] = 3
+    #params['whiten'] = True    # Just false for Space Invaders dataset...
+    params['dataCrop'] = 1000       # Set to None to not crop data...
+
+    stackedTica.learnNextLayer(params)
+
+    resman.stop()
+
+
 
 if __name__ == '__main__':
     main()

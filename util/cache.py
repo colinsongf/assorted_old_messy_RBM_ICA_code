@@ -110,6 +110,8 @@ class PersistentHasher(object):
         if typeStr is not None:
             st += ' (latest %s)' % typeStr
         print st
+        #if self.hexdigest()[:4] == '0211':
+        #    pdb.set_trace()
 
 
 
