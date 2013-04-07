@@ -5,7 +5,7 @@ import sys
 from numpy import *
 
 from util.cache import cached
-from util.dataLoaders import loadUpsonData, loadAtariData, saveToFile
+from util.dataLoaders import loadUpsonData, loadUpsonData3, loadAtariData, saveToFile
 from util.dataPrep import printDataStats, PCAWhiteningDataNormalizer
 
 
@@ -20,7 +20,14 @@ def main():
         sys.exit(1)
 
     dataLoader = globals()[dataLoaderName]   # convert string to function
-    data = dataLoader(dataPath)
+    loaded = dataLoader(dataPath)
+    if type(loaded) is tuple:
+        data, labels, labelStrings = loaded
+        print 'Data has labels:', labelStrings
+    else:
+        data = loaded
+        labels, labelStrings = None, None
+        print 'Data does not have labels.'
     #data = data[:,:1000]; print 'HACKK!'
 
     print 'Raw data stats:'
