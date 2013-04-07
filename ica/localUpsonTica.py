@@ -42,7 +42,6 @@ def main():
         params['hiddenISize'] = 15
         params['hiddenJSize'] = params['hiddenISize']
         params['neighborhoodSize'] = 1.0
-        lambd = exp(random.uniform(log(.0001), log(10)))   # Uniform in log space
         params['lambd'] = .026
         params['randSeed'] = 22
         #params['dataWidth'] = random.choice((2, 4))   # just quick
