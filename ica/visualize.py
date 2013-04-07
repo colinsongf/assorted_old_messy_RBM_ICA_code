@@ -14,6 +14,7 @@ import os
 import sys
 import ipdb as pdb
 from PIL import Image, ImageFont, ImageDraw
+from matplotlib import cm
 from numpy import *
 
 from util.plotting import tile_raster_images, pil_imagesc, scale_some_rows_to_unit_interval, scale_rows_together_to_unit_interval
@@ -109,7 +110,7 @@ def plotRicaActivations(WW, data, saveDir = None, prefix = 'activations'):
 
 
 
-def plotRicaReconstructions(rica, data, imgShape, saveDir = None, unwhitener = None, tileShape = None, number = 50, prefix = 'recon'):
+def plotRicaReconstructions(rica, data, imgShape, saveDir = None, unwhitener = None, tileShape = None, number = 50, prefix = 'recon', onlyHilights = False, hilightCmap = None):
     '''Plots reconstructions for some randomly chosen data points.'''
 
     if saveDir:
@@ -136,13 +137,21 @@ def plotRicaReconstructions(rica, data, imgShape, saveDir = None, unwhitener = N
             maxHilight = hilightAmount.max()
             #hilightAmount -= hilightAmount.min()   # Don't push to 0
             hilightAmount /= maxHilight + 1e-6
-            hilights = outer(hilightAmount, array([1,0,0]))  # Red
+
+            if hilightCmap:
+                cmap = cm.get_cmap(hilightCmap)
+                hilights = cmap(hilightAmount)[:,:3]  # chop off alpha channel
+            else:
+                # default black -> red colormap
+                hilights = outer(hilightAmount, array([1,0,0]))
+            
             tileImg = Image.fromarray(tile_raster_images(
                 X = rica.WW,
                 img_shape = imgShape, tile_shape = tileShape,
                 tile_spacing=(2,2),
                 scale_colors_together = True,
-                hilights = hilights))
+                hilights = hilights,
+                onlyHilights = onlyHilights))
             tileImg = tileImg.resize([x*tileRescaleFactor for x in tileImg.size])
 
             # Input / Reconstruction image
@@ -190,6 +199,6 @@ def plotRicaReconstructions(rica, data, imgShape, saveDir = None, unwhitener = N
             wholeImage.paste(rawReconErrImg, (tileImg.size[0] + reconRescaleFactor, 0))
             draw = ImageDraw.Draw(wholeImage)
             draw.text(((size[0]-fontSize[0])/2, size[1]-fontSize[1]), costString, font=font)
-            wholeImage.save(os.path.join(rica.saveDir, '%s_%04d.png' % (prefix, ii)))
+            wholeImage.save(os.path.join(saveDir, '%s_%04d.png' % (prefix, ii)))
 
         print 'done.'

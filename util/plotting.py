@@ -78,7 +78,7 @@ def scale_rows_together_to_unit_interval(arr, rowIdx, eps = 1e-8, anchor0 = True
 
 def tile_raster_images(X, img_shape, tile_shape, tile_spacing = (0,0), 
                        scale_rows_to_unit_interval = True, scale_colors_together = False,
-                       output_pixel_vals = True, hilights = None):
+                       output_pixel_vals = True, hilights = None, onlyHilights = False):
     '''
     Transform an array with one flattened image per row, into an array in 
     which images are reshaped and layed out like tiles on a floor.
@@ -133,13 +133,13 @@ def tile_raster_images(X, img_shape, tile_shape, tile_spacing = (0,0),
             promotedImgShape = (img_shape[0], img_shape[1], 3)
             return tile_raster_images(promotedX, promotedImgShape, tile_shape, tile_spacing,
                                       scale_rows_to_unit_interval, scale_colors_together,
-                                      output_pixel_vals, hilights)
+                                      output_pixel_vals, hilights, onlyHilights)
         if isColor and not hilightIsColor:
             # promote hilight to be color
             promotedHilight = tile(numpy.atleast_2d(hilights).T, (1,3))
             return tile_raster_images(X, img_shape, tile_shape, tile_spacing,
                                       scale_rows_to_unit_interval, scale_colors_together,
-                                      output_pixel_vals, promotedHilight)
+                                      output_pixel_vals, promotedHilight, onlyHilights)
 
         # Now this must be true
         assert isColor == hilightIsColor
@@ -221,7 +221,7 @@ def tile_raster_images(X, img_shape, tile_shape, tile_spacing = (0,0),
                     doScaleRows = False
                 out_array[:,:,i] = tile_raster_images(X[i], img_shape[0:2], tile_shape,
                                                       tile_spacing, doScaleRows, False,
-                                                      output_pixel_vals, hilights[i])
+                                                      output_pixel_vals, hilights[i], onlyHilights)
         return out_array
 
     else:
@@ -261,11 +261,12 @@ def tile_raster_images(X, img_shape, tile_shape, tile_spacing = (0,0),
                             tile_col * (W+Ws):tile_col*(W+Ws)+W+Ws
                             ] \
                             = hilights[tile_row * tile_shape[1] + tile_col] * c
-                    out_array[
-                        tile_row * (H+Hs)+Hs/2:tile_row*(H+Hs)+H+Hs/2,
-                        tile_col * (W+Ws)+Ws/2:tile_col*(W+Ws)+W+Ws/2
-                        ] \
-                        = this_img * c
+                    if not onlyHilights:
+                        out_array[
+                            tile_row * (H+Hs)+Hs/2:tile_row*(H+Hs)+H+Hs/2,
+                            tile_col * (W+Ws)+Ws/2:tile_col*(W+Ws)+W+Ws/2
+                            ] \
+                            = this_img * c
         return out_array
 
 

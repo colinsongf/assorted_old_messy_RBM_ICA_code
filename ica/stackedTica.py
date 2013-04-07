@@ -14,11 +14,11 @@ from GitResultsManager import resman
 from IPython.parallel import Client
 
 from tica import neighborMatrix, TICA
-#from visualize import plotImageData, plotCov, plotImageRicaWW, plotRicaActivations, plotRicaReconstructions
-from util.dataLoaders import loadAtariData, loadUpsonData, loadRandomData, saveToFile, loadFromPklGz
+from visualize import plotImageData, plotCov, plotImageRicaWW, plotRicaActivations, plotRicaReconstructions
+from util.dataLoaders import loadAtariData, loadUpsonData, loadUpsonData3, loadRandomData, saveToFile, loadFromPklGz
 from util.cache import cached
-#from util.dataPrep import PCAWhiteningDataNormalizer, printDataStats
-#from util.misc import pt, pc
+from util.dataPrep import PCAWhiteningDataNormalizer, printDataStats
+from util.misc import pt, pc
 from makeData.makeUpsonRovio3 import randomSampleMatrixWithLabels, trainFilter, testFilter, exploreFilter
 
 
@@ -34,6 +34,7 @@ class StackedTICA(object):
         self.ticas      = [layer1Tica]
         self.saveDir    = saveDir
 
+
     def learnNextLayer(self, params):
         nLayers = len(self.ticas)
         print 'StackedTica currently has %d layers, learning next' % nLayers
@@ -41,39 +42,76 @@ class StackedTICA(object):
         # TODO: only works for one extra layer!
         Nw = 10
         Nwshift = 5
-        Nsamples = 1000
-        
+        Nsamples = 50000
+
+        # Get data and norm it
         nextLayerData = cached(makeNewData, self.ticas[-1], self.l1whitener, seed = 0,
                                isColor = self.isColor, Nw = Nw, Nwshift = Nwshift,
                                Nsamples = Nsamples)
+        colNorms = sqrt(sum(nextLayerData**2, 0) + (1e-8))
+        nextLayerData = nextLayerData / colNorms
 
-        pdb.set_trace()
-
+        # Parameters
         if params['dataCrop']:
             print '\nWARNING: Cropping data from %d examples to only %d for debug\n' % (nextLayerData.shape[1], params['dataCrop'])
             nextLayerData = nextLayerData[:,:params['dataCrop']]
-        
         if params['hiddenISize'] != params['hiddenJSize']:
             raise Exception('hiddenISize and hiddenJSize must be the same')
+        hiddenLayerShape = (params['hiddenISize'], params['hiddenJSize'])
         neighborhoodParams = ('gaussian', params['neighborhoodSize'], 0, 0)
-
         if self.saveDir:
             layerLogDir = os.path.join(self.saveDir, 'layer_%02d' % (nLayers+1))
             os.makedirs(layerLogDir)
         else:
             layerLogDir = ''
-        nextTica = TICA(nInputs            = nextLayerData.shape[0],
-                        hiddenLayerShape   = (params['hiddenISize'], params['hiddenJSize']),
-                        neighborhoodParams = neighborhoodParams,
-                        lambd              = params['lambd'],
-                        epsilon            = 1e-5,
-                        saveDir            = layerLogDir)
+
+        # Print/plot data stats
+        if layerLogDir:
+            pseudoImgShape = (int(sqrt(nextLayerData.shape[0])), int(sqrt(nextLayerData.shape[0])))
+            plotImageData(nextLayerData, pseudoImgShape, layerLogDir, pc('data_raw'))
+        printDataStats(nextLayerData)
+
+        # Learn model
+        tica = TICA(nInputs            = nextLayerData.shape[0],
+                    hiddenLayerShape   = hiddenLayerShape,
+                    neighborhoodParams = neighborhoodParams,
+                    lambd              = params['lambd'],
+                    epsilon            = 1e-5,
+                    saveDir            = layerLogDir)
+
+        beginTotalCost, beginPoolingCost, beginReconstructionCost, grad = tica.cost(tica.WW, nextLayerData)
 
         tic = time.time()
-        nextTica.learn(nextLayerData, maxFun = params['maxFuncCalls'])
+        tica.learn(nextLayerData, maxFun = params['maxFuncCalls'])
         execTime = time.time() - tic
         if layerLogDir:
-            saveToFile(os.path.join(layerLogDir, 'tica.pkl.gz'), nextTica)    # save learned model
+            saveToFile(os.path.join(layerLogDir, 'tica.pkl.gz'), tica)    # save learned model
+
+        endTotalCost, endPoolingCost, endReconstructionCost, grad = tica.cost(tica.WW, nextLayerData)
+
+        print 'beginTotalCost, beginPoolingCost, beginReconstructionCost, endTotalCost, endPoolingCost, endReconstructionCost, execTime ='
+        print [beginTotalCost, beginPoolingCost, beginReconstructionCost, endTotalCost, endPoolingCost, endReconstructionCost, execTime]
+
+        # Plot some results
+        #plotImageRicaWW(tica.WW, imgShape, saveDir, tileShape = hiddenLayerShape, prefix = pc('WW_iterFinal'))
+        if layerLogDir:
+            self.plotResults(layerLogDir, tica, nextLayerData, pseudoImgShape, hiddenLayerShape)
+
+        self.ticas.append(tica)
+
+
+    def plotResults(self, layerLogDir, tica, data, imgShape, hiddenLayerShape):
+            plotRicaActivations(tica.WW, data, layerLogDir, prefix = pc('activations_iterFinal'))
+            plotRicaReconstructions(tica, data, imgShape, layerLogDir,
+                                    unwhitener = None,
+                                    tileShape = hiddenLayerShape, prefix = pc('recon_iterFinal'),
+                                    number = 20)
+            plotRicaReconstructions(tica, data, imgShape, layerLogDir,
+                                    unwhitener = None,
+                                    tileShape = hiddenLayerShape, prefix = pc('recon_hl_iterFinal'),
+                                    number = 20, onlyHilights = True,
+                                    hilightCmap = 'hot')
+
 
 
 
@@ -174,8 +212,17 @@ def main():
     #layer1Whitener = loadFromPklGz('../data/upson_rovio_2/white/train_10_50000_1c.whitener.pkl.gz')
     layer1Whitener = loadFromPklGz('../data/upson_rovio_3/white/train_10_50000_1c.whitener.pkl.gz')
 
+    layerSizes = [10, 15, 23, 35, 53, 80, 120, 180]
+
     stackedTica = StackedTICA(l1tica, layer1Whitener, '../data/upson_rovio_3/imgfiles/', False,
                               saveDir = resman.rundir)
+
+    #pdb.set_trace()
+
+    data,labels,strings = loadUpsonData3('../data/upson_rovio_3/train_10_50000_1c.pkl.gz')
+    stackedTica.plotResults(resman.rundir, stackedTica.ticas[0], data, (10,10), (15,15))
+    
+    pdb.set_trace()
 
     params = {}
     params['hiddenISize'] = 15
@@ -191,10 +238,12 @@ def main():
     #                      (params['dataWidth'], params['dataWidth']))
     params['maxFuncCalls'] = 3
     #params['whiten'] = True    # Just false for Space Invaders dataset...
+    params['dataCrop'] = None       # Set to None to not crop data...
     params['dataCrop'] = 1000       # Set to None to not crop data...
 
     stackedTica.learnNextLayer(params)
-
+    saveToFile(os.path.join(resman.rundir, 'stackedTica.pkl.gz'), stackedTica)    # save learned model
+    
     resman.stop()
 
 
