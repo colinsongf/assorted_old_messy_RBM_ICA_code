@@ -23,15 +23,18 @@ from makeData.makeUpsonRovio3 import randomSampleMatrixWithLabels, trainFilter, 
 
 
 
+STACKED_NEIGHBORHOOD_SIZE = 2.0
+
 class StackedTICA(object):
     '''Contains one or more TICA objects'''
 
-    def __init__(self, layer1Tica, layer1Whitener, layer1DataPath, isColor, saveDir):
+    def __init__(self, layer1Tica, layer1Whitener, layer1DataPath, layerSizePlan, isColor, saveDir):
         ''''''
         self.l1dataPath = layer1DataPath      # path to image directories
         self.l1whitener = layer1Whitener
         self.isColor    = isColor
-        self.ticas      = [layer1Tica]
+        self.ticas      = [layer1Tica]        # this fills up as training completes
+        self.layerSizePlan = layerSizePlan    # this should be complete
         self.saveDir    = saveDir
 
 
@@ -43,6 +46,7 @@ class StackedTICA(object):
         Nw = 10
         Nwshift = 5
         Nsamples = 50000
+        #Nsamples = 1000; print 'HACK!'
 
         # Get data and norm it
         nextLayerData = cached(makeNewData, self.ticas[-1], self.l1whitener, seed = 0,
@@ -79,18 +83,22 @@ class StackedTICA(object):
                     epsilon            = 1e-5,
                     saveDir            = layerLogDir)
 
-        beginTotalCost, beginPoolingCost, beginReconstructionCost, grad = tica.cost(tica.WW, nextLayerData)
+        manuallySkipExpensivePart = False
+        if not manuallySkipExpensivePart:
+            beginTotalCost, beginPoolingCost, beginReconstructionCost, grad = tica.cost(tica.WW, nextLayerData)
 
-        tic = time.time()
-        tica.learn(nextLayerData, maxFun = params['maxFuncCalls'])
-        execTime = time.time() - tic
-        if layerLogDir:
-            saveToFile(os.path.join(layerLogDir, 'tica.pkl.gz'), tica)    # save learned model
+            tic = time.time()
+            tica.learn(nextLayerData, maxFun = params['maxFuncCalls'])
+            execTime = time.time() - tic
+            if layerLogDir:
+                saveToFile(os.path.join(layerLogDir, 'tica.pkl.gz'), tica)    # save learned model
 
-        endTotalCost, endPoolingCost, endReconstructionCost, grad = tica.cost(tica.WW, nextLayerData)
+            endTotalCost, endPoolingCost, endReconstructionCost, grad = tica.cost(tica.WW, nextLayerData)
 
-        print 'beginTotalCost, beginPoolingCost, beginReconstructionCost, endTotalCost, endPoolingCost, endReconstructionCost, execTime ='
-        print [beginTotalCost, beginPoolingCost, beginReconstructionCost, endTotalCost, endPoolingCost, endReconstructionCost, execTime]
+            print 'beginTotalCost, beginPoolingCost, beginReconstructionCost, endTotalCost, endPoolingCost, endReconstructionCost, execTime ='
+            print [beginTotalCost, beginPoolingCost, beginReconstructionCost, endTotalCost, endPoolingCost, endReconstructionCost, execTime]
+        else:
+            pdb.set_trace()
 
         # Plot some results
         #plotImageRicaWW(tica.WW, imgShape, saveDir, tileShape = hiddenLayerShape, prefix = pc('WW_iterFinal'))
@@ -98,6 +106,60 @@ class StackedTICA(object):
             self.plotResults(layerLogDir, tica, nextLayerData, pseudoImgShape, hiddenLayerShape)
 
         self.ticas.append(tica)
+
+
+    def getRepresentation(self, data):
+        '''Assumes data is one example per column. Returns the pooled
+        activations. Figures out which layer to use based on the data
+        size.'''
+
+        Nwbig = int(sqrt(data.shape[0]))
+        if Nwbig not in self.layerSizePlan:
+            raise Exception('Nwbig = %d not in %s, data shape was %s' % (Nwbig, repr(self.layerSizePlan), repr(data.shape)))
+        layerIdx = self.layerSizePlan.index(Nwbig)
+
+        if layerIdx > 1:
+            raise Exception('not supported yet...')
+        elif layerIdx == 1:
+            Nwsmall = self.layerSizePlan[layerIdx-1]
+            Nwshift = Nwbig - Nwsmall
+            Nsamples = data.shape[1]
+            stackedSmall = large2StackedSmall(data.T, Nwsmall, Nwshift).T   # expects one per row
+            hidden,pooled = self.getRepresentation(stackedSmall)
+
+            # LCN and subsample...
+            hiddenSize = int(sqrt(self.ticas[1].nHidden))           # e.g. 15x15
+            downsampleSize = int(sqrt(self.ticas[1].nInputs)) / 2   # e.g. 8x8
+            downsampleSizeSq = downsampleSize**2
+            downsampled = zeros((downsampleSize**2, Nsamples*4))   # store in columns for use with neighbor matrix
+
+            gaussNeighbors = neighborMatrix((downsampleSize,downsampleSize), STACKED_NEIGHBORHOOD_SIZE, gaussian=True)
+            for smallIdx in xrange(4*Nsamples):
+                poolEmbedded = reshape(pooled[:,smallIdx], (hiddenSize, hiddenSize))     # 15x15
+                downsampled[:,smallIdx] = poolEmbedded[::2,::2].flatten()                # 8x8 -> 64 column
+
+            # 2. LCN
+            vv = downsampled - dot(gaussNeighbors, downsampled)
+            sig = sqrt(dot(gaussNeighbors, vv**2))
+            cc = .01     # ss = sorted(sig.flatten()); ss[len(ss)/10] = 0.026 in one test. So .01 seems about right.
+            yy = vv / maximum(cc, sig)
+
+            # 3. Stack together 4x (one example per COLUMN)
+            nextLayerInput = zeros((downsampleSizeSq * 4, Nsamples))
+            for smallIdx in xrange(4*Nsamples):
+                col    = smallIdx / 4
+                offset = smallIdx % 4
+                nextLayerInput[(offset*downsampleSizeSq):((offset+1)*downsampleSizeSq),col] = yy[:,smallIdx]
+
+            hidden,pooled = self.ticas[1].getRepresentation(nextLayerInput)
+
+            return pooled
+
+        else:
+            # layerIdx == 0
+            whiteData,junk = self.l1whitener.raw2normalized(data)
+            return self.ticas[0].getRepresentation(whiteData)
+
 
 
     def plotResults(self, layerLogDir, tica, data, imgShape, hiddenLayerShape):
@@ -112,6 +174,38 @@ class StackedTICA(object):
                                     number = 20, onlyHilights = True,
                                     hilightCmap = 'hot')
 
+
+
+def large2StackedSmall(largeMatrix, Nw, Nwshift):
+    # Sample each corner of the 1.5x patch (e.g. 4 patches 10px on a
+    # side). Color order is [ii_r ii_g ii_b ii+1_r ii+1_g ii+1_b ...]
+    Nsamples = largeMatrix.shape[0]   # one sample per row
+    stackedSmall = zeros((4*Nsamples, Nw*Nw))
+    NwLarge = Nw + Nwshift
+    counter = 0
+    for largeIdx in xrange(Nsamples):
+        largePatch = reshape(largeMatrix[largeIdx,:], (NwLarge, NwLarge))
+        for ii in (0,1):
+            for jj in (0,1):
+                stackedSmall[counter,:] = largePatch[(ii*Nwshift):(ii*Nwshift+Nw), (jj*Nwshift):(jj*Nwshift+Nw)].flatten()
+                counter += 1
+    return stackedSmall
+
+
+
+def getBigAndSmallerSamples(fileFilter, whitener, seed, isColor, Nw, Nwshift, Nsamples):
+    # Sample 1.5x larger windows (e.g. 15 px on a side). This is for
+    # patches that overlap half with their
+    # neighbors. largeSamples.shape is (Nsamples, Nw15^2)
+    NwLarge = Nw + Nwshift
+    largeSampleMatrix, labelMatrix, labelStrings = cached(randomSampleMatrixWithLabels, fileFilter, seed, isColor, Nw = NwLarge, Nsamples = Nsamples)
+
+    stackedSmall = large2StackedSmall(largeSampleMatrix, Nw, Nwshift)
+
+    stackedSmallWhite,junk = whitener.raw2normalized(stackedSmall.T)
+    # dataWhite.shape = (Nw^2, 4*Nsamples). Now with one example per COLUMN!
+
+    return largeSampleMatrix.T, stackedSmall.T, stackedSmallWhite, labelMatrix.T, labelStrings
 
 
 
@@ -141,29 +235,12 @@ def makeNewData(tica, layer1Whitener, seed, isColor, Nw, Nwshift, Nsamples):
     if hiddenISize != hiddenJSize:
         raise Exception('representation embedding must be square (for now)')
     hiddenSize = hiddenISize
-    
-    # Sample 1.5x larger windows (e.g. 15 px on a side). This is for
-    # patches that overlap half with their
-    # neighbors. largeSamples.shape is (Nsamples, Nw15^2)
-    NwLarge = Nw + Nwshift
-    largeSampleMatrix, labelMatrix, labelStrings = cached(randomSampleMatrixWithLabels, trainFilter, seed, isColor, Nw = NwLarge, Nsamples = Nsamples)
-    
-    # Sample each corner of the 1.5x patch (e.g. 4 patches 10px on a
-    # side). Color order is [ii_r ii_g ii_b ii+1_r ii+1_g ii+1_b ...]
-    stackedSmallSamples = zeros((4*Nsamples, Nw*Nw))
-    counter = 0
-    for largeIdx in xrange(Nsamples):
-        largePatch = reshape(largeSampleMatrix[largeIdx,:], (NwLarge, NwLarge))
-        for ii in (0,1):
-            for jj in (0,1):
-                stackedSmallSamples[counter,:] = largePatch[(ii*Nwshift):(ii*Nwshift+Nw), (jj*Nwshift):(jj*Nwshift+Nw)].flatten()
-                counter += 1
 
-    dataWhite,junk = layer1Whitener.raw2normalized(stackedSmallSamples.T)
-    # dataWhite.shape = (Nw^2, 4*Nsamples). Now with one example per COLUMN!
+    temp = getBigAndSmallerSamples(trainFilter, layer1Whitener, seed, isColor, Nw, Nwshift, Nsamples)
+    largeSampleMatrix, stackedSmall, stackedSmallWhite, labelMatrix, labelStrings = temp
 
     # Represent (pooled is one example per COLUMN)
-    hidden,pooled = tica.getRepresentation(dataWhite)
+    hidden,pooled = tica.getRepresentation(stackedSmallWhite)
 
     # Create the input data for the next layer.
 
@@ -180,7 +257,7 @@ def makeNewData(tica, layer1Whitener, seed, isColor, Nw, Nwshift, Nsamples):
     downsampleSizeSq = downsampleSize**2
     downsampled = zeros((downsampleSize**2, Nsamples*4))   # store in columns for use with neighbor matrix
     
-    gaussNeighbors = neighborMatrix((downsampleSize,downsampleSize), 2.0, gaussian=True)
+    gaussNeighbors = neighborMatrix((downsampleSize,downsampleSize), STACKED_NEIGHBORHOOD_SIZE, gaussian=True)
     for smallIdx in xrange(4*Nsamples):
         poolEmbedded = reshape(pooled[:,smallIdx], (hiddenSize, hiddenSize))     # 15x15
         downsampled[:,smallIdx] = poolEmbedded[::2,::2].flatten()                # 8x8 -> 64 column
@@ -212,17 +289,26 @@ def main():
     #layer1Whitener = loadFromPklGz('../data/upson_rovio_2/white/train_10_50000_1c.whitener.pkl.gz')
     layer1Whitener = loadFromPklGz('../data/upson_rovio_3/white/train_10_50000_1c.whitener.pkl.gz')
 
-    layerSizes = [10, 15, 23, 35, 53, 80, 120, 180]
+    layerSizePlan = [10, 15, 23, 35, 53, 80, 120, 180]
 
-    stackedTica = StackedTICA(l1tica, layer1Whitener, '../data/upson_rovio_3/imgfiles/', False,
+    stackedTica = StackedTICA(l1tica, layer1Whitener, '../data/upson_rovio_3/imgfiles/',
+                              layerSizePlan = layerSizePlan,
+                              isColor = False,
                               saveDir = resman.rundir)
 
-    #pdb.set_trace()
+    if False:
+        print 'JUST DEBUG...'
 
-    data,labels,strings = loadUpsonData3('../data/upson_rovio_3/train_10_50000_1c.pkl.gz')
-    stackedTica.plotResults(resman.rundir, stackedTica.ticas[0], data, (10,10), (15,15))
+        pdb.set_trace()
+        
+        tica = stackedTica.ticas[0]
+        pdb.set_trace()
+        return
+    #data,labels,strings = loadUpsonData3('../data/upson_rovio_3/train_10_50000_1c.pkl.gz')
+    #data = loadFromPklGz('../data/upson_rovio_3/white/train_10_50000_1c.white.pkl.gz')
+    #stackedTica.plotResults(resman.rundir, stackedTica.ticas[0], data, (10,10), (15,15))
     
-    pdb.set_trace()
+    #pdb.set_trace()
 
     params = {}
     params['hiddenISize'] = 15
@@ -239,9 +325,10 @@ def main():
     params['maxFuncCalls'] = 3
     #params['whiten'] = True    # Just false for Space Invaders dataset...
     params['dataCrop'] = None       # Set to None to not crop data...
-    params['dataCrop'] = 1000       # Set to None to not crop data...
+    #params['dataCrop'] = 10000       # Set to None to not crop data...
 
     stackedTica.learnNextLayer(params)
+    #print 'HACK FOR DEBUG'
     saveToFile(os.path.join(resman.rundir, 'stackedTica.pkl.gz'), stackedTica)    # save learned model
     
     resman.stop()

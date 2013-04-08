@@ -202,3 +202,23 @@ def plotRicaReconstructions(rica, data, imgShape, saveDir = None, unwhitener = N
             wholeImage.save(os.path.join(saveDir, '%s_%04d.png' % (prefix, ii)))
 
         print 'done.'
+
+
+
+def plotTopActivations(activations, data, imgShape, saveDir = None, nActivations = 50, nSamples = 20, prefix = 'topact'):
+    '''Plots top and bottom few activations for the first number activations.'''
+
+    if saveDir:
+        sortIdx = argsort(activations, 1)
+
+        plotData = zeros((prod(imgShape), nActivations*nSamples))
+
+        for ii in range(nActivations):
+            idx = sortIdx[ii,-1:-(nSamples+1):-1]
+            plotData[:,(ii*nSamples):((ii+1)*nSamples)] = data[:,idx]
+
+        image = Image.fromarray(tile_raster_images(
+            X = plotData.T, img_shape = imgShape,
+            tile_shape = (nActivations, nSamples), tile_spacing=(1,1),
+            scale_rows_to_unit_interval = True))
+        image.save(os.path.join(saveDir, '%s.png' % prefix))

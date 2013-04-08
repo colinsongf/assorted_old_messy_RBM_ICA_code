@@ -25,6 +25,10 @@ trainFilter = ['u3_backward_0_person',
                'u3_red_star_close_1',
                'u3_red_star_far_1',
                ]
+print 'TODO: Fix symlink bug where no old data is being included??'
+# ipdb> labelMatrix.sum(1)
+#array([ 519.,    0.,  487.,  513.,  449.,  551.,    0.,    0.,    0.,
+#                  0.,    0.,    0.,    0.])
 
 testFilter  = ['u3_backward_1',
                'u3_backward_3',
@@ -52,7 +56,7 @@ exploreFilter = ['u3_all_shapes_tour',
                  ]
 
 labelStrings = ['circle',
-                'square',
+                'star',
                 'red',
                 'green',
                 'close',

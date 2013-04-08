@@ -176,21 +176,24 @@ class TICA(RICA):
         if plotEvery and numEvals % plotEvery == 0:
             self.plotWW(WW, filePrefix = 'intermed_WW_%04d' % numEvals)
 
+        #from time import time
+        #pdb.set_trace()
+
         # Forward Prop
-        hidden = dot(WW, data)
-        reconstruction = dot(WW.T, hidden)
+        hidden = dot(WW, data)                   # 4.0s, aligned (C * C)
+        reconstruction = dot(WW.T, hidden)       # 6.3s, misaligned: (F * C)
         
         # Reconstruction cost
         reconDiff = reconstruction - data
         reconstructionCost = sum(reconDiff ** 2)
 
         # L2 Pooling / Sparsity cost
-        absPooledActivations = sqrt(self.epsilon + dot(self.HH, hidden ** 2))
+        absPooledActivations = sqrt(self.epsilon + dot(self.HH, hidden ** 2))     # 2.9s, aligned (C * C)
         poolingTerm = absPooledActivations.sum()
         poolingCost = self.lambd * poolingTerm
 
         # Gradient of reconstruction cost term
-        RxT = dot(reconDiff, data.T)
+        RxT = dot(reconDiff, data.T)                                              # 1.7s, misaligned (C * F)
         reconstructionCostGrad = 2 * dot(RxT + RxT.T, WW.T).T
 
         # Gradient of sparsity / pooling term
@@ -205,8 +208,8 @@ class TICA(RICA):
             print poolingCostGrad[:4,:4]
 
         # fast way
-        Ha = dot(self.HH.T, 1/absPooledActivations)
-        poolingCostGrad = self.lambd * dot(hidden * Ha, data.T)
+        Ha = dot(self.HH.T, 1/absPooledActivations)                              # 3.1s, misaligned (F * C) -> -0.3 with self.HHT
+        poolingCostGrad = self.lambd * dot(hidden * Ha, data.T)                  # 1.5s, misaligned (C * F) -> -0.3 with dataT
         #print 'fast way'
         #print poolingCostGrad[:4,:4]
 
