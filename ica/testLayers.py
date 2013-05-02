@@ -48,6 +48,16 @@ class StackedLayers(object):
         print 'layers look good (purely cursory check)'
 
 
+    def printStatus(self):
+        for ii, layer in reversed(list(enumerate(self.layers))):
+            print 'layer %d: %-20s' % (ii, '%s (%s)' % (layer.name, layer.layerType)),
+            if layer.trainable:
+                print 'trainable'
+            else:
+                print 'not trainable'
+                
+
+
 
 
 
@@ -57,8 +67,10 @@ class Layer(object):
     trainable = False   # override if desired
     isDataLayer = False
     
-    def __init__(self):
-        pass
+    def __init__(self, params):
+        self.name = params['name']
+        self.layerType = params['type']
+
 
 
 
@@ -70,14 +82,15 @@ class DataLayer(Layer):
 
     isDataLayer = True
 
-    def __init__(self):
-        super(DataLayer, self).__init__()
-        pass
+    def __init__(self, params):
+        super(DataLayer, self).__init__(params)
+
 
 
 class UpsonData3(DataLayer):
 
     def __init__(self, params):
+        super(UpsonData3, self).__init__(params)
         self.colors = params['colors']
 
 
@@ -91,13 +104,15 @@ class WhiteningLayer(Layer):
     trainable = True
 
     def __init__(self, params):
-        pass
+        super(WhiteningLayer, self).__init__(params)
+
 
 
 class PCAWhiteningLayer(WhiteningLayer):
 
     def __init__(self, params):
-        pass
+        super(PCAWhiteningLayer, self).__init__(params)
+
 
 
 
@@ -110,7 +125,8 @@ class TicaLayer(Layer):
     trainable = True
 
     def __init__(self, params):
-        pass
+        super(TicaLayer, self).__init__(params)
+
 
 
 
@@ -121,21 +137,22 @@ class TicaLayer(Layer):
 class DownsampleLayer(Layer):
 
     def __init__(self, params):
-        pass
+        super(DownsampleLayer, self).__init__(params)
 
 
 
 class LcnLayer(Layer):
 
     def __init__(self, params):
-        pass
+        super(LcnLayer, self).__init__(params)
 
 
 
 class ConcatenationLayer(Layer):
 
     def __init__(self, params):
-        pass
+        super(ConcatenationLayer, self).__init__(params)
+
 
 
 
@@ -174,6 +191,8 @@ def main(layerFilename):
     #print layers
 
     stackedLayers = StackedLayers(layers)
+
+    stackedLayers.printStatus()
 
 
 

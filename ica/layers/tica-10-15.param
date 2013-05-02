@@ -23,7 +23,7 @@ ll.append({'name':         'tica1',
            'neighborhood': ('gaussian', 1.5, 0, 0),
            'lambd':        .012,
            'epsilon':      1e-5,
-           'stride':       6,             # 6: completely non-overlapping given 6x6 input
+           'stride':       (6,6),         # 6: completely non-overlapping given 6x6 input
            'downsample':   2,
            })
 # Also add (in sep file): training schedule: maxFuncCalls: 300, randSeed 123
