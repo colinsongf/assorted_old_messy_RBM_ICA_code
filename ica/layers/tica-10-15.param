@@ -1,0 +1,82 @@
+#! /usr/bin/env python
+#
+# This is a parameter file
+
+ll = []
+
+ll.append({'name':      'data',
+           'type':      'data',
+           'dataClass': 'UpsonData3',   # provides 320x240 images
+           'colors':    1,
+           })
+
+ll.append({'name':          'whitener',
+           'type':          'whitener',
+           'whitenerClass': 'PCAWhiteningLayer',
+           'size':          (6,6),
+           'unitNorm':      True})
+
+# layer 1 - tica
+ll.append({'name':         'tica1',
+           'type':         'tica',
+           'hiddenSize':   (16,16),        # (output size is same as hidden size, 16x16)
+           'neighborhood': ('gaussian', 1.5, 0, 0),
+           'lambd':        .012,
+           'epsilon':      1e-5,
+           'stride':       6,             # 6: completely non-overlapping given 6x6 input
+           'downsample':   2,
+           })
+# Also add (in sep file): training schedule: maxFuncCalls: 300, randSeed 123
+# HERE: add stride and downsampling info, see Alex paper and https://code.google.com/p/cuda-convnet/wiki/LayerParams
+
+# layer 1 - downsample (16x16) -> (8x8)
+ll.append({'name':         'ds1',
+           'type':         'downsample',
+           'factor':       2,      # -> 8x8
+           })
+
+# layer 1 - lcn
+ll.append({'name':         'lcn1',
+           'type':         'lcn',
+           'c':            .01,
+           })
+
+# concatenate
+ll.append({'name':         'cat1',
+           'type':         'concat',
+           'concat':       (2,2),
+           })
+
+
+
+#type=data
+#dataIdx=0
+#
+#[labels]
+#type=data
+#dataIdx=1
+#
+#[conv1]
+#type=conv
+#inputs=data
+#channels=3
+#filters=64
+#padding=2
+#stride=1
+#filterSize=5
+#neuron=relu
+#initW=0.0001
+#partialSum=4
+#sharedBiases=1
+#
+#[pool1]
+#type=pool
+#pool=max
+#inputs=conv1
+#start=0
+#sizeX=3
+#stride=2
+#outputsX=0
+#channels=64
+
+layers = ll
