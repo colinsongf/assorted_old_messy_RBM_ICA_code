@@ -10,149 +10,7 @@ import argparse
 from GitResultsManager import resman
 #from util.plotting import plot3DShapeFromFlattened
 from util.dataPrep import PCAWhiteningDataNormalizer  #, printDataStats
-
-
-
-class StackedLayers(object):
-
-    def __init__(self, layerList):
-
-        self.layers = []
-
-        # Check for duplicate names
-        layerNames = [layer['name'] for layer in layerList]
-        dups = set([x for x in layerNames if layerNames.count(x) > 1])
-        if len(dups) > 0:
-            raise Exception('Duplicate layer names: %s' % dups)
-        
-        for ii, layerDict in enumerate(layerList):
-            print 'layer %d:' % ii
-            print '  ', layerDict
-
-            layerClass = layerClassNames[layerDict['type']]
-            if isinstance(layerClass, basestring):
-                actualLayerClass = eval(layerDict[layerClass])
-                thisLayer = actualLayerClass(layerDict)
-            else:
-                thisLayer = layerClass(layerDict)
-
-            self.layers.append(thisLayer)
-
-        # Check layer compatability
-        for ii, layer in enumerate(self.layers):
-            if ii == 0 and not layer.isDataLayer:
-                raise Exception('First layer must be data layer, but it is %s' % repr(layer))
-            if ii != 0 and layer.isDataLayer:
-                raise Exception('Only the first layer can be a data layer, but layer %d is %s' % (ii, repr(layer)))
-
-        print 'layers look good (purely cursory check)'
-
-
-    def printStatus(self):
-        for ii, layer in reversed(list(enumerate(self.layers))):
-            print 'layer %d: %-20s' % (ii, '%s (%s)' % (layer.name, layer.layerType)),
-            if layer.trainable:
-                print 'trainable'
-            else:
-                print 'not trainable'
-                
-
-
-
-
-
-
-class Layer(object):
-
-    trainable = False   # override if desired
-    isDataLayer = False
-    
-    def __init__(self, params):
-        self.name = params['name']
-        self.layerType = params['type']
-
-
-
-
-######################
-# Data
-######################
-
-class DataLayer(Layer):
-
-    isDataLayer = True
-
-    def __init__(self, params):
-        super(DataLayer, self).__init__(params)
-
-
-
-class UpsonData3(DataLayer):
-
-    def __init__(self, params):
-        super(UpsonData3, self).__init__(params)
-        self.colors = params['colors']
-
-
-
-######################
-# Whitening
-######################
-
-class WhiteningLayer(Layer):
-
-    trainable = True
-
-    def __init__(self, params):
-        super(WhiteningLayer, self).__init__(params)
-
-
-
-class PCAWhiteningLayer(WhiteningLayer):
-
-    def __init__(self, params):
-        super(PCAWhiteningLayer, self).__init__(params)
-
-
-
-
-######################
-# Learning
-######################
-
-class TicaLayer(Layer):
-
-    trainable = True
-
-    def __init__(self, params):
-        super(TicaLayer, self).__init__(params)
-
-
-
-
-######################
-# Downsampling, LCN, Concatenation
-######################
-
-class DownsampleLayer(Layer):
-
-    def __init__(self, params):
-        super(DownsampleLayer, self).__init__(params)
-
-
-
-class LcnLayer(Layer):
-
-    def __init__(self, params):
-        super(LcnLayer, self).__init__(params)
-
-
-
-class ConcatenationLayer(Layer):
-
-    def __init__(self, params):
-        super(ConcatenationLayer, self).__init__(params)
-
+from layers import Layer, DataLayer, UpsonData3, WhiteningLayer, PCAWhiteningLayer, TicaLayer, DownsampleLayer, LcnLayer, ConcatenationLayer
 
 
 
@@ -163,6 +21,72 @@ layerClassNames = {'data':       'dataClass',       # load the class specified b
                    'lcn':        LcnLayer,
                    'concat':     ConcatenationLayer,
                    }
+
+
+
+class StackedLayers(object):
+
+    def __init__(self, layerList):
+
+        self.layers = []
+
+        # 0. Check for duplicate names
+        layerNames = [layer['name'] for layer in layerList]
+        dups = set([x for x in layerNames if layerNames.count(x) > 1])
+        if len(dups) > 0:
+            raise Exception('Duplicate layer names: %s' % dups)
+
+        # 1. Construct all layers
+        for ii, layerDict in enumerate(layerList):
+            print 'constructing layer %d:' % ii
+            print '  ', layerDict
+
+            layerClass = layerClassNames[layerDict['type']]
+            if isinstance(layerClass, basestring):
+                actualLayerClass = eval(layerDict[layerClass])
+                layer = actualLayerClass(layerDict)
+            else:
+                layer = layerClass(layerDict)
+
+            # Checks
+            if ii == 0 and not layer.isDataLayer:
+                raise Exception('First layer must be data layer, but it is %s' % repr(layer))
+            if ii != 0 and layer.isDataLayer:
+                raise Exception('Only the first layer can be a data layer, but layer %d is %s' % (ii, repr(layer)))
+
+            # Input / Output sizes
+            if ii == 0:
+                # For data layer
+                layer.outputSize = layer.getOutputSize()
+            else:
+                prevLayer = self.layers[ii-1]
+
+                # only for non-data layers
+                layer.inputSize = prevLayer.outputSize
+                layer.outputSize = layer.calculateOutputSize(layer.inputSize)
+
+            self.layers.append(layer)
+
+        # 2. Post construction checks...
+        for ii, layer in enumerate(self.layers):
+            pass
+        print 'layers look good (purely cursory check)'
+
+
+    def printStatus(self):
+        for ii, layer in reversed(list(enumerate(self.layers))):
+            print 'layer %d: %-20s' % (ii, '%s (%s)' % (layer.name, layer.layerType)),
+            if ii == 0:
+                st = 'outputs size %s' % repr(layer.outputSize),
+            else:
+                st = 'maps size %s -> %s' % (repr(layer.inputSize), repr(layer.outputSize)),
+            print '%-32s' % st,
+            if layer.trainable:
+                print 'trainable'
+            else:
+                print 'not trainable'
+                
+
 
 
 
@@ -190,9 +114,11 @@ def main(layerFilename):
     #print 'got layers'
     #print layers
 
-    stackedLayers = StackedLayers(layers)
+    sl = StackedLayers(layers)
 
-    stackedLayers.printStatus()
+    sl.printStatus()
+
+    pdb.set_trace()
 
 
 

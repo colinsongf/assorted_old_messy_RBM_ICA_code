@@ -6,14 +6,16 @@ ll = []
 
 ll.append({'name':      'data',
            'type':      'data',
-           'dataClass': 'UpsonData3',   # provides 320x240 images
+           'dataClass': 'UpsonData3',   # provides 240x320 images
+           'imageSize': (240,320),
+           'patchSize': (6,6),          # not including colors
+           'stride':    (5,5),
            'colors':    1,
            })
 
 ll.append({'name':          'whitener',
            'type':          'whitener',
            'whitenerClass': 'PCAWhiteningLayer',
-           'size':          (6,6),
            'unitNorm':      True})
 
 # layer 1 - tica
@@ -23,8 +25,8 @@ ll.append({'name':         'tica1',
            'neighborhood': ('gaussian', 1.5, 0, 0),
            'lambd':        .012,
            'epsilon':      1e-5,
-           'stride':       (6,6),         # 6: completely non-overlapping given 6x6 input
-           'downsample':   2,
+  ##         'stride':       (6,6),         # 6: completely non-overlapping given 6x6 input
+  ##         'downsample':   2,
            })
 # Also add (in sep file): training schedule: maxFuncCalls: 300, randSeed 123
 # HERE: add stride and downsampling info, see Alex paper and https://code.google.com/p/cuda-convnet/wiki/LayerParams
@@ -32,7 +34,7 @@ ll.append({'name':         'tica1',
 # layer 1 - downsample (16x16) -> (8x8)
 ll.append({'name':         'ds1',
            'type':         'downsample',
-           'factor':       2,      # -> 8x8
+           'factor':       (2,2),      # -> 8x8
            })
 
 # layer 1 - lcn
@@ -44,7 +46,8 @@ ll.append({'name':         'lcn1',
 # concatenate
 ll.append({'name':         'cat1',
            'type':         'concat',
-           'concat':       (2,2),
+           'concat':       (2,2),    # these two params control growth
+           'stride':       (2,2),    # 
            })
 
 
