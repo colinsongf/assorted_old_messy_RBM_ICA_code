@@ -4,6 +4,10 @@
 Research code
 
 Jason Yosinski
+
+Note: This coding was mostly done in a rush. Not that it is
+necessarily horrible, but there may be duplicated functionality
+between this file and others.
 '''
 
 import ipdb as pdb

@@ -72,14 +72,21 @@ labelStrings = ['circle',
 
 
 
-def randomSampleMatrixWithLabels(filterNames, seed, color, Nw = 10, Nsamples = 10,
+def randomSampleMatrixWithLabels(filterNames, color, Nw = 10, Nsamples = 10, seed = None, rng = None,
                                  imgDirectory = '../data/upson_rovio_3/imgfiles'):
-    '''color = True or False'''
+    '''color = True or False
+    It is an error to give both a seed and an rng'''
 
-    # reset the random seed before each sample
-    random.seed(seed)
+    if seed is not None and rng is not None:
+        raise Exception('must specify at most one of (seed, rng)')
+
+    if rng is None:
+        rng = random.RandomState(seed)      # if seed is None, this takes its seed from timer
 
     files = getFilesIn(imgDirectory)
+
+    print 'CHECK: does this include symlinked files??'
+    pdb.set_trace()
 
     filteredFiles = []
     for filterName in filterNames:
@@ -98,9 +105,9 @@ def randomSampleMatrixWithLabels(filterNames, seed, color, Nw = 10, Nsamples = 1
     # select random windows
     maxJ = size[0] - Nw
     maxI = size[1] - Nw
-    randomSamples = vstack((random.randint(0, Nimages, Nsamples),
-                            random.randint(0, maxI+1, Nsamples),
-                            random.randint(0, maxJ+1, Nsamples))).T
+    randomSamples = vstack((rng.randint(0, Nimages, Nsamples),
+                            rng.randint(0, maxI+1, Nsamples),
+                            rng.randint(0, maxJ+1, Nsamples))).T
     # for efficient loading and unloading of images into memory. Re-randomize before returing
     randomSamples = randomSamples[argsort(randomSamples[:,0]), :]
     
@@ -135,7 +142,7 @@ def randomSampleMatrixWithLabels(filterNames, seed, color, Nw = 10, Nsamples = 1
     imageMatrix /= 255   # normalize to 0-1 range
 
     # shuffle both matrices together
-    shufIdx = random.permutation(range(Nsamples))
+    shufIdx = rng.permutation(range(Nsamples))
     imageMatrix = imageMatrix[shufIdx,:]
     labelMatrix = labelMatrix[shufIdx,:]
 

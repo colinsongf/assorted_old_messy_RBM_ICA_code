@@ -107,14 +107,14 @@ class StackedLayers(object):
                 layer.initialize()
 
                 data = 'HERE'
-                # Add method to each layer: forwardProp
-                # Add method to data layer: getData(size, number, seed)
-                # Figure out how many patches are needed to train a give layer (prod(sees) * number?)
-                # Get that many patches of data
-                # figure out how to feed the data through all the layers until the prevLayer
+                # ~ Add method to each layer: forwardProp
+                # + Add method to data layer: getData(size, number, seed)
+                # - Figure out how many patches are needed to train a give layer (prod(sees) * number?)
+                # - Get that many patches of data
+                # - figure out how to feed the data through all the layers until the prevLayer
 
-                # finally, something like this:
-                #   data = prevLayer.forwardProp(otherData)
+                # - finally, something like this:
+                #      data = prevLayer.forwardProp(otherData)
                 
                 layer.train(data)
 

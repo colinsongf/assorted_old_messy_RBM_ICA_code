@@ -5,6 +5,7 @@ import imp
 import ipdb as pdb
 import argparse
 import types
+from numpy import *
 
 #from utils import loadFromFile
 #from squaresRbm import loadPickledData
@@ -162,6 +163,7 @@ class UpsonData3(DataLayer):
         super(UpsonData3, self).__init__(params)
 
         self.colors = params['colors']
+        #self.rng = random.RandomState()   # takes seed from timer initially
 
         assert self.colors in (1,3)
 
@@ -170,6 +172,14 @@ class UpsonData3(DataLayer):
             return self.patchSize
         else:
             return (self.patchSize[0], self.patchSize[1], 3)
+
+    def getData(self, patchSize, number, seed = None):
+        samples, labelMatrix, labelStrings = cached(randomSampleMatrixWithLabels, fileFilter,
+                                                    color = (self.colors == 3),
+                                                    Nw = patchSize, Nsamples = number, seed = seed,
+                                                    imgDirectory = '../data/upson_rovio_3/imgfiles')
+
+        return samples
 
 
 
