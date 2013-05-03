@@ -1,0 +1,17 @@
+#! /usr/bin/env python
+#
+# This is a parameter file
+
+tp = {}
+
+tp['whitener'] = {'examples': 50000}
+
+tp['tica1'] = {'examples': 50000,
+               'method': 'lbfgs',
+               }
+
+tp['tica2'] = {'examples': 50000,
+               'method': 'lbfgs',
+               }
+
+trainParam = tp

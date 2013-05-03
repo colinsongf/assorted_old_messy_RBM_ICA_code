@@ -54,7 +54,7 @@ class StackedLayers(object):
             if ii != 0 and layer.isDataLayer:
                 raise Exception('Only the first layer can be a data layer, but layer %d is %s' % (ii, repr(layer)))
 
-            # Input / Output sizes
+            # Populate inputSize, outputSize, and seesPixels
             if ii == 0:
                 # For data layer
                 layer.outputSize = layer.getOutputSize()
@@ -64,6 +64,8 @@ class StackedLayers(object):
                 # only for non-data layers
                 layer.inputSize = prevLayer.outputSize
                 layer.outputSize = layer.calculateOutputSize(layer.inputSize)
+                prevLayerSees = prevLayer.outputSize if prevLayer.isDataLayer else prevLayer.seesPixels
+                layer.seesPixels = layer.calculateSeesPixels(prevLayerSees)
 
             self.layers.append(layer)
 
@@ -89,34 +91,36 @@ class StackedLayers(object):
 
 
 
-
-def main(layerFilename):
+def importFromFile(filename, objectName):
     try:
-        with open(layerFilename, 'r') as ff:
-            layerFileText = ff.read()
+        with open(filename, 'r') as ff:
+            fileText = ff.read()
     except IOError:
-        print 'Could not open layer file "%s". Are you sure it exists?' % layerFilename
-        sys.exit(1)
-
+        print 'Could not open file "%s". Are you sure it exists?' % filename
+        raise
 
     try:
-        exec(compile(layerFileText, 'contents of file: %s' % layerFilename, 'exec'))
+        exec(compile(fileText, 'contents of file: %s' % filename, 'exec'))
     except:
-        print 'Tried to execute layer definition file "%s" but got this error:' % layerFilename
+        print 'Tried to execute file "%s" but got this error:' % filename
         raise
         
-    if not 'layers' in locals():
-        print 'file "%s" did not define the layers variable' % layerFilename
-        sys.exit(1)
-    #layerDefModule = imp.load_source('layerDefModule', layerFilename)
-    #layers = layerDefModule.layers
+    if not objectName in locals():
+        raise Exception('file "%s" did not define the %s variable' % (layerFilename, objectName))
 
-    #print 'got layers'
-    #print layers
+    return locals()[objectName]
+
+
+
+def main(layerFilename, trainParamFilename):
+    layers = importFromFile(layerFilename, 'layers')
+    trainParam = importFromFile(trainParamFilename, 'trainParam')
 
     sl = StackedLayers(layers)
 
     sl.printStatus()
+
+    #sl.train(trainParam)
 
     pdb.set_trace()
 
@@ -125,12 +129,14 @@ def main(layerFilename):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='layer sandbox...')
     parser.add_argument('layerFilename', type = str,
-                        help='file defining layers, something like tica-10-15.param')
+                        help='file defining layers, something like tica-10-15.layers')
+    parser.add_argument('trainParamFilename', type = str,
+                        help='file defining training parameters, something like tica-10-15.trainparam')
     args = parser.parse_args()
 
     #resman.start('junk')
     
-    main(args.layerFilename)
+    main(args.layerFilename, args.trainParamFilename)
 
     #resman.stop()
     
