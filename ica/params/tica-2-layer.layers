@@ -52,6 +52,32 @@ ll.append({'name':         'cat1',
 
 
 
+
+# layer 2 - tica
+ll.append({'name':         'tica2',
+           'type':         'tica',
+           'hiddenSize':   (20,30),        # (output size is same as hidden size, 16x16)
+           'neighborhood': ('gaussian', 1.5, 0, 0),
+           'lambd':        .012,
+           'epsilon':      1e-5,
+           })
+
+# layer 2 - downsample (16x16) -> (8x8)
+ll.append({'name':         'ds2',
+           'type':         'downsample',
+           'factor':       (1,3),      # -> 8x8
+           })
+
+# layer 2 - lcn
+ll.append({'name':         'lcn2',
+           'type':         'lcn',
+           'c':            .01,
+           })
+
+
+
+
+
 #type=data
 #dataIdx=0
 #
