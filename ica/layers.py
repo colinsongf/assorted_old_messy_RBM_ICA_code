@@ -58,7 +58,7 @@ class NonDataLayer(Layer):
         assert isinstance(prevLayerSees, tuple), 'prevLayerSees must be a tuple but it is %s' % repr(prevLayerSees)
         assert isinstance(prevDistToNeighbor, tuple), 'prevDistToNeighbor must be a tuple but it is %s' % repr(prevDistToNeighbor)
         assert len(prevLayerSees) == len(prevDistToNeighbor)
-        return self._calculateSeesPatches(self, prevLayerSees, prevDistToNeighbor)
+        return self._calculateSeesPatches(prevLayerSees, prevDistToNeighbor)
 
     def _calculateSeesPatches(self, prevLayerSees, prevDistToNeighbor):
         '''Default pass through version. Override in derived classes
@@ -67,13 +67,62 @@ class NonDataLayer(Layer):
 
     def calculateDistToNeighbor(self, prevDistToNeighbor):
         assert isinstance(prevDistToNeighbor, tuple), 'prevDistToNeighbor must be a tuple but it is %s' % repr(prevDistToNeighbor)
-        return self._calculateDistToNeighbor(self, prevDistToNeighbor)
+        return self._calculateDistToNeighbor(prevDistToNeighbor)
 
     def _calculateDistToNeighbor(self, prevDistToNeighbor):
         '''Default pass through version. Override in derived classes
         if desired. This method may assume prevDistToNeighbor is a
         tuple.'''
         return prevDistToNeighbor
+
+    def forwardProp(self, data):
+        '''data is one example per column'''
+        if self.trainable and not self.isInitialized:
+            raise Exception('Must initialize %s layer first' % self.name)
+        if self.trainable and not self.isTrained:
+            print 'WARNING: forwardProp through untrained layer, might not be desired'
+        dimension, numExamples = data.shape
+        if dimension != prod(self.inputSize):
+            raise Exception('Layer %s expects examples of shape %s = %s rows but got %s data matrix'
+                            % (self.name, self.inputSize, prod(self.inputSize), data.shape))
+        return self._forwardProp(data)
+
+    def _forwardProp(self, data):
+        '''Default pass through version. Override in derived classes
+        if desired.'''
+        return data
+
+
+
+class TrainableLayer(NonDataLayer):
+
+    trainable = True
+
+    def __init__(self, params):
+        super(TrainableLayer, self).__init__(params)
+        self.isInitialized = False
+        self.isTrained = False
+
+    def initialize(self):
+        if self.isInitialized:
+            raise Exception('Layer was already initialized')
+        self._initialize()
+        self.isInitialized = True
+
+    def _initialize(self):
+        '''Default no-op version. Override in derived class.'''
+        pass
+
+    def train(self, data):
+        if self.isTrained:
+            raise Exception('Layer was already trained')
+        self._train(data)
+        self.isTrained = True
+
+    def _train(self, data):
+        '''Default no-op version. Override in derived class.'''
+        pass
+        
 
 
 
@@ -92,6 +141,7 @@ class DataLayer(Layer):
         self.patchSize = params['patchSize']
         self.stride = params['stride']
 
+        # Only 2D data types for now (color is fine though)
         assert len(self.imageSize) == 2
         assert len(self.patchSize) == 2
         assert len(self.stride) == 2
@@ -103,7 +153,6 @@ class DataLayer(Layer):
 
     def getOutputSize(self):
         raise Exception('must implement in derived class')
-
 
 
 
@@ -128,9 +177,7 @@ class UpsonData3(DataLayer):
 # Whitening
 ######################
 
-class WhiteningLayer(NonDataLayer):
-
-    trainable = True
+class WhiteningLayer(TrainableLayer):
 
     def __init__(self, params):
         super(WhiteningLayer, self).__init__(params)
@@ -141,7 +188,14 @@ class PCAWhiteningLayer(WhiteningLayer):
 
     def __init__(self, params):
         super(PCAWhiteningLayer, self).__init__(params)
+        self.pcaWhiteningDataNormalizer = None
 
+    def _train(self, data):
+        self.pcaWhiteningDataNormalizer = PCAWhiteningDataNormalizer(data)
+
+    def _forwardProp(self, data):
+        dataWhite, junk = whiteningStage.raw2normalized(data, unitNorm = True)
+        return dataWhite
 
 
 
@@ -149,9 +203,7 @@ class PCAWhiteningLayer(WhiteningLayer):
 # Learning
 ######################
 
-class TicaLayer(NonDataLayer):
-
-    trainable = True
+class TicaLayer(TrainableLayer):
 
     def __init__(self, params):
         super(TicaLayer, self).__init__(params)
@@ -160,6 +212,7 @@ class TicaLayer(NonDataLayer):
         self.neighborhood = params['neighborhood']
         self.lambd = params['lambd']
         self.epsilon = params['epsilon']
+        self.tica = None
 
         assert isinstance(self.hiddenSize, tuple)
         assert len(self.neighborhood) == 4
@@ -167,6 +220,40 @@ class TicaLayer(NonDataLayer):
 
     def _calculateOutputSize(self, inputSize):
         return self.hiddenSize
+
+    def _train(self, data, trainParam):
+        logDir = trainParam.get('logDir', None)
+        # Learn model
+        tica = TICA(nInputs            = self.numInputs,
+                    hiddenLayerShape   = self.hiddenSize,
+                    neighborhoodParams = self.neighborhood,
+                    lambd              = self.lambd,
+                    epsilon            = self.epsilon)
+
+        beginTotalCost, beginPoolingCost, beginReconstructionCost, grad = tica.cost(tica.WW, nextLayerData)
+
+        tic = time.time()
+        tica.learn(data, maxFun = trainParam['maxFuncCalls'])
+        execTime = time.time() - tic
+        if logDir:
+            saveToFile(os.path.join(logDir, 'tica.pkl.gz'), tica)    # save learned model
+
+        endTotalCost, endPoolingCost, endReconstructionCost, grad = tica.cost(tica.WW, data)
+
+        print 'beginTotalCost, beginPoolingCost, beginReconstructionCost, endTotalCost, endPoolingCost, endReconstructionCost, execTime ='
+        print [beginTotalCost, beginPoolingCost, beginReconstructionCost, endTotalCost, endPoolingCost, endReconstructionCost, execTime]
+
+        # Plot some results
+        #plotImageRicaWW(tica.WW, imgShape, saveDir, tileShape = hiddenLayerShape, prefix = pc('WW_iterFinal'))
+        if logDir:
+            tica.plotResults(logDir, tica, data, self.numInputs, self.hiddenSize)
+
+        self.tica = tica
+
+
+    def _forwardProp(self, data):
+        hidden, absPooledActivations = self.tica(data)
+        return absPooledActivations
 
 
 
@@ -199,6 +286,21 @@ class DownsampleLayer(NonDataLayer):
             else: # length 2
                 return (inputSize[0]/self.factor[0], inputSize[1]/self.factor[1])
 
+    def _forwardProp(self, data):
+        dimension, numExamples = data.shape
+
+        patches = reshape(data, self.inputShape + (numExamples,))
+        # len(self.factor) is either 1 or 2
+        if len(self.factor) == 1:
+            downsampled = patches[::self.factor[0],:]
+        else:
+            downsampled = patches[::self.factor[0],::self.factor[1],:]
+            
+        output = reshape(downsampled, (prod(self.outputShape), numExamples))
+        return output
+
+
+
 class AvgPool(NonDataLayer):
     pass
 
@@ -210,6 +312,20 @@ class LcnLayer(NonDataLayer):
 
     def __init__(self, params):
         super(LcnLayer, self).__init__(params)
+        self.gaussWidth = params['gaussWidth']
+
+    def _forwardProp(self, data):
+        dimension, numExamples = data.shape
+
+        gaussNeighbors = neighborMatrix(self.inputSize, self.gaussWidth, gaussian=True)
+
+        # 2. LCN
+        vv = data - dot(gaussNeighbors, data)
+        sig = sqrt(dot(gaussNeighbors, vv**2))
+        cc = .01     # ss = sorted(sig.flatten()); ss[len(ss)/10] = 0.026 in one test. So .01 seems about right.
+        yy = vv / maximum(cc, sig)
+
+        return yy
 
 
 
@@ -260,3 +376,7 @@ class ConcatenationLayer(NonDataLayer):
                     prevDistToNeighbor[1] * self.stride[1])
         else:
             raise Exception('logic error')
+
+    def _forwardProp(self, data):
+        HERE    # ;)
+

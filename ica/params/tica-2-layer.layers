@@ -41,6 +41,7 @@ ll.append({'name':         'ds1',
 ll.append({'name':         'lcn1',
            'type':         'lcn',
            'c':            .01,
+           'gaussWidth':   2.0,
            })
 
 # concatenate

@@ -31,8 +31,8 @@ class StackedLayers(object):
         self.layers = []
 
         # 0. Check for duplicate names
-        layerNames = [layer['name'] for layer in layerList]
-        dups = set([x for x in layerNames if layerNames.count(x) > 1])
+        self.layerNames = [layer['name'] for layer in layerList]
+        dups = set([x for x in self.layerNames if self.layerNames.count(x) > 1])
         if len(dups) > 0:
             raise Exception('Duplicate layer names: %s' % dups)
 
@@ -54,7 +54,7 @@ class StackedLayers(object):
             if ii != 0 and layer.isDataLayer:
                 raise Exception('Only the first layer can be a data layer, but layer %d is %s' % (ii, repr(layer)))
 
-            # Populate inputSize, outputSize, and seesPixels
+            # Populate inputSize, outputSize, seesPatches, and distToNeighbor
             if ii == 0:
                 # For data layer
                 layer.outputSize = layer.getOutputSize()
@@ -62,10 +62,16 @@ class StackedLayers(object):
                 prevLayer = self.layers[ii-1]
 
                 # only for non-data layers
-                layer.inputSize = prevLayer.outputSize
-                layer.outputSize = layer.calculateOutputSize(layer.inputSize)
-                prevLayerSees = prevLayer.outputSize if prevLayer.isDataLayer else prevLayer.seesPixels
-                layer.seesPixels = layer.calculateSeesPixels(prevLayerSees)
+                layer.inputSize    = prevLayer.outputSize
+                layer.outputSize   = layer.calculateOutputSize(layer.inputSize)
+                if prevLayer.isDataLayer:
+                    prevLayerSees      = (1,) * len(prevLayer.stride)
+                    prevDistToNeighbor = (1,) * len(prevLayer.stride)
+                else:
+                    prevLayerSees      = prevLayer.seesPatches
+                    prevDistToNeighbor = prevLayer.distToNeighbor
+                layer.seesPatches    = layer.calculateSeesPatches(prevLayerSees, prevDistToNeighbor)
+                layer.distToNeighbor = layer.calculateDistToNeighbor(prevDistToNeighbor)
 
             self.layers.append(layer)
 
@@ -87,7 +93,32 @@ class StackedLayers(object):
                 print 'trainable'
             else:
                 print 'not trainable'
+
+    def train(self, trainParam):
+        # check to make sure names match
+        for layerName in trainParam.keys():
+            if layerName not in self.layerNames:
+                raise Exception('unknown layer name in param file: %s' % layerName)
+
+        for ii, layer in enumerate(self.layers):
+            if layer.trainable:
+                print 'training layer %d - %s (%s)' % (ii, layer.name, layer.layerType)
+
+                layer.initialize()
+
+                data = 'HERE'
+                # Add method to each layer: forwardProp
+                # Add method to data layer: getData(size, number, seed)
+                # Figure out how many patches are needed to train a give layer (prod(sees) * number?)
+                # Get that many patches of data
+                # figure out how to feed the data through all the layers until the prevLayer
+
+                # finally, something like this:
+                #   data = prevLayer.forwardProp(otherData)
                 
+                layer.train(data)
+
+                # TODO: could checkpoint here...
 
 
 
@@ -120,7 +151,7 @@ def main(layerFilename, trainParamFilename):
 
     sl.printStatus()
 
-    #sl.train(trainParam)
+    sl.train(trainParam)
 
     pdb.set_trace()
 
