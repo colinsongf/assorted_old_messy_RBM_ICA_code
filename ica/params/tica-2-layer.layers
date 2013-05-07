@@ -73,6 +73,7 @@ ll.append({'name':         'ds2',
 ll.append({'name':         'lcn2',
            'type':         'lcn',
            'c':            .01,
+           'gaussWidth':   2.0,
            })
 
 

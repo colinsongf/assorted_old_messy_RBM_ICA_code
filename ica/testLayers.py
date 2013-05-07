@@ -94,11 +94,28 @@ class StackedLayers(object):
             else:
                 print 'not trainable'
 
-    def train(self, trainParam):
+    def forwardProp(self, data, layerIdx = None):
+        '''Push the given data through the layers 0, 1, ..., layerIdx.
+        If layerIdx, layerIdx = max
+        '''
+
+        if layerIdx is None: layerIdx = len(self.layers)-1
+
+        currentRep = data
+        for ii in range(1, layerIdx):
+            print 'TODO: if concatlayer, need to pass more info'
+            layer = self.layers[layerIdx]
+            print '  fp through layer %d - %s (%s)' % (ii, layer.name, layer.layerType)
+            currentRep = layer.forwardProp(currentRep)
+        return currentRep
+
+    def train(self, trainParams, quick = False):
         # check to make sure names match
-        for layerName in trainParam.keys():
+        for layerName in trainParams.keys():
             if layerName not in self.layerNames:
                 raise Exception('unknown layer name in param file: %s' % layerName)
+
+        dataLayer = self.layers[0]
 
         for ii, layer in enumerate(self.layers):
             if layer.trainable:
@@ -115,8 +132,28 @@ class StackedLayers(object):
 
                 # - finally, something like this:
                 #      data = prevLayer.forwardProp(otherData)
+
+                layerTrainParams = trainParams[layer.name]
+                numExamples = layerTrainParams['examples']
+                if quick:
+                    numExamples = 1000
+                    print 'QUICK MODE: chopping training examples to 1000!'
+
+                # make sure layer.sees, data.stride, and data.patchSize are all same len
+                assert len(layer.seesPatches) == len(dataLayer.patchSize)
+                assert len(layer.seesPatches) == len(dataLayer.stride)
+
+                # How many pixels this layer sees at once
+                seesPixels = tuple([ps + st * (sp-1) for sp,ps,st in zip(layer.seesPatches,dataLayer.patchSize, dataLayer.stride)])
                 
-                layer.train(data)
+                trainRawData = dataLayer.getData(seesPixels, numExamples, seed = 0)
+
+                # Push data through N-1 layers
+                trainPrevLayerData = self.forwardProp(trainRawData, ii-1)
+                
+                layer.train(trainPrevLayerData, layerTrainParams)
+
+                pdb.set_trace()
 
                 # TODO: could checkpoint here...
 
@@ -143,7 +180,9 @@ def importFromFile(filename, objectName):
 
 
 
-def main(layerFilename, trainParamFilename):
+def main(layerFilename, trainParamFilename, quick = False):
+    if quick:
+        print 'WARNING: running in --quick mode, chopping all training data to 1000 examples!!'
     layers = importFromFile(layerFilename, 'layers')
     trainParam = importFromFile(trainParamFilename, 'trainParam')
 
@@ -151,7 +190,7 @@ def main(layerFilename, trainParamFilename):
 
     sl.printStatus()
 
-    sl.train(trainParam)
+    sl.train(trainParam, quick = quick)
 
     pdb.set_trace()
 
@@ -163,11 +202,13 @@ if __name__ == '__main__':
                         help='file defining layers, something like tica-10-15.layers')
     parser.add_argument('trainParamFilename', type = str,
                         help='file defining training parameters, something like tica-10-15.trainparam')
+    parser.add_argument('--quick', action='store_true')
+
     args = parser.parse_args()
 
     #resman.start('junk')
     
-    main(args.layerFilename, args.trainParamFilename)
+    main(args.layerFilename, args.trainParamFilename, args.quick)
 
     #resman.stop()
     

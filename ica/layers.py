@@ -5,13 +5,17 @@ import imp
 import ipdb as pdb
 import argparse
 import types
+import time
 from numpy import *
 
 #from utils import loadFromFile
+from util.cache import cached, PersistentHasher
 #from squaresRbm import loadPickledData
 from GitResultsManager import resman
 #from util.plotting import plot3DShapeFromFlattened
 from util.dataPrep import PCAWhiteningDataNormalizer  #, printDataStats
+from makeData import makeUpsonRovio3
+from tica import TICA
 
 
 
@@ -114,13 +118,13 @@ class TrainableLayer(NonDataLayer):
         '''Default no-op version. Override in derived class.'''
         pass
 
-    def train(self, data):
+    def train(self, data, trainParams = None):
         if self.isTrained:
             raise Exception('Layer was already trained')
-        self._train(data)
+        self._train(data, trainParams)
         self.isTrained = True
 
-    def _train(self, data):
+    def _train(self, data, trainParams = None):
         '''Default no-op version. Override in derived class.'''
         pass
         
@@ -155,6 +159,9 @@ class DataLayer(Layer):
     def getOutputSize(self):
         raise Exception('must implement in derived class')
 
+    def getData(self):
+        raise Exception('must implement in derived class')
+
 
 
 class UpsonData3(DataLayer):
@@ -174,12 +181,13 @@ class UpsonData3(DataLayer):
             return (self.patchSize[0], self.patchSize[1], 3)
 
     def getData(self, patchSize, number, seed = None):
-        samples, labelMatrix, labelStrings = cached(randomSampleMatrixWithLabels, fileFilter,
+        samples, labelMatrix, labelStrings = cached(makeUpsonRovio3.randomSampleMatrixWithLabels,
+                                                    makeUpsonRovio3.trainFilter,
                                                     color = (self.colors == 3),
                                                     Nw = patchSize, Nsamples = number, seed = seed,
                                                     imgDirectory = '../data/upson_rovio_3/imgfiles')
 
-        return samples
+        return samples.T    # one example per column
 
 
 
@@ -200,7 +208,7 @@ class PCAWhiteningLayer(WhiteningLayer):
         super(PCAWhiteningLayer, self).__init__(params)
         self.pcaWhiteningDataNormalizer = None
 
-    def _train(self, data):
+    def _train(self, data, trainParams = None):
         self.pcaWhiteningDataNormalizer = PCAWhiteningDataNormalizer(data)
 
     def _forwardProp(self, data):
@@ -231,19 +239,19 @@ class TicaLayer(TrainableLayer):
     def _calculateOutputSize(self, inputSize):
         return self.hiddenSize
 
-    def _train(self, data, trainParam):
-        logDir = trainParam.get('logDir', None)
+    def _train(self, data, trainParams):
+        logDir = trainParams.get('logDir', None)
         # Learn model
-        tica = TICA(nInputs            = self.numInputs,
+        tica = TICA(nInputs            = prod(self.inputSize),
                     hiddenLayerShape   = self.hiddenSize,
                     neighborhoodParams = self.neighborhood,
                     lambd              = self.lambd,
                     epsilon            = self.epsilon)
 
-        beginTotalCost, beginPoolingCost, beginReconstructionCost, grad = tica.cost(tica.WW, nextLayerData)
+        beginTotalCost, beginPoolingCost, beginReconstructionCost, grad = tica.cost(tica.WW, data)
 
         tic = time.time()
-        tica.learn(data, maxFun = trainParam['maxFuncCalls'])
+        tica.learn(data, maxFun = trainParams['maxFuncCalls'])
         execTime = time.time() - tic
         if logDir:
             saveToFile(os.path.join(logDir, 'tica.pkl.gz'), tica)    # save learned model
@@ -389,4 +397,5 @@ class ConcatenationLayer(NonDataLayer):
 
     def _forwardProp(self, data):
         HERE    # ;)
+        # Need more info: current layer size in patches x patches (I think?)
 
