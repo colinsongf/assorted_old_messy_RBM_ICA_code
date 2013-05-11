@@ -8,16 +8,37 @@ import types
 import time
 from numpy import *
 
-#from utils import loadFromFile
 from util.cache import cached, PersistentHasher
-#from squaresRbm import loadPickledData
 from GitResultsManager import resman
-#from util.plotting import plot3DShapeFromFlattened
 from util.dataPrep import PCAWhiteningDataNormalizer  #, printDataStats
 from makeData import makeUpsonRovio3
-from tica import TICA
+from tica import TICA, neighborMatrix
 
 
+
+class DataArrangement(object):
+    '''Represents a particular arragement of data. Example: 1000 layers of 2 x
+    3 patches each, with each patch of unrolled length N, could be
+    represented as an N x 6000 matrix. In this case, we would use
+
+    DataArrangement((2,3), 1000)
+    '''
+    
+    def __init__(self, layerShape, nLayers):
+        self.layerShape = layerShape      # number of patches along i, j, ... e.g.: (2,3)
+        self.nLayers    = nLayers         # number of layers, e.g.: 1000
+
+    def __repr__(self):
+        return 'DataArrangement(layerShape = %s, nLayers = %s)' % (repr(self.layerShape), repr(self.nLayers))
+
+    def totalPatches(self):
+        return prod(self.layerShape) * self.nLayers
+
+
+
+######################
+# Base classes
+######################
 
 class Layer(object):
 
@@ -80,22 +101,49 @@ class NonDataLayer(Layer):
         tuple.'''
         return prevDistToNeighbor
 
-    def forwardProp(self, data):
-        '''data is one example per column'''
+    def forwardProp(self, data, dataArrangement):
+        '''
+        Input:
+        data - one example per column
+
+        dataArrangement - specifies how the data should be interpreted.
+        Many classes will not care about the arrangement
+        of the data, in which case they can ignore dataArrangement
+
+        Returns:
+        representation, newDataArrangement
+        '''
+        
         if self.trainable and not self.isInitialized:
             raise Exception('Must initialize %s layer first' % self.name)
         if self.trainable and not self.isTrained:
             print 'WARNING: forwardProp through untrained layer, might not be desired'
-        dimension, numExamples = data.shape
-        if dimension != prod(self.inputSize):
+        inDimension, numExamples = data.shape
+        if inDimension != prod(self.inputSize):
             raise Exception('Layer %s expects examples of shape %s = %s rows but got %s data matrix'
                             % (self.name, self.inputSize, prod(self.inputSize), data.shape))
-        return self._forwardProp(data)
+        self._checkDataArrangement(data, dataArrangement)
 
-    def _forwardProp(self, data):
+        representation, newDataArrangement = self._forwardProp(data, dataArrangement)
+
+        self._checkDataArrangement(representation, newDataArrangement)
+        if len(dataArrangement.layerShape) != len(newDataArrangement.layerShape):
+            raise Exception('Conversion from %s to %s is invalid'
+                            % (dataArrangement, newDataArrangement))
+        if representation.shape[0] != prod(self.outputSize):
+            raise Exception('Layer %s was supposed to output examples of shape %s = %s rows but got %s output matrix'
+                            % (self.name, self.outputSize, prod(self.outputSize), representation.shape))
+        return representation, newDataArrangement
+
+    def _forwardProp(self, data, dataArrangement):
         '''Default pass through version. Override in derived classes
         if desired.'''
-        return data
+        return data, dataArrangement
+
+    def _checkDataArrangement(self, data, dataArrangement):
+        if dataArrangement.totalPatches() != data.shape[1]:
+            raise Exception('dataArrangement mismatched with data (data.shape is %s, dataArrangement is %s, %d != %d'
+                            % (data.shape, dataArrangement, data.shape[1], dataArrangement.totalPatches()))
 
 
 
@@ -118,13 +166,14 @@ class TrainableLayer(NonDataLayer):
         '''Default no-op version. Override in derived class.'''
         pass
 
-    def train(self, data, trainParams = None):
+    def train(self, data, dataArrangement, trainParams = None):
         if self.isTrained:
             raise Exception('Layer was already trained')
-        self._train(data, trainParams)
+        self._checkDataArrangement(data, dataArrangement)
+        self._train(data, dataArrangement, trainParams)
         self.isTrained = True
 
-    def _train(self, data, trainParams = None):
+    def _train(self, data, dataArrangement, trainParams = None):
         '''Default no-op version. Override in derived class.'''
         pass
         
@@ -208,12 +257,12 @@ class PCAWhiteningLayer(WhiteningLayer):
         super(PCAWhiteningLayer, self).__init__(params)
         self.pcaWhiteningDataNormalizer = None
 
-    def _train(self, data, trainParams = None):
+    def _train(self, data, dataArrangement, trainParams = None):
         self.pcaWhiteningDataNormalizer = PCAWhiteningDataNormalizer(data)
 
-    def _forwardProp(self, data):
-        dataWhite, junk = whiteningStage.raw2normalized(data, unitNorm = True)
-        return dataWhite
+    def _forwardProp(self, data, dataArrangement):
+        dataWhite, junk = self.pcaWhiteningDataNormalizer.raw2normalized(data, unitNorm = True)
+        return dataWhite, dataArrangement
 
 
 
@@ -239,7 +288,7 @@ class TicaLayer(TrainableLayer):
     def _calculateOutputSize(self, inputSize):
         return self.hiddenSize
 
-    def _train(self, data, trainParams):
+    def _train(self, data, dataArrangement, trainParams):
         logDir = trainParams.get('logDir', None)
         # Learn model
         tica = TICA(nInputs            = prod(self.inputSize),
@@ -269,9 +318,9 @@ class TicaLayer(TrainableLayer):
         self.tica = tica
 
 
-    def _forwardProp(self, data):
-        hidden, absPooledActivations = self.tica(data)
-        return absPooledActivations
+    def _forwardProp(self, data, dataArrangement):
+        hidden, absPooledActivations = self.tica.getRepresentation(data)
+        return absPooledActivations, dataArrangement
 
 
 
@@ -304,18 +353,18 @@ class DownsampleLayer(NonDataLayer):
             else: # length 2
                 return (inputSize[0]/self.factor[0], inputSize[1]/self.factor[1])
 
-    def _forwardProp(self, data):
+    def _forwardProp(self, data, dataArrangement):
         dimension, numExamples = data.shape
 
-        patches = reshape(data, self.inputShape + (numExamples,))
+        patches = reshape(data, self.inputSize + (numExamples,))
         # len(self.factor) is either 1 or 2
         if len(self.factor) == 1:
             downsampled = patches[::self.factor[0],:]
         else:
             downsampled = patches[::self.factor[0],::self.factor[1],:]
             
-        output = reshape(downsampled, (prod(self.outputShape), numExamples))
-        return output
+        output = reshape(downsampled, (prod(self.outputSize), numExamples))
+        return output, dataArrangement
 
 
 
@@ -332,7 +381,7 @@ class LcnLayer(NonDataLayer):
         super(LcnLayer, self).__init__(params)
         self.gaussWidth = params['gaussWidth']
 
-    def _forwardProp(self, data):
+    def _forwardProp(self, data, dataArrangement):
         dimension, numExamples = data.shape
 
         gaussNeighbors = neighborMatrix(self.inputSize, self.gaussWidth, gaussian=True)
@@ -343,7 +392,7 @@ class LcnLayer(NonDataLayer):
         cc = .01     # ss = sorted(sig.flatten()); ss[len(ss)/10] = 0.026 in one test. So .01 seems about right.
         yy = vv / maximum(cc, sig)
 
-        return yy
+        return yy, dataArrangement
 
 
 
@@ -395,7 +444,50 @@ class ConcatenationLayer(NonDataLayer):
         else:
             raise Exception('logic error')
 
-    def _forwardProp(self, data):
-        HERE    # ;)
-        # Need more info: current layer size in patches x patches (I think?)
+    def _forwardProp(self, data, dataArrangement):
+        '''This is where the concatenation actually takes place.'''
 
+        newLayerShape = tuple([1+(layerShape - concat) / stride for layerShape,concat,stride
+                               in zip(dataArrangement.layerShape, self.concat, self.stride)])
+        remainders    = tuple([(layerShape - concat) % stride for layerShape,concat,stride
+                               in zip(dataArrangement.layerShape, self.concat, self.stride)])
+        tooSmall = sum([nls < 1 for nls in newLayerShape])  # must be at least 1 in every dimension
+        if tooSmall or any(remainders):
+            raise Exception('%s cannot be evenly concatenated by concat %s and stride %s'
+                            % (dataArrangement, self.concat, self.stride))
+
+        reshapedData = reshape(data, (data.shape[0], dataArrangement.nLayers,) + dataArrangement.layerShape)
+
+        newDataArrangement = DataArrangement(newLayerShape, dataArrangement.nLayers)
+
+        # BEGIN: 2D data assumption
+        # Note: this only works for 2D data! Add other cases if needed.
+
+        assert len(self.concat) == 2, 'Only works for 2D data for now!'
+        assert len(dataArrangement.layerShape) == 2, 'Only works for 2D data for now!'
+
+        concatenatedData = zeros((prod(self.outputSize),
+                                  prod(newLayerShape) * dataArrangement.nLayers))
+        
+        oldPatchLength = prod(self.inputSize)
+        newPatchCounter = 0
+        # Note: this code assumes the default numpy flattening order:
+        # C-order, or row-major order.
+        for layerIdx in xrange(dataArrangement.nLayers):
+            for newPatchII in xrange(newLayerShape[0]):
+                for newPatchJJ in xrange(newLayerShape[1]):
+                    oldPatchStartII = newPatchII * self.stride[0]
+                    oldPatchStartJJ = newPatchJJ * self.stride[1]
+                    curLoc = 0
+                    for oldPatchII in xrange(oldPatchStartII, oldPatchStartII + self.concat[0]):
+                        for oldPatchJJ in xrange(oldPatchStartJJ, oldPatchStartJJ + self.concat[1]):
+                            concatenatedData[curLoc:(curLoc+oldPatchLength),newPatchCounter] = \
+                              reshapedData[:,layerIdx,oldPatchII,oldPatchJJ]
+                            curLoc += oldPatchLength
+                    newPatchCounter += 1
+        # sanity check
+        assert newPatchCounter == concatenatedData.shape[1]
+        assert curLoc == prod(self.outputSize)
+        # END: 2D data assumption
+
+        return concatenatedData, newDataArrangement

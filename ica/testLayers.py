@@ -2,15 +2,17 @@
 
 import sys
 import imp
-import ipdb as pdb
+#import ipdb as pdb
+import pdb
 import argparse
+from numpy import zeros, prod, reshape
 
 #from utils import loadFromFile
 #from squaresRbm import loadPickledData
 from GitResultsManager import resman
 #from util.plotting import plot3DShapeFromFlattened
 from util.dataPrep import PCAWhiteningDataNormalizer  #, printDataStats
-from layers import Layer, DataLayer, UpsonData3, WhiteningLayer, PCAWhiteningLayer, TicaLayer, DownsampleLayer, LcnLayer, ConcatenationLayer
+from layers import DataArrangement, Layer, DataLayer, UpsonData3, WhiteningLayer, PCAWhiteningLayer, TicaLayer, DownsampleLayer, LcnLayer, ConcatenationLayer
 
 
 
@@ -90,24 +92,29 @@ class StackedLayers(object):
                 st = 'maps size %s -> %s' % (repr(layer.inputSize), repr(layer.outputSize)),
             print '%-32s' % st,
             if layer.trainable:
-                print 'trainable'
+                print 'trained' if layer.isTrained else 'not trained'
             else:
-                print 'not trainable'
+                print '--'
 
-    def forwardProp(self, data, layerIdx = None):
+    def forwardProp(self, data, dataArrangement, layerIdx = None):
         '''Push the given data through the layers 0, 1, ..., layerIdx.
-        If layerIdx, layerIdx = max
+        If layerIdx is None, set layerIdx = max
         '''
 
         if layerIdx is None: layerIdx = len(self.layers)-1
 
+        print 'forwardProp from layer 1 through %d' % (layerIdx)
         currentRep = data
-        for ii in range(1, layerIdx):
-            print 'TODO: if concatlayer, need to pass more info'
-            layer = self.layers[layerIdx]
+        currentArrangement = dataArrangement
+        for ii in range(1, layerIdx+1):
+            layer = self.layers[ii]
             print '  fp through layer %d - %s (%s)' % (ii, layer.name, layer.layerType)
-            currentRep = layer.forwardProp(currentRep)
-        return currentRep
+            newRep, newArrangement = layer.forwardProp(currentRep, currentArrangement)
+            print ('    layer transformed data from\n      %s, %s ->\n      %s, %s'
+                   % (currentRep.shape, currentArrangement, newRep.shape, newArrangement))
+            currentRep = newRep
+            currentArrangement = newArrangement
+        return currentRep, currentArrangement
 
     def train(self, trainParams, quick = False):
         # check to make sure names match
@@ -117,13 +124,14 @@ class StackedLayers(object):
 
         dataLayer = self.layers[0]
 
-        for ii, layer in enumerate(self.layers):
+        for layerIdx, layer in enumerate(self.layers):
             if layer.trainable:
-                print 'training layer %d - %s (%s)' % (ii, layer.name, layer.layerType)
+                print '\n' + '*' * 40
+                print 'training layer %d - %s (%s)' % (layerIdx, layer.name, layer.layerType)
+                print '*' * 40 + '\n'
 
                 layer.initialize()
 
-                data = 'HERE'
                 # ~ Add method to each layer: forwardProp
                 # + Add method to data layer: getData(size, number, seed)
                 # - Figure out how many patches are needed to train a give layer (prod(sees) * number?)
@@ -144,16 +152,40 @@ class StackedLayers(object):
                 assert len(layer.seesPatches) == len(dataLayer.stride)
 
                 # How many pixels this layer sees at once
-                seesPixels = tuple([ps + st * (sp-1) for sp,ps,st in zip(layer.seesPatches,dataLayer.patchSize, dataLayer.stride)])
+                seesPixels = tuple([ps + st * (sp-1) for sp,ps,st in
+                                    zip(layer.seesPatches,dataLayer.patchSize, dataLayer.stride)])
                 
-                trainRawData = dataLayer.getData(seesPixels, numExamples, seed = 0)
+                trainRawDataLargePatches = dataLayer.getData(seesPixels, numExamples, seed = 0)
+
+                # Reshape into patches
+                trainRawDataPatches = zeros((prod(dataLayer.patchSize), prod(layer.seesPatches)*numExamples))
+                dataArrangementLayer0 = DataArrangement(layerShape = layer.seesPatches, nLayers = numExamples)
+                # BEGIN: 2D data assumption
+                # Note: this only works for 2D data! Add other cases if needed.
+                assert len(layer.seesPatches) == 2, 'Only works for 2D data for now!'
+                counter = 0
+                sp0,sp1 = layer.seesPatches
+                ps0,ps1 = dataLayer.patchSize
+                st0,st1 = dataLayer.stride
+                for largePatchIdx in xrange(trainRawDataLargePatches.shape[1]):
+                    thisLargePatch = reshape(trainRawDataLargePatches[:,largePatchIdx], seesPixels)
+                    # Note: this code flattens in the default numpy
+                    # flattening order: C-order, or row-major order.
+                    for ii in xrange(sp0):
+                        for jj in xrange(sp1):
+                            trainRawDataPatches[:,counter] = thisLargePatch[(ii*st0):(ii*st0+ps0),(jj*st1):(jj*st1+ps1)].flatten()
+                            counter += 1
+                # just check last patch 
+                assert trainRawDataPatches.shape[0] == len(thisLargePatch[(ii*st0):(ii*st0+ps0),(jj*st1):(jj*st1+ps1)].flatten())
+                assert trainRawDataPatches.shape[1] == counter
+                # END: 2D data assumption
 
                 # Push data through N-1 layers
-                trainPrevLayerData = self.forwardProp(trainRawData, ii-1)
+                trainPrevLayerData, dataArrangementPrevLayer = self.forwardProp(trainRawDataPatches, dataArrangementLayer0, layerIdx-1)
                 
-                layer.train(trainPrevLayerData, layerTrainParams)
+                layer.train(trainPrevLayerData, dataArrangementPrevLayer, layerTrainParams)
 
-                pdb.set_trace()
+                print 'training done for layer %d - %s (%s)' % (layerIdx, layer.name, layer.layerType)
 
                 # TODO: could checkpoint here...
 
