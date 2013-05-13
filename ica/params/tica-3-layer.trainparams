@@ -1,0 +1,24 @@
+#! /usr/bin/env python
+#
+# This is a training parameters file. It must define one object: trainParams
+
+tp = {}
+
+tp['whitener'] = {'examples': 100000}
+
+tp['tica1'] = {'examples': 100000,
+               'method': 'lbfgs',
+               'maxFuncCalls': 300,
+               }
+
+tp['tica2'] = {'examples': 100000,
+               'method': 'lbfgs',
+               'maxFuncCalls': 300,
+               }
+
+tp['tica3'] = {'examples': 100000,
+               'method': 'lbfgs',
+               'maxFuncCalls': 300,
+               }
+
+trainParams = tp

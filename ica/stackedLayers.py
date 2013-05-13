@@ -70,7 +70,7 @@ class StackedLayers(object):
 
     def printStatus(self):
         for ii, layer in reversed(list(enumerate(self.layers))):
-            print 'layer %d: %-20s' % (ii, '%s (%s)' % (layer.name, layer.layerType)),
+            print 'layer %2d: %-20s' % (ii, '%s (%s)' % (layer.name, layer.layerType)),
             if ii == 0:
                 st = 'outputs size %s' % repr(layer.outputSize),
             else:
@@ -102,10 +102,15 @@ class StackedLayers(object):
         return currentRep, currentArrangement
 
     def train(self, trainParams, saveDir = None, quick = False):
-        # check to make sure names match
+        # check to make sure each trainParam matches a known layer...
         for layerName in trainParams.keys():
             if layerName not in self.layerNames:
                 raise Exception('unknown layer name in param file: %s' % layerName)
+        # ...and each trainable but untrained layer has a trainParam present
+        for layerIdx, layer in enumerate(self.layers):
+            if layer.trainable and not layer.isTrained:
+                if not layer.name in trainParams:
+                    raise Exception('Param file missing training params for layer: %s' % layer.name)
 
         dataLayer = self.layers[0]
 
