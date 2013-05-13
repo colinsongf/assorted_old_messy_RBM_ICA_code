@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 #
-# This is a parameter file
+# This is a training parameters file. It must define one object: trainParams
 
 tp = {}
 
@@ -16,4 +16,4 @@ tp['tica2'] = {'examples': 50000,
                'maxFuncCalls': 3,
                }
 
-trainParam = tp
+trainParams = tp

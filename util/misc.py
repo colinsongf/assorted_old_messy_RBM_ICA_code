@@ -18,6 +18,58 @@ def mkdir_p(path):
 
 
 
+def dictPrettyPrint(dd, prefix = '', width = 20):
+    '''Prints a dict in key:   val format, one per line.'''
+    for key in sorted(dd.keys()):
+        keystr = '%s:' % (key if isinstance(key,basestring) else repr(key))
+        valstr = '%s' % repr(dd[key])
+        formatstr = '%%-%ds %%s' % width
+        print prefix + (formatstr % (keystr, valstr))
+
+
+
+def importFromFile(filename, objectName):
+    try:
+        with open(filename, 'r') as ff:
+            fileText = ff.read()
+    except IOError:
+        print 'Could not open file "%s". Are you sure it exists?' % filename
+        raise
+
+    try:
+        exec(compile(fileText, 'contents of file: %s' % filename, 'exec'))
+    except:
+        print 'Tried to execute file "%s" but got this error:' % filename
+        raise
+        
+    if not objectName in locals():
+        raise Exception('file "%s" did not define the %s variable' % (layerFilename, objectName))
+
+    return locals()[objectName]
+
+
+
+def relhack():
+    '''Utter Hack to reload local modules (modules with relative filenames and
+    paths in home directory).
+    '''
+    import sys
+    from os.path import expanduser
+    homedir = expanduser("~")
+    toReload = set()
+    for name,mod in sys.modules.iteritems():
+        if mod is not None:
+            filename = getattr(mod, '__file__', None)
+            if filename:
+                if (filename[0] != '/' or homedir in filename) and not '__' in mod.__name__:
+                    toReload.add(mod)
+                    #print 'Adding:', mod.__name__, '   ', filename
+    for mod in toReload:
+        print 'Reloading: %s' % repr(mod)
+        reload(mod)
+
+
+
 class Stopwatch(object):
     def __init__(self):
         self._start = time.time()

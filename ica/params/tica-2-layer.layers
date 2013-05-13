@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 #
-# This is a parameter file
+# This is a layers parameter file. It must define one object: layers.
 
 ll = []
 

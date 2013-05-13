@@ -88,8 +88,8 @@ class PCAWhiteningDataNormalizer(object):
 
 
 
-def printDataStats(data):
-    print 'Current data: %d data points of dimension %d.' % (data.shape[1], data.shape[0]),
+def printDataStats(data, prefix = ''):
+    print prefix + ('Current data: %d data points of dimension %d.' % (data.shape[1], data.shape[0])),
     print 'Min %f, Mean %f, Max %f' % (data.min(), data.mean(), data.max())
 
 

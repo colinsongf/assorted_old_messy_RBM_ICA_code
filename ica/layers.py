@@ -10,7 +10,7 @@ from numpy import *
 
 from util.cache import cached, PersistentHasher
 from GitResultsManager import resman
-from util.dataPrep import PCAWhiteningDataNormalizer  #, printDataStats
+from util.dataPrep import PCAWhiteningDataNormalizer
 from makeData import makeUpsonRovio3
 from tica import TICA, neighborMatrix
 
@@ -37,7 +37,7 @@ class DataArrangement(object):
 
 
 ######################
-# Base classes
+# Base Layer classes
 ######################
 
 class Layer(object):
@@ -491,3 +491,13 @@ class ConcatenationLayer(NonDataLayer):
         # END: 2D data assumption
 
         return concatenatedData, newDataArrangement
+
+
+
+layerClassNames = {'data':       'dataClass',       # load the class specified by DataClass
+                   'whitener':   'whitenerClass',   # load the class specified by whitenerClass 
+                   'tica':       TicaLayer,
+                   'downsample': DownsampleLayer,
+                   'lcn':        LcnLayer,
+                   'concat':     ConcatenationLayer,
+                   }
