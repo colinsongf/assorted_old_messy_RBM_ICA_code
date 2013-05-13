@@ -7,6 +7,8 @@ from numpy import *
 import cPickle as pickle
 
 from rbm.utils import DuckStruct
+from util.dataLoaders import saveToFile
+
 
 
 def getFilesIn(dir):
@@ -66,14 +68,6 @@ def randomSampleMatrix(path, filterNames, Nw = 10, Nsamples = 10, color = False)
     imageMatrix /= 255   # normalize to 0-1 range
     random.shuffle(imageMatrix)
     return imageMatrix
-
-
-
-def saveToFile(filename, obj):
-    ff = gzip.open(filename, 'wb')
-    pickle.dump(obj, ff, protocol = -1)
-    print 'saved to', filename
-    ff.close()
 
 
 

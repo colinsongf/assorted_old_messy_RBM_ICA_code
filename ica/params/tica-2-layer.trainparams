@@ -8,12 +8,12 @@ tp['whitener'] = {'examples': 50000}
 
 tp['tica1'] = {'examples': 50000,
                'method': 'lbfgs',
-               'maxFuncCalls': 3,
+               'maxFuncCalls': 300,
                }
 
 tp['tica2'] = {'examples': 50000,
                'method': 'lbfgs',
-               'maxFuncCalls': 3,
+               'maxFuncCalls': 300,
                }
 
 trainParams = tp

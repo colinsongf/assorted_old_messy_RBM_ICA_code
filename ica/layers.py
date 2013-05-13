@@ -166,14 +166,14 @@ class TrainableLayer(NonDataLayer):
         '''Default no-op version. Override in derived class.'''
         pass
 
-    def train(self, data, dataArrangement, trainParams = None):
+    def train(self, data, dataArrangement, trainParams = None, quick = False):
         if self.isTrained:
             raise Exception('Layer was already trained')
         self._checkDataArrangement(data, dataArrangement)
-        self._train(data, dataArrangement, trainParams)
+        self._train(data, dataArrangement, trainParams, quick)
         self.isTrained = True
 
-    def _train(self, data, dataArrangement, trainParams = None):
+    def _train(self, data, dataArrangement, trainParams = None, quick = False):
         '''Default no-op version. Override in derived class.'''
         pass
         
@@ -257,7 +257,7 @@ class PCAWhiteningLayer(WhiteningLayer):
         super(PCAWhiteningLayer, self).__init__(params)
         self.pcaWhiteningDataNormalizer = None
 
-    def _train(self, data, dataArrangement, trainParams = None):
+    def _train(self, data, dataArrangement, trainParams = None, quick = False):
         self.pcaWhiteningDataNormalizer = PCAWhiteningDataNormalizer(data)
 
     def _forwardProp(self, data, dataArrangement):
@@ -288,7 +288,12 @@ class TicaLayer(TrainableLayer):
     def _calculateOutputSize(self, inputSize):
         return self.hiddenSize
 
-    def _train(self, data, dataArrangement, trainParams):
+    def _train(self, data, dataArrangement, trainParams, quick = False):
+        maxFuncCalls = trainParams['maxFuncCalls']
+        if quick:
+            print 'QUICK MODE: chopping maxFuncCalls from %d to 1!' % maxFuncCalls
+            maxFuncCalls = 1
+            
         logDir = trainParams.get('logDir', None)
         # Learn model
         tica = TICA(nInputs            = prod(self.inputSize),
@@ -300,7 +305,7 @@ class TicaLayer(TrainableLayer):
         beginTotalCost, beginPoolingCost, beginReconstructionCost, grad = tica.cost(tica.WW, data)
 
         tic = time.time()
-        tica.learn(data, maxFun = trainParams['maxFuncCalls'])
+        tica.learn(data, maxFun = maxFuncCalls)
         execTime = time.time() - tic
         if logDir:
             saveToFile(os.path.join(logDir, 'tica.pkl.gz'), tica)    # save learned model

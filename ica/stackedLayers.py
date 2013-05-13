@@ -1,18 +1,11 @@
 #! /usr/bin/env python
 
-#import sys
-#import imp
-##import ipdb as pdb
 import pdb
-#import argparse
+import os
 from numpy import zeros, prod, reshape
-#
-##from utils import loadFromFile
-##from squaresRbm import loadPickledData
-#from GitResultsManager import resman
-##from util.plotting import plot3DShapeFromFlattened
+
+from util.dataLoaders import loadFromPklGz, saveToFile
 from util.misc import dictPrettyPrint, relhack
-#from util.dataPrep import PCAWhiteningDataNormalizer  #, printDataStats
 from layers import layerClassNames, DataArrangement, Layer, DataLayer, UpsonData3, WhiteningLayer, PCAWhiteningLayer, TicaLayer, DownsampleLayer, LcnLayer, ConcatenationLayer
 
 
@@ -108,7 +101,7 @@ class StackedLayers(object):
             currentArrangement = newArrangement
         return currentRep, currentArrangement
 
-    def train(self, trainParams, quick = False):
+    def train(self, trainParams, saveDir = None, quick = False):
         # check to make sure names match
         for layerName in trainParams.keys():
             if layerName not in self.layerNames:
@@ -116,8 +109,10 @@ class StackedLayers(object):
 
         dataLayer = self.layers[0]
 
+        trainedSomething = False
         for layerIdx, layer in enumerate(self.layers):
-            if layer.trainable:
+            if layer.trainable and not layer.isTrained:
+                trainedSomething = True
                 print '\n' + '*' * 40
                 print 'training layer %d - %s (%s)' % (layerIdx, layer.name, layer.layerType)
                 print '*' * 40 + '\n'
@@ -175,8 +170,19 @@ class StackedLayers(object):
                 # Push data through N-1 layers
                 trainPrevLayerData, dataArrangementPrevLayer = self.forwardProp(trainRawDataPatches, dataArrangementLayer0, layerIdx-1)
                 
-                layer.train(trainPrevLayerData, dataArrangementPrevLayer, layerTrainParams)
+                layer.train(trainPrevLayerData, dataArrangementPrevLayer, layerTrainParams, quick = quick)
 
                 print 'training done for layer %d - %s (%s)' % (layerIdx, layer.name, layer.layerType)
 
-                # TODO: could checkpoint here...
+                if saveDir:
+                    fileFinal = os.path.join(saveDir, 'stackedLayers.pkl.gz')
+                    fileTmp = fileFinal + '.tmp'
+                    print 'Saving checkpoint...'
+                    saveToFile(fileTmp, self)
+                    os.rename(fileTmp, fileFinal)
+                    print 'Saving these StackedLayers...'
+                    self.printStatus()
+                    print '... to %s' % fileFinal
+
+        if not trainedSomething:
+            print '\nNothing to train. Maybe it was already finished?'
