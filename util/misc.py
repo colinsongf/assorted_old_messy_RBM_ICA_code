@@ -70,6 +70,15 @@ def relhack():
 
 
 
+def getFilesIn(dir):
+    fileList = []
+    for dd,junk,files in os.walk(dir, followlinks=True):
+        for file in files:
+            fileList.append(os.path.join(dd, file))
+    return fileList
+
+
+
 class Stopwatch(object):
     def __init__(self):
         self._start = time.time()

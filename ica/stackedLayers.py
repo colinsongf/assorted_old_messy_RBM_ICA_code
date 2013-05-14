@@ -8,7 +8,7 @@ from numpy import zeros, prod, reshape
 from util.dataLoaders import loadFromPklGz, saveToFile
 from util.misc import dictPrettyPrint, relhack
 from layers import layerClassNames, DataArrangement, Layer, DataLayer, UpsonData3, WhiteningLayer, PCAWhiteningLayer, TicaLayer, DownsampleLayer, LcnLayer, ConcatenationLayer
-
+from visualize import plotImageData, plotTopActivations
 
 
 
@@ -147,8 +147,7 @@ class StackedLayers(object):
                 assert len(layer.seesPatches) == len(dataLayer.stride)
 
                 # How many pixels this layer sees at once
-                seesPixels = tuple([ps + st * (sp-1) for sp,ps,st in
-                                    zip(layer.seesPatches,dataLayer.patchSize, dataLayer.stride)])
+                seesPixels = self._seesPixels(layer, dataLayer)
                 
                 trainRawDataLargePatches = dataLayer.getData(seesPixels, numExamples, seed = 0)
 
@@ -194,3 +193,29 @@ class StackedLayers(object):
 
         if not trainedSomething:
             print '\nNothing to train. Maybe it was already finished?'
+
+    def _seesPixels(self, layer, dataLayer):
+        seesPixels = tuple([ps + st * (sp-1) for sp,ps,st in zip(layer.seesPatches,dataLayer.patchSize, dataLayer.stride)])
+        return seesPixels
+
+    def vis(self, saveDir = None):
+        dataLayer = self.layers[0]
+        for ii,layer in enumerate(self.layers):
+            if ii == 0:
+                continue
+
+            numExamples = 10000
+            prefix = 'layer_%02d_%s' % (ii, layer.name)
+            seesPixels = self._seesPixels(layer, dataLayer)
+            rawdata = dataLayer.getData(seesPixels, numExamples, 0)
+
+            # 0. Inputs
+            plotImageData(rawdata, seesPixels, saveDir, prefix = prefix + '_0_input', tileShape = (10,10))
+
+            # 1. Top activations
+            dataArrangementLayer0 = DataArrangement(layerShape = layer.seesPatches, nLayers = numExamples)
+            activations, dataArrangementPrevLayer = self.forwardProp(rawdata, dataArrangementLayer0, ii)
+            plotTopActivations(activations, rawdata, dataLayer.patchSize, saveDir = saveDir,
+                               nActivations = 20, nSamples = 20, prefix = prefix + '_1_topact')
+            
+            #pdb.set_trace()

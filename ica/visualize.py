@@ -22,24 +22,24 @@ from util.cache import cached
 
 
 
-def plotImageData(data, imgShape, saveDir = None, prefix = 'imgdata'):
+def plotImageData(data, imgShape, saveDir = None, prefix = 'imgdata', tileShape = (20,30)):
     isColor = (len(imgShape) > 2)
     if saveDir:
         image = Image.fromarray(tile_raster_images(
             X = data.T, img_shape = imgShape,
-            tile_shape = (20, 30), tile_spacing=(1,1),
+            tile_shape = tileShape, tile_spacing=(1,1),
             scale_rows_to_unit_interval = False))
         image.save(os.path.join(saveDir, '%s.png' % prefix))
         image = Image.fromarray(tile_raster_images(
             X = data.T, img_shape = imgShape,
-            tile_shape = (20, 30), tile_spacing=(1,1),
+            tile_shape = tileShape, tile_spacing=(1,1),
             scale_rows_to_unit_interval = True,
             scale_colors_together = True))
         image.save(os.path.join(saveDir, '%s_rescale.png' % prefix))
         if isColor:
             image = Image.fromarray(tile_raster_images(
                 X = data.T, img_shape = imgShape,
-                tile_shape = (20, 30), tile_spacing=(1,1),
+                tile_shape = tileShape, tile_spacing=(1,1),
                 scale_rows_to_unit_interval = True,
                 scale_colors_together = False))
             image.save(os.path.join(saveDir, '%s_rescale_indiv.png' % prefix))
