@@ -170,7 +170,10 @@ class TrainableLayer(NonDataLayer):
         if self.isTrained:
             raise Exception('Layer was already trained')
         self._checkDataArrangement(data, dataArrangement)
+        ticw = time.time()
+        ticc = time.clock()
         self._train(data, dataArrangement, trainParams, quick)
+        print 'Layer took %.3fs wall time to train (%.3fs cpu time)' % (time.time() - ticw, time.clock()-ticc)
         self.isTrained = True
 
     def _train(self, data, dataArrangement, trainParams = None, quick = False):

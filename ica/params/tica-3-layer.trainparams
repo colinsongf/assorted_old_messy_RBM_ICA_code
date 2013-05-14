@@ -4,7 +4,7 @@
 
 tp = {}
 
-tp['whitener'] = {'examples': 100000}
+tp['whitener'] = {'examples': 500000}
 
 tp['tica1'] = {'examples': 100000,
                'method': 'lbfgs',

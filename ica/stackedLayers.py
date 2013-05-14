@@ -2,6 +2,7 @@
 
 import pdb
 import os
+import gc
 from numpy import zeros, prod, reshape
 
 from util.dataLoaders import loadFromPklGz, saveToFile
@@ -132,6 +133,8 @@ class StackedLayers(object):
 
                 # - finally, something like this:
                 #      data = prevLayer.forwardProp(otherData)
+                
+                print 'gc.collect found', gc.collect(), 'objects'
 
                 layerTrainParams = trainParams[layer.name]
                 numExamples = layerTrainParams['examples']
