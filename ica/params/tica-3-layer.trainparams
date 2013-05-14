@@ -11,12 +11,12 @@ tp['tica1'] = {'examples': 100000,
                'maxFuncCalls': 300,
                }
 
-tp['tica2'] = {'examples': 100000,
+tp['tica2'] = {'examples': 50000,
                'method': 'lbfgs',
                'maxFuncCalls': 300,
                }
 
-tp['tica3'] = {'examples': 100000,
+tp['tica3'] = {'examples': 50000,
                'method': 'lbfgs',
                'maxFuncCalls': 300,
                }
