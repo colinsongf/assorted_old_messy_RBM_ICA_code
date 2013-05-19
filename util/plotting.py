@@ -11,6 +11,7 @@ https://github.com/lisa-lab/DeepLearningTutorials/blob/master/code/utils.py
 
 import ipdb as pdb
 import numpy
+from matplotlib import cm
 from numpy import mgrid, array, ones, zeros, linspace, random, reshape
 from PIL import Image
 
@@ -271,13 +272,27 @@ def tile_raster_images(X, img_shape, tile_shape, tile_spacing = (0,0),
 
 
 
-def pil_imagesc(arr, epsilon = 1e-8, saveto = None):
+def pil_imagesc(arr, epsilon = 1e-8, saveto = None, cmap = None):
     '''Like imagesc for Octave/Matlab, but using PIL.'''
 
-    imarray = numpy.array(arr, dtype = numpy.float32)
+    imarray = numpy.array(arr, dtype = numpy.float32, copy=True)
     imarray -= imarray.min()
     imarray /= (imarray.max() + epsilon)
-    image = Image.fromarray(imarray * 255).convert('L')
+    if len(arr.shape) > 2:
+        # color image given
+        arr = array(imarray * 255, dtype='uint8')
+        image = Image.fromarray(arr)
+    else:
+        # grayscale image given
+        if cmap:
+            thecmap = cm.get_cmap(cmap)
+            imarray = thecmap(imarray)[:,:,:3]  # chop off alpha channel
+            imarray = array(imarray * 255, dtype='uint8')
+            image = Image.fromarray(imarray)
+        else:
+            image = Image.fromarray(imarray * 255).convert('L')
+
     if saveto:
         image.save(saveto)
+    return image
 

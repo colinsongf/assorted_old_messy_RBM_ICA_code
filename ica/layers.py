@@ -6,6 +6,7 @@ import ipdb as pdb
 import argparse
 import types
 import time
+import h5py
 from numpy import *
 
 from util.cache import cached, PersistentHasher
@@ -240,6 +241,110 @@ class UpsonData3(DataLayer):
                                                     imgDirectory = '../data/upson_rovio_3/imgfiles')
 
         return samples.T    # one example per column
+
+
+
+class NYU2_Labeled(DataLayer):
+
+    def __init__(self, params):
+        '''
+        Loads this dataset: http://cs.nyu.edu/~silberman/datasets/nyu_depth_v2.html
+        '''
+        super(NYU2_Labeled, self).__init__(params)
+
+        assert self.imageSize == (480,640)
+
+        self.colors = params['colors']
+        assert self.colors in (1,3,4)
+
+        self._loaded = False
+        self._rgb2L = array([.299, .587, .114])  # same as PIL
+
+    def getOutputSize(self):
+        if self.colors == 1:
+            return self.patchSize
+        else:
+            return (self.patchSize[0], self.patchSize[1], self.colors)
+
+    def _ensureLoaded(self):
+        if not self._loaded:
+            filename = '../data/nyu_local/nyu_depth_v2_labeled.mat'
+            print 'loading', filename, '(could take a while)'
+            ff = h5py.File(filename, 'r')
+            self._depths = array(ff['depths'])
+            self._images = array(ff['images'])
+            self._labels = array(ff['labels'])
+            referencedObjects = ff['#refs#']
+            self._names = []
+            for ref in ff['names'][0]:
+                name = ''.join([str(unichr(x)) for x in referencedObjects[ref]])
+                self._names.append(name)
+            self._scenes = []
+            for ref in ff['scenes'][0]:
+                name = ''.join([str(unichr(x)) for x in referencedObjects[ref]])
+                self._scenes.append(name)
+            self._sceneTypes = []
+            for ref in ff['sceneTypes'][0]:
+                name = ''.join([str(unichr(x)) for x in referencedObjects[ref]])
+                self._sceneTypes.append(name)
+            self._loaded = True
+            print 'done.'
+
+    def getData(self, patchSize, number, seed = None):
+        patches, labels = self.getDataAndLabels(patchSize, number, seed = seed)
+        return patches
+
+    def getDataAndLabels(self, patchSize, number, seed = None):
+        '''Loads everything into memory first.'''
+
+        self._ensureLoaded()
+        rng = random.RandomState(seed)      # if seed is None, this takes its seed from timer
+
+        # self._images.shape = (1449, 3, 640, 480)  <-- note this is jj,ii
+        # self._depths.shape = (1449, 640, 480)     <-- note this is jj,ii
+        # self._labels.shape = (1449, 640, 480)     <-- note this is jj,ii
+        Nimages = self._images.shape[0]
+        maxI = self._images.shape[3] - patchSize[0]
+        maxJ = self._images.shape[2] - patchSize[1]
+
+        randomSamples = vstack((rng.randint(0, Nimages, number),
+                                rng.randint(0, maxI+1, number),
+                                rng.randint(0, maxJ+1, number))).T
+        singleChannelLength = patchSize[0] * patchSize[1]
+        imageMatrix = zeros((number, singleChannelLength * self.colors), dtype = float32)
+        labelMatrix = zeros((number, singleChannelLength), dtype = uint16)
+
+        for count, sample in enumerate(randomSamples):
+            idx, ii, jj = sample
+            print 'Image idx:', idx
+
+            imgRegion = array(self._images[idx,:,jj:(jj+patchSize[1]),ii:(ii+patchSize[0])].transpose((2,1,0)),
+                              order = 'C', copy = True, dtype = float)
+            imgRegion /= 255    # normalize to 0-1 range
+
+            if self.colors == 1:
+                # Just grayscale images, no depth
+                grayscaleRegion = dot(reshape(imgRegion, (-1,3)), self._rgb2L)
+                imageMatrix[count,:] = grayscaleRegion.flatten()
+            elif self.colors == 3:
+                # Just color images, no depth
+                # For color images, flattens to [ii_r ii_g ii_b ii+1_r ii+1_g ii+1_b ...]
+                imageMatrix[count,:] = imgRegion.flatten()
+            else:   # self.colors == 4
+                # Color image + depth
+                # For RGBD images, flattens to [ii_r ii_g ii_b ii_d ii+1_r ii+1_g ii+1_b ii+1_d ...]
+                depRegion = copy(self._depths[idx,  jj:(jj+patchSize[1]),ii:(ii+patchSize[0])].T, order='C')
+                depRegion = reshape(depRegion, depRegion.shape + (1,))
+                # self._depths.min() = 0.71329951, self._depths.max() = 9.99547
+                depRegion /= 10     # approx normalize to 0-1 range
+                rgbdRegion = concatenate((imgRegion, depRegion), axis = 2)
+                imageMatrix[count,:] = rgbdRegion.flatten()
+
+            labelRegion = copy(self._labels[idx,  jj:(jj+patchSize[1]),ii:(ii+patchSize[0])].T, order='C')
+            labelMatrix[count:] = labelRegion.flatten()
+
+        # one example per column
+        return imageMatrix.T, labelMatrix.T
 
 
 

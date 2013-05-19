@@ -128,3 +128,14 @@ class MakePc(object):
         return '%03d_%s' % (self.counter.count(), st)
     
 pc = lambda st : makePc(st)
+
+
+
+class Tic(object):
+    def __init__(self, descrip = ''):
+        self._descrip = descrip
+        self._startw = time.time()
+        self._startc = time.clock()
+
+    def __call__(self):
+        print 'Time to %s: %.3fs (wall) %.3fs (cpu)' % (self._descrip, time.time()-self._startw, time.clock()-self._startc)

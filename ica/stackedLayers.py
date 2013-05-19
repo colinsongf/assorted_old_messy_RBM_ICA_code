@@ -6,7 +6,7 @@ import gc
 from numpy import zeros, prod, reshape
 
 from util.dataLoaders import loadFromPklGz, saveToFile
-from util.misc import dictPrettyPrint, relhack
+from util.misc import dictPrettyPrint, relhack, Tic
 from layers import layerClassNames, DataArrangement, Layer, DataLayer, UpsonData3, WhiteningLayer, PCAWhiteningLayer, TicaLayer, DownsampleLayer, LcnLayer, ConcatenationLayer
 from visualize import plotImageData, plotTopActivations
 
@@ -148,8 +148,10 @@ class StackedLayers(object):
 
                 # How many pixels this layer sees at once
                 seesPixels = self._seesPixels(layer, dataLayer)
-                
+
+                tic = Tic('get patches')
                 trainRawDataLargePatches = dataLayer.getData(seesPixels, numExamples, seed = 0)
+                tic()
 
                 # Reshape into patches
                 trainRawDataPatches = zeros((prod(dataLayer.patchSize), prod(layer.seesPatches)*numExamples))
@@ -174,10 +176,16 @@ class StackedLayers(object):
                 assert trainRawDataPatches.shape[1] == counter
                 # END: 2D data assumption
 
+                print 'Memory used to store trainRawDataPatches: %g MB' % (trainRawDataPatches.nbytes/1e6)
+
                 # Push data through N-1 layers
+                tic = Tic('forward prop')
                 trainPrevLayerData, dataArrangementPrevLayer = self.forwardProp(trainRawDataPatches, dataArrangementLayer0, layerIdx-1)
+                tic()
                 
+                tic = Tic('train')
                 layer.train(trainPrevLayerData, dataArrangementPrevLayer, layerTrainParams, quick = quick)
+                tic()
 
                 print 'training done for layer %d - %s (%s)' % (layerIdx, layer.name, layer.layerType)
 

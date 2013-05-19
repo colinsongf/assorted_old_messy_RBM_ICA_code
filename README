@@ -1,2 +1,4 @@
 Deep Learning repository
 
+To make TAGS:
+    find . -name "*.py" | etags --output TAGS -
