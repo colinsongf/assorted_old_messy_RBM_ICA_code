@@ -89,7 +89,7 @@ ll.append({'name':         'tica3',
            'type':         'tica',
            'hiddenSize':   (16,16),        # (output size is same as hidden size, 16x16)
            'neighborhood': ('gaussian', 1.5, 0, 0),
-           'lambd':        .012,
+           'lambd':        .03,
            'epsilon':      1e-5,
            })
 
