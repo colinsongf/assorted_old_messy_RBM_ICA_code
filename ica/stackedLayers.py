@@ -7,7 +7,7 @@ from numpy import zeros, prod, reshape
 
 from util.dataLoaders import loadFromPklGz, saveToFile
 from util.misc import dictPrettyPrint, relhack, Tic
-from layers import layerClassNames, DataArrangement, Layer, DataLayer, UpsonData3, WhiteningLayer, PCAWhiteningLayer, TicaLayer, DownsampleLayer, LcnLayer, ConcatenationLayer
+from layers import layerClassNames, DataArrangement, Layer, DataLayer, UpsonData3, NYU2_Labeled, WhiteningLayer, PCAWhiteningLayer, TicaLayer, DownsampleLayer, LcnLayer, ConcatenationLayer
 from visualize import plotImageData, plotTopActivations
 
 

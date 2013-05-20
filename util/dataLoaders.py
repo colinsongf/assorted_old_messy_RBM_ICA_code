@@ -2,7 +2,7 @@
 
 import cPickle as pickle
 import numpy
-from numpy import array, zeros, reshape, random, vstack, concatenate, copy
+from numpy import array, zeros, reshape, random, vstack, concatenate, copy, dot
 import gzip
 import cPickle as pickle
 import h5py
@@ -133,6 +133,10 @@ def loadNYU2Data(patchSize, number, rgbColors = 3, depthChannels = 1, seed = Non
     params: rgbColors: 0 for no data, 1 for grayscale images, 3 for color images
             depthChannels: 0 for no depth channel, 1 for depth channel
     Note: sum([rgbColors, depthChannels]) must be > 0.
+
+    Note: For color images, data flattens to [ii_r ii_g ii_b      ii+1_r ii+1_g ii+1_b ...]
+          For RGBD images, data  flattens to [ii_r ii_g ii_b ii_d ii+1_r ii+1_g ii+1_b ii+1_d ...]
+
     '''
 
     assert rgbColors in (0, 1, 3)
@@ -186,24 +190,18 @@ def loadNYU2Data(patchSize, number, rgbColors = 3, depthChannels = 1, seed = Non
         print 'Image idx:', idx
 
         if rgbColors > 0:
+            # Grab imgRegion
             imgRegion = array(loadNYU2Data._images[idx,:,jj:(jj+patchSize[1]),ii:(ii+patchSize[0])].transpose((2,1,0)),
                               order = 'C', copy = True, dtype = numpy.float32)
             imgRegion /= 255    # normalize to 0-1 range
 
-            # Grab imageMatrix
             if rgbColors == 1:
-                # Just grayscale images, no depth
+                # grayscale images, no depth
                 imgRegion = dot(reshape(imgRegion, (-1,3)), rgb2L)
                 imgRegion = reshape(imgRegion, imgRegion.shape + (1,))
-                imageMatrix[count,:] = grayscaleRegion.flatten()
-            elif rgbColors == 3:
-                # Just color images, no depth
-                # For color images, flattens to [ii_r ii_g ii_b ii+1_r ii+1_g ii+1_b ...]
-                pass
 
         if depthChannels > 0:
-            # Grab dep
-            # For RGBD images, flattens to [ii_r ii_g ii_b ii_d ii+1_r ii+1_g ii+1_b ii+1_d ...]
+            # Grab depRegion
             depRegion = copy(loadNYU2Data._depths[idx,  jj:(jj+patchSize[1]),ii:(ii+patchSize[0])].T, order='C')
             depRegion = reshape(depRegion, depRegion.shape + (1,))
             # loadNYU2Data._depths.min() = 0.71329951, loadNYU2Data._depths.max() = 9.99547
@@ -223,6 +221,9 @@ def loadNYU2Data(patchSize, number, rgbColors = 3, depthChannels = 1, seed = Non
     # one example per column
     return imageMatrix.T, labelMatrix.T
 
+# Note: we cache the large matrices by attaching them to the function
+# instead of in a class object so that the higher level util.cache
+# framework will work
 loadNYU2Data._loaded = False
 loadNYU2Data._depths = None
 loadNYU2Data._images = None
