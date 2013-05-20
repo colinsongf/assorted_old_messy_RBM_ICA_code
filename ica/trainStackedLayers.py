@@ -30,11 +30,11 @@ def main():
                                 'be used to resume training a previously checkpointed, ' +
                                 'partially trained StackedLayers object (default: none)'))
     parser.add_argument('--quick', action='store_true', help = 'Enable quick mode (default: off)')
+    parser.add_argument('--nodiary', action='store_true', help = 'Disable diary (default: diary is on)')
 
     args = parser.parse_args()
 
-
-    resman.start(args.name)
+    resman.start(args.name, diary = not args.nodiary)
     saveDir = resman.rundir
 
 

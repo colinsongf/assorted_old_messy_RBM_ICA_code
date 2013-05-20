@@ -2,9 +2,10 @@
 
 import cPickle as pickle
 import numpy
-from numpy import array, zeros, reshape
+from numpy import array, zeros, reshape, random, vstack, concatenate, copy
 import gzip
 import cPickle as pickle
+import h5py
 import ipdb
 
 
@@ -121,3 +122,111 @@ def loadRandomData(filename):
     data = loadFromPklGz(filename)
     return data
 
+
+
+def loadNYU2Data(patchSize, number, rgbColors = 3, depthChannels = 1, seed = None, filename = '../data/nyu_local/nyu_depth_v2_labeled.mat'):
+    '''Load the supervised portion of the NYU2 dataset direclty from the
+    nyu_depth_v2_labeled.mat file. See:
+    http://cs.nyu.edu/~silberman/datasets/nyu_depth_v2.html
+    http://horatio.cs.nyu.edu/mit/silberman/nyu_depth_v2/nyu_depth_v2_labeled.mat
+
+    params: rgbColors: 0 for no data, 1 for grayscale images, 3 for color images
+            depthChannels: 0 for no depth channel, 1 for depth channel
+    Note: sum([rgbColors, depthChannels]) must be > 0.
+    '''
+
+    assert rgbColors in (0, 1, 3)
+    assert depthChannels in (0, 1)
+    nChannels = rgbColors + depthChannels
+    assert nChannels > 0, 'Must load something!'
+    
+    if not loadNYU2Data._loaded:
+        # load data into memory, only once. Takes ~1 min.
+        print 'loading', filename, '(could take a while)'
+        ff = h5py.File(filename, 'r')
+        loadNYU2Data._depths = array(ff['depths'])
+        loadNYU2Data._images = array(ff['images'])
+        loadNYU2Data._labels = array(ff['labels'])
+        referencedObjects = ff['#refs#']
+        loadNYU2Data._names = []
+        for ref in ff['names'][0]:
+            name = ''.join([str(unichr(x)) for x in referencedObjects[ref]])
+            loadNYU2Data._names.append(name)
+        loadNYU2Data._scenes = []
+        for ref in ff['scenes'][0]:
+            name = ''.join([str(unichr(x)) for x in referencedObjects[ref]])
+            loadNYU2Data._scenes.append(name)
+        loadNYU2Data._sceneTypes = []
+        for ref in ff['sceneTypes'][0]:
+            name = ''.join([str(unichr(x)) for x in referencedObjects[ref]])
+            loadNYU2Data._sceneTypes.append(name)
+        loadNYU2Data._loaded = True
+        print 'done.'
+
+    rng = random.RandomState(seed)      # if seed is None, this takes its seed from timer
+
+    # loadNYU2Data._images.shape = (1449, 3, 640, 480)  <-- note this is jj,ii
+    # loadNYU2Data._depths.shape = (1449, 640, 480)     <-- note this is jj,ii
+    # loadNYU2Data._labels.shape = (1449, 640, 480)     <-- note this is jj,ii
+    Nimages = loadNYU2Data._images.shape[0]
+    maxI = loadNYU2Data._images.shape[3] - patchSize[0]
+    maxJ = loadNYU2Data._images.shape[2] - patchSize[1]
+
+    randomSamples = vstack((rng.randint(0, Nimages, number),
+                            rng.randint(0, maxI+1, number),
+                            rng.randint(0, maxJ+1, number))).T
+    singleChannelLength = patchSize[0] * patchSize[1]
+    imageMatrix = zeros((number, singleChannelLength * nChannels), dtype = numpy.float32)
+    labelMatrix = zeros((number, singleChannelLength), dtype = numpy.uint16)
+
+    rgb2L = array([.299, .587, .114])  # same as PIL
+
+    for count, sample in enumerate(randomSamples):
+        idx, ii, jj = sample
+        print 'Image idx:', idx
+
+        if rgbColors > 0:
+            imgRegion = array(loadNYU2Data._images[idx,:,jj:(jj+patchSize[1]),ii:(ii+patchSize[0])].transpose((2,1,0)),
+                              order = 'C', copy = True, dtype = numpy.float32)
+            imgRegion /= 255    # normalize to 0-1 range
+
+            # Grab imageMatrix
+            if rgbColors == 1:
+                # Just grayscale images, no depth
+                imgRegion = dot(reshape(imgRegion, (-1,3)), rgb2L)
+                imgRegion = reshape(imgRegion, imgRegion.shape + (1,))
+                imageMatrix[count,:] = grayscaleRegion.flatten()
+            elif rgbColors == 3:
+                # Just color images, no depth
+                # For color images, flattens to [ii_r ii_g ii_b ii+1_r ii+1_g ii+1_b ...]
+                pass
+
+        if depthChannels > 0:
+            # Grab dep
+            # For RGBD images, flattens to [ii_r ii_g ii_b ii_d ii+1_r ii+1_g ii+1_b ii+1_d ...]
+            depRegion = copy(loadNYU2Data._depths[idx,  jj:(jj+patchSize[1]),ii:(ii+patchSize[0])].T, order='C')
+            depRegion = reshape(depRegion, depRegion.shape + (1,))
+            # loadNYU2Data._depths.min() = 0.71329951, loadNYU2Data._depths.max() = 9.99547
+            depRegion /= 10     # approx normalize to 0-1 range
+
+        if rgbColors == 0:
+            concatRegion = depRegion
+        elif depthChannels == 0:
+            concatRegion = imgRegion
+        else:
+            concatRegion = concatenate((imgRegion, depRegion), axis = 2)
+        imageMatrix[count,:] = concatRegion.flatten()
+
+        labelRegion = copy(loadNYU2Data._labels[idx, jj:(jj+patchSize[1]),ii:(ii+patchSize[0])].T, order='C')
+        labelMatrix[count:] = labelRegion.flatten()
+
+    # one example per column
+    return imageMatrix.T, labelMatrix.T
+
+loadNYU2Data._loaded = False
+loadNYU2Data._depths = None
+loadNYU2Data._images = None
+loadNYU2Data._labels = None
+loadNYU2Data._names = None
+loadNYU2Data._scenes = None
+loadNYU2Data._sceneTypes = None

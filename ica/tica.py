@@ -6,7 +6,7 @@ Research code
 Jason Yosinski
 '''
 
-import ipdb as pdb
+import pdb
 import os
 from numpy import *
 from matplotlib import pyplot
@@ -261,19 +261,21 @@ class TICA(RICA):
         return self.hiddenLayerShape
 
 
-    def plotCostLog(self):
+    def plotCostLog(self, saveDir = None, prefix = None):
         # plot sparsity/reconstruction costs over time
         costs = self.costLog
-        self.costLog = None
+        #self.costLog = None     # disabled
         pyplot.figure()
         pyplot.plot(costs[:,0], 'b-', costs[:,1], 'r-')
         pyplot.hold(True)
         pyplot.plot(costs[:,2], '--', color = (.7,0,.7,1))
         pyplot.legend(('pooling/sparsity * %s' % repr(self.lambd), 'reconstruction', 'total'))
         pyplot.xlabel('iteration'); pyplot.ylabel('cost')
-        if self.saveDir:
-            pyplot.savefig(os.path.join(self.saveDir, 'cost.png'))
-            pyplot.savefig(os.path.join(self.saveDir, 'cost.pdf'))
+        if saveDir is None:
+            saveDir = self.saveDir
+        if saveDir:
+            pyplot.savefig(os.path.join(saveDir, (prefix if prefix else '') + 'cost.png'))
+            pyplot.savefig(os.path.join(saveDir, (prefix if prefix else '') + 'cost.pdf'))
         pyplot.close()
 
 

@@ -215,7 +215,7 @@ class RICA(object):
     def plotCostLog(self):
         # plot sparsity/reconstruction costs over time
         costs = self.costLog
-        self.costLog = None
+        #self.costLog = None    # disabled this reset.
         pyplot.figure()
         pyplot.plot(costs[:,0], 'b-', costs[:,1], 'r-')
         pyplot.hold(True)

@@ -14,7 +14,7 @@ def main():
     testNr = 0
 
     if testNr == 0:
-        dataLayer = NYU2_Labeled({'name': 'data', 'type': 'data', 'imageSize': (480,640), 'patchSize': (10,10), 'stride': (10,10), 'colors': 4})
+        dataLayer = NYU2_Labeled({'name': 'data', 'type': 'data', 'imageSize': (480,640), 'patchSize': (10,10), 'stride': (10,10), 'colorChannels': 3, 'depthChannels': 1})
         patchShape = (480,640)
         patches, labels = dataLayer.getDataAndLabels(patchShape, 1, 0)
 

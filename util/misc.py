@@ -57,7 +57,8 @@ def relhack():
     from os.path import expanduser
     homedir = expanduser("~")
     toReload = set()
-    for name,mod in sys.modules.iteritems():
+    sysmoditems = list(sys.modules.iteritems())
+    for name,mod in sysmoditems:
         if mod is not None:
             filename = getattr(mod, '__file__', None)
             if filename:

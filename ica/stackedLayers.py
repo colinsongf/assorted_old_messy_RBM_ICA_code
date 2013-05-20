@@ -46,6 +46,7 @@ class StackedLayers(object):
             if ii == 0:
                 # For data layer
                 layer.outputSize = layer.getOutputSize()
+                layer.seesPatches = layer.calculateSeesPatches()  # no input needed for DataLayer
             else:
                 prevLayer = self.layers[ii-1]
 
@@ -70,6 +71,7 @@ class StackedLayers(object):
 
 
     def printStatus(self):
+        dataLayer = self.layers[0]
         for ii, layer in reversed(list(enumerate(self.layers))):
             print 'layer %2d: %-20s' % (ii, '%s (%s)' % (layer.name, layer.layerType)),
             if ii == 0:
@@ -77,6 +79,9 @@ class StackedLayers(object):
             else:
                 st = 'maps size %s -> %s' % (repr(layer.inputSize), repr(layer.outputSize)),
             print '%-32s' % st,
+            
+            st = 'sees %s' % repr(self._seesPixels(layer, dataLayer))
+            print '%-16s' % st,
             if layer.trainable:
                 print 'trained' if layer.isTrained else 'not trained'
             else:
@@ -125,13 +130,13 @@ class StackedLayers(object):
 
                 layer.initialize()
 
-                # ~ Add method to each layer: forwardProp
+                # + Add method to each layer: forwardProp
                 # + Add method to data layer: getData(size, number, seed)
-                # - Figure out how many patches are needed to train a give layer (prod(sees) * number?)
-                # - Get that many patches of data
-                # - figure out how to feed the data through all the layers until the prevLayer
+                # + Figure out how many patches are needed to train a give layer (prod(sees) * number?)
+                # + Get that many patches of data
+                # + figure out how to feed the data through all the layers until the prevLayer
 
-                # - finally, something like this:
+                # + finally, something like this:
                 #      data = prevLayer.forwardProp(otherData)
                 
                 print 'gc.collect found', gc.collect(), 'objects'
@@ -182,13 +187,18 @@ class StackedLayers(object):
                 tic = Tic('forward prop')
                 trainPrevLayerData, dataArrangementPrevLayer = self.forwardProp(trainRawDataPatches, dataArrangementLayer0, layerIdx-1)
                 tic()
-                
+
+                del trainRawDataPatches   # free the raw patches from memory
+                print 'gc.collect found', gc.collect(), 'objects'
+
+                print 'Memory used to store trainPrevLayerData: %g MB' % (trainPrevLayerData.nbytes/1e6)
+
                 tic = Tic('train')
                 layer.train(trainPrevLayerData, dataArrangementPrevLayer, layerTrainParams, quick = quick)
                 tic()
 
                 print 'training done for layer %d - %s (%s)' % (layerIdx, layer.name, layer.layerType)
-
+                
                 if saveDir:
                     fileFinal = os.path.join(saveDir, 'stackedLayers.pkl.gz')
                     fileTmp = fileFinal + '.tmp'
@@ -198,6 +208,12 @@ class StackedLayers(object):
                     print 'Saving these StackedLayers...'
                     self.printStatus()
                     print '... to %s' % fileFinal
+
+                    tic = Tic('plot')
+                    prefix = 'layer_%02d_%s_' % (layerIdx, layer.name)
+                    layer.plot(trainPrevLayerData, dataArrangementPrevLayer, saveDir, prefix)
+                    tic()
+
 
         if not trainedSomething:
             print '\nNothing to train. Maybe it was already finished?'

@@ -2,16 +2,16 @@
 
 import sys
 import imp
-import ipdb as pdb
+import pdb
 import argparse
 import types
 import time
-import h5py
 from numpy import *
 
 from util.cache import cached, PersistentHasher
 from GitResultsManager import resman
 from util.dataPrep import PCAWhiteningDataNormalizer
+from util.dataLoaders import loadNYU2Data
 from makeData import makeUpsonRovio3
 from tica import TICA, neighborMatrix
 
@@ -171,15 +171,28 @@ class TrainableLayer(NonDataLayer):
         if self.isTrained:
             raise Exception('Layer was already trained')
         self._checkDataArrangement(data, dataArrangement)
-        ticw = time.time()
-        ticc = time.clock()
+        #ticw = time.time()
+        #ticc = time.clock()
         self._train(data, dataArrangement, trainParams, quick)
-        print 'Layer took %.3fs wall time to train (%.3fs cpu time)' % (time.time() - ticw, time.clock()-ticc)
+        #print 'Layer took %.3fs wall time to train (%.3fs cpu time)' % (time.time() - ticw, time.clock()-ticc)
         self.isTrained = True
 
     def _train(self, data, dataArrangement, trainParams = None, quick = False):
         '''Default no-op version. Override in derived class.'''
         pass
+
+    def plot(self, data, dataArrangement, saveDir = None, prefix = None):
+        if not self.isTrained:
+            raise Exception('Layer not trained yet')
+        self._checkDataArrangement(data, dataArrangement)
+        self._plot(data, dataArrangement, saveDir, prefix)
+
+    def _plot(self, data, dataArrangement, saveDir = None, prefix = None):
+        '''Default no-op version. Override in derived class. It is up to the layer
+        what to plot.
+        '''
+        pass
+        
         
 
 
@@ -204,6 +217,10 @@ class DataLayer(Layer):
         assert len(self.patchSize) == 2
         assert len(self.stride) == 2
         assert len(self.imageSize) == len(self.stride), 'imageSize and stride must be same length'
+
+    def calculateSeesPatches(self):
+        '''For completeness. Always returns (1, 1, 1...)'''
+        return (1,) * len(self.stride)
 
     def numPatches(self):
         '''How many patches fit within the data. Rounds down.'''
@@ -254,97 +271,29 @@ class NYU2_Labeled(DataLayer):
 
         assert self.imageSize == (480,640)
 
-        self.colors = params['colors']
-        assert self.colors in (1,3,4)
-
-        self._loaded = False
-        self._rgb2L = array([.299, .587, .114])  # same as PIL
+        self.colorChannels = params['colorChannels']
+        self.depthChannels = params['depthChannels']
+        self.channels = self.colorChannels + self.depthChannels
+        
+        assert self.colorChannels in (0,1,3)
+        assert self.depthChannels in (0,1)
+        assert self.channels > 0
 
     def getOutputSize(self):
-        if self.colors == 1:
+        if self.channels == 1:
             return self.patchSize
         else:
-            return (self.patchSize[0], self.patchSize[1], self.colors)
-
-    def _ensureLoaded(self):
-        if not self._loaded:
-            filename = '../data/nyu_local/nyu_depth_v2_labeled.mat'
-            print 'loading', filename, '(could take a while)'
-            ff = h5py.File(filename, 'r')
-            self._depths = array(ff['depths'])
-            self._images = array(ff['images'])
-            self._labels = array(ff['labels'])
-            referencedObjects = ff['#refs#']
-            self._names = []
-            for ref in ff['names'][0]:
-                name = ''.join([str(unichr(x)) for x in referencedObjects[ref]])
-                self._names.append(name)
-            self._scenes = []
-            for ref in ff['scenes'][0]:
-                name = ''.join([str(unichr(x)) for x in referencedObjects[ref]])
-                self._scenes.append(name)
-            self._sceneTypes = []
-            for ref in ff['sceneTypes'][0]:
-                name = ''.join([str(unichr(x)) for x in referencedObjects[ref]])
-                self._sceneTypes.append(name)
-            self._loaded = True
-            print 'done.'
+            return (self.patchSize[0], self.patchSize[1], self.channels)
 
     def getData(self, patchSize, number, seed = None):
-        patches, labels = self.getDataAndLabels(patchSize, number, seed = seed)
+        patches, labels = self.getDataAndLabels(patchSize, number, seed)
         return patches
 
     def getDataAndLabels(self, patchSize, number, seed = None):
-        '''Loads everything into memory first.'''
-
-        self._ensureLoaded()
-        rng = random.RandomState(seed)      # if seed is None, this takes its seed from timer
-
-        # self._images.shape = (1449, 3, 640, 480)  <-- note this is jj,ii
-        # self._depths.shape = (1449, 640, 480)     <-- note this is jj,ii
-        # self._labels.shape = (1449, 640, 480)     <-- note this is jj,ii
-        Nimages = self._images.shape[0]
-        maxI = self._images.shape[3] - patchSize[0]
-        maxJ = self._images.shape[2] - patchSize[1]
-
-        randomSamples = vstack((rng.randint(0, Nimages, number),
-                                rng.randint(0, maxI+1, number),
-                                rng.randint(0, maxJ+1, number))).T
-        singleChannelLength = patchSize[0] * patchSize[1]
-        imageMatrix = zeros((number, singleChannelLength * self.colors), dtype = float32)
-        labelMatrix = zeros((number, singleChannelLength), dtype = uint16)
-
-        for count, sample in enumerate(randomSamples):
-            idx, ii, jj = sample
-            print 'Image idx:', idx
-
-            imgRegion = array(self._images[idx,:,jj:(jj+patchSize[1]),ii:(ii+patchSize[0])].transpose((2,1,0)),
-                              order = 'C', copy = True, dtype = float)
-            imgRegion /= 255    # normalize to 0-1 range
-
-            if self.colors == 1:
-                # Just grayscale images, no depth
-                grayscaleRegion = dot(reshape(imgRegion, (-1,3)), self._rgb2L)
-                imageMatrix[count,:] = grayscaleRegion.flatten()
-            elif self.colors == 3:
-                # Just color images, no depth
-                # For color images, flattens to [ii_r ii_g ii_b ii+1_r ii+1_g ii+1_b ...]
-                imageMatrix[count,:] = imgRegion.flatten()
-            else:   # self.colors == 4
-                # Color image + depth
-                # For RGBD images, flattens to [ii_r ii_g ii_b ii_d ii+1_r ii+1_g ii+1_b ii+1_d ...]
-                depRegion = copy(self._depths[idx,  jj:(jj+patchSize[1]),ii:(ii+patchSize[0])].T, order='C')
-                depRegion = reshape(depRegion, depRegion.shape + (1,))
-                # self._depths.min() = 0.71329951, self._depths.max() = 9.99547
-                depRegion /= 10     # approx normalize to 0-1 range
-                rgbdRegion = concatenate((imgRegion, depRegion), axis = 2)
-                imageMatrix[count,:] = rgbdRegion.flatten()
-
-            labelRegion = copy(self._labels[idx,  jj:(jj+patchSize[1]),ii:(ii+patchSize[0])].T, order='C')
-            labelMatrix[count:] = labelRegion.flatten()
-
-        # one example per column
-        return imageMatrix.T, labelMatrix.T
+        patches, labels = cached(loadNYU2Data, patchSize = patchSize, number = number,
+                                 rgbColors = self.colorChannels, depthChannels = self.depthChannels,
+                                 seed = seed)
+        return patches, labels
 
 
 
@@ -402,7 +351,6 @@ class TicaLayer(TrainableLayer):
             print 'QUICK MODE: chopping maxFuncCalls from %d to 1!' % maxFuncCalls
             maxFuncCalls = 1
             
-        logDir = trainParams.get('logDir', None)
         # Learn model
         tica = TICA(nInputs            = prod(self.inputSize),
                     hiddenLayerShape   = self.hiddenSize,
@@ -410,30 +358,36 @@ class TicaLayer(TrainableLayer):
                     lambd              = self.lambd,
                     epsilon            = self.epsilon)
 
-        beginTotalCost, beginPoolingCost, beginReconstructionCost, grad = tica.cost(tica.WW, data)
-
         tic = time.time()
         tica.learn(data, maxFun = maxFuncCalls)
         execTime = time.time() - tic
-        if logDir:
-            saveToFile(os.path.join(logDir, 'tica.pkl.gz'), tica)    # save learned model
+        #if logDir:
+        #    saveToFile(os.path.join(logDir, (prefix if prefix else '') + 'tica.pkl.gz'), tica)    # save learned model
 
-        endTotalCost, endPoolingCost, endReconstructionCost, grad = tica.cost(tica.WW, data)
+        beginTotalCost, beginPoolingCost, beginReconstructionCost = tica.costLog[0]
+        endTotalCost,   endPoolingCost,   endReconstructionCost   = tica.costLog[-1]
 
-        print 'beginTotalCost, beginPoolingCost, beginReconstructionCost, endTotalCost, endPoolingCost, endReconstructionCost, execTime ='
-        print [beginTotalCost, beginPoolingCost, beginReconstructionCost, endTotalCost, endPoolingCost, endReconstructionCost, execTime]
+        print 'Training stats:'
+        print '  begin {totalCost, poolingCost, reconCost} = %f, %f, %f' % (beginTotalCost, beginPoolingCost, beginReconstructionCost)
+        print '    end {totalCost, poolingCost, reconCost} = %f, %f, %f' % (endTotalCost, endPoolingCost, endReconstructionCost)
+        print '  Number of cost evals:', len(tica.costLog)
+        print '  Training time (wall)', execTime
 
         # Plot some results
         #plotImageRicaWW(tica.WW, imgShape, saveDir, tileShape = hiddenLayerShape, prefix = pc('WW_iterFinal'))
-        if logDir:
-            tica.plotResults(logDir, tica, data, self.numInputs, self.hiddenSize)
 
         self.tica = tica
-
 
     def _forwardProp(self, data, dataArrangement):
         hidden, absPooledActivations = self.tica.getRepresentation(data)
         return absPooledActivations, dataArrangement
+
+    def _plot(self, data, dataArrangement, saveDir = None, prefix = None):
+        '''Default no-op version. Override in derived class. It is up to the layer
+        what to plot.
+        '''
+        if saveDir:
+            self.tica.plotCostLog(saveDir, prefix)
 
 
 
