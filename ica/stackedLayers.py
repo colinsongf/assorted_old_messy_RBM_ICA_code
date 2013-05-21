@@ -4,6 +4,7 @@ import pdb
 import os
 import gc
 from numpy import zeros, prod, reshape
+from IPython import embed
 
 from util.dataLoaders import loadFromPklGz, saveToFile
 from util.misc import dictPrettyPrint, relhack, Tic
@@ -79,8 +80,11 @@ class StackedLayers(object):
             else:
                 st = 'maps size %s -> %s' % (repr(layer.inputSize), repr(layer.outputSize)),
             print '%-32s' % st,
-            
-            st = 'sees %s' % repr(self._seesPixels(layer, dataLayer))
+
+            try:
+                st = 'sees %s' % repr(self._seesPixels(layer, dataLayer))
+            except AttributeError:
+                st = '--'
             print '%-16s' % st,
             if layer.trainable:
                 print 'trained' if layer.isTrained else 'not trained'
@@ -130,75 +134,40 @@ class StackedLayers(object):
 
                 layer.initialize()
 
-                # + Add method to each layer: forwardProp
-                # + Add method to data layer: getData(size, number, seed)
-                # + Figure out how many patches are needed to train a give layer (prod(sees) * number?)
-                # + Get that many patches of data
-                # + figure out how to feed the data through all the layers until the prevLayer
-
-                # + finally, something like this:
-                #      data = prevLayer.forwardProp(otherData)
-                
-                print 'gc.collect found', gc.collect(), 'objects'
-
                 layerTrainParams = trainParams[layer.name]
                 numExamples = layerTrainParams['examples']
                 if quick:
                     numExamples = 1000
                     print 'QUICK MODE: chopping training examples to 1000!'
 
-                # make sure layer.sees, data.stride, and data.patchSize are all same len
+                # Make sure layer.sees, data.stride, and data.patchSize are all same len
                 assert len(layer.seesPatches) == len(dataLayer.patchSize)
                 assert len(layer.seesPatches) == len(dataLayer.stride)
 
-                # How many pixels this layer sees at once
-                seesPixels = self._seesPixels(layer, dataLayer)
-
-                tic = Tic('get patches')
-                trainRawDataLargePatches = dataLayer.getData(seesPixels, numExamples, seed = 0)
-                tic()
-
-                # Reshape into patches
-                trainRawDataPatches = zeros((prod(dataLayer.patchSize), prod(layer.seesPatches)*numExamples))
-                dataArrangementLayer0 = DataArrangement(layerShape = layer.seesPatches, nLayers = numExamples)
-                # BEGIN: 2D data assumption
-                # Note: this only works for 2D data! Add other cases if needed.
-                assert len(layer.seesPatches) == 2, 'Only works for 2D data for now!'
-                counter = 0
-                sp0,sp1 = layer.seesPatches
-                ps0,ps1 = dataLayer.patchSize
-                st0,st1 = dataLayer.stride
-                for largePatchIdx in xrange(trainRawDataLargePatches.shape[1]):
-                    thisLargePatch = reshape(trainRawDataLargePatches[:,largePatchIdx], seesPixels)
-                    # Note: this code flattens in the default numpy
-                    # flattening order: C-order, or row-major order.
-                    for ii in xrange(sp0):
-                        for jj in xrange(sp1):
-                            trainRawDataPatches[:,counter] = thisLargePatch[(ii*st0):(ii*st0+ps0),(jj*st1):(jj*st1+ps1)].flatten()
-                            counter += 1
-                # just check last patch 
-                assert trainRawDataPatches.shape[0] == len(thisLargePatch[(ii*st0):(ii*st0+ps0),(jj*st1):(jj*st1+ps1)].flatten())
-                assert trainRawDataPatches.shape[1] == counter
-                # END: 2D data assumption
-
+                # Get data
+                print 'gc.collect found', gc.collect(), 'objects'
+                trainRawDataLargePatches, trainRawDataPatches = self.getDataForLayer(layerIdx, numExamples)
                 print 'Memory used to store trainRawDataPatches: %g MB' % (trainRawDataPatches.nbytes/1e6)
 
                 # Push data through N-1 layers
+                dataArrangementLayer0 = DataArrangement(layerShape = layer.seesPatches, nLayers = numExamples)
                 tic = Tic('forward prop')
                 trainPrevLayerData, dataArrangementPrevLayer = self.forwardProp(trainRawDataPatches, dataArrangementLayer0, layerIdx-1)
                 tic()
-
-                del trainRawDataPatches   # free the raw patches from memory
-                print 'gc.collect found', gc.collect(), 'objects'
-
                 print 'Memory used to store trainPrevLayerData: %g MB' % (trainPrevLayerData.nbytes/1e6)
 
+                # Free the raw patches from memory
+                del trainRawDataLargePatches
+                del trainRawDataPatches
+                print 'gc.collect found', gc.collect(), 'objects'
+
+                # Train layer
                 tic = Tic('train')
                 layer.train(trainPrevLayerData, dataArrangementPrevLayer, layerTrainParams, quick = quick)
                 tic()
-
                 print 'training done for layer %d - %s (%s)' % (layerIdx, layer.name, layer.layerType)
                 
+                # Checkpoint and plot
                 if saveDir:
                     fileFinal = os.path.join(saveDir, 'stackedLayers.pkl.gz')
                     fileTmp = fileFinal + '.tmp'
@@ -222,24 +191,68 @@ class StackedLayers(object):
         seesPixels = tuple([ps + st * (sp-1) for sp,ps,st in zip(layer.seesPatches,dataLayer.patchSize, dataLayer.stride)])
         return seesPixels
 
-    def vis(self, saveDir = None):
+    def getDataForLayer(self, layerIdx, numExamples):
+        layer = self.layers[layerIdx]
         dataLayer = self.layers[0]
-        for ii,layer in enumerate(self.layers):
-            if ii == 0:
-                continue
+        
+        # How many pixels this layer sees at once
+        seesPixels = self._seesPixels(layer, dataLayer)
 
-            numExamples = 10000
-            prefix = 'layer_%02d_%s' % (ii, layer.name)
-            seesPixels = self._seesPixels(layer, dataLayer)
-            rawdata = dataLayer.getData(seesPixels, numExamples, 0)
+        tic = Tic('get patches')
+        rawDataLargePatches = dataLayer.getData(seesPixels, numExamples, seed = 0)
+        tic()
 
-            # 0. Inputs
-            plotImageData(rawdata, seesPixels, saveDir, prefix = prefix + '_0_input', tileShape = (10,10))
+        # Reshape into patches
+        rawDataPatches = zeros((prod(dataLayer.patchSize), prod(layer.seesPatches)*numExamples))
 
-            # 1. Top activations
-            dataArrangementLayer0 = DataArrangement(layerShape = layer.seesPatches, nLayers = numExamples)
-            activations, dataArrangementPrevLayer = self.forwardProp(rawdata, dataArrangementLayer0, ii)
-            plotTopActivations(activations, rawdata, dataLayer.patchSize, saveDir = saveDir,
-                               nActivations = 20, nSamples = 20, prefix = prefix + '_1_topact')
-            
-            #pdb.set_trace()
+        # BEGIN: 2D data assumption
+        # Note: this only works for 2D data! Add other cases if needed.
+        assert len(layer.seesPatches) == 2, 'Only works for 2D data for now!'
+        counter = 0
+        sp0,sp1 = layer.seesPatches
+        ps0,ps1 = dataLayer.patchSize
+        st0,st1 = dataLayer.stride
+        for largePatchIdx in xrange(rawDataLargePatches.shape[1]):
+            thisLargePatch = reshape(rawDataLargePatches[:,largePatchIdx], seesPixels)
+            # Note: this code flattens in the default numpy
+            # flattening order: C-order, or row-major order.
+            for ii in xrange(sp0):
+                for jj in xrange(sp1):
+                    rawDataPatches[:,counter] = thisLargePatch[(ii*st0):(ii*st0+ps0),(jj*st1):(jj*st1+ps1)].flatten()
+                    counter += 1
+        # just check last patch 
+        assert rawDataPatches.shape[0] == len(thisLargePatch[(ii*st0):(ii*st0+ps0),(jj*st1):(jj*st1+ps1)].flatten())
+        assert rawDataPatches.shape[1] == counter
+        # END: 2D data assumption
+        #################
+
+        return rawDataLargePatches, rawDataPatches
+    
+    def visLayer(self, layerIdx, saveDir = None):
+        layer     = self.layers[layerIdx]
+        dataLayer = self.layers[0]
+
+        numExamples = 100000
+        prefix = 'layer_%02d_%s_' % (layerIdx, layer.name)
+        seesPixels = self._seesPixels(layer, dataLayer)
+
+        # Get data and forward prop
+        rawDataLargePatches, rawDataPatches = self.getDataForLayer(layerIdx, numExamples)
+        dataArrangementLayer0 = DataArrangement(layerShape = layer.seesPatches, nLayers = numExamples)
+        tic = Tic('forward prop')
+        activations, dataArrangement = self.forwardProp(rawDataPatches, dataArrangementLayer0, layerIdx)
+        tic()
+        
+        # 0. Inputs
+        plotImageData(rawDataLargePatches, seesPixels, saveDir, prefix = prefix + '0_input', tileShape = (10,10))
+
+        # 1. Top activations
+        plotTopActivations(activations, rawDataLargePatches, seesPixels, saveDir = saveDir,
+                           nActivations = 50, nSamples = 20, prefix = prefix + '1_topact')
+
+    def visAllTica(self, layerIdx, saveDir = None):
+        # NOTE: untested...
+        for layerIdx, layer in enumerate(self.layers):
+            if layer.type == 'tica' and layer.isTrained:
+                print 'vis layer %2d: %s' % (layerIdx, layer.name)
+                self.visLayer(layerIdx, saveDir)

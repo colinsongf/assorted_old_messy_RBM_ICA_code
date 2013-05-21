@@ -1,10 +1,13 @@
 #! /usr/bin/env python
 
 import sys
+import os
 import imp
 import pdb
 import argparse
-from numpy import zeros, prod, reshape
+import shutil
+from IPython import embed
+from numpy import *
 
 from GitResultsManager import resman
 from util.misc import dictPrettyPrint, importFromFile, relhack
@@ -16,25 +19,27 @@ from stackedLayers import StackedLayers
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Visualizes a previously trained StackedLayers model.')
+    parser = argparse.ArgumentParser(description='Visualizes a trained StackedLayers model.')
+    parser.add_argument('stackedLayersFilename', type = str,
+                        help = 'File where a StackedLayers model was stored, something like stackedLayers.pkl.gz')
     parser.add_argument('--name', type = str, default = 'junk',
                         help = 'Name for GitResultsManager results directory (default: junk)')
-    parser.add_argument('load', type = str,
-                        help = 'Which previously saved StackedLayers object to load')
+    parser.add_argument('--quick', action='store_true', help = 'Enable quick mode (default: off)')
+    parser.add_argument('--nodiary', action='store_true', help = 'Disable diary (default: diary is on)')
 
     args = parser.parse_args()
 
+    resman.start(args.name, diary = not args.nodiary)
+    saveDir = resman.rundir
 
-    resman.start(args.name)
+    print 'Loading StackedLayers from %s' % args.stackedLayersFilename
+    sl = loadFromPklGz(args.stackedLayersFilename)
 
-    print 'Loading StackedLayers object from %s' % args.load
-    sl = loadFromPklGz(args.load)
-
-    print 'Loaded the following StackedLayers:'
+    print 'Loaded these StackedLayers:'
     sl.printStatus()
 
-    print 'VIS HERE!'
-    
+    embed()
+
     resman.stop()
 
 
