@@ -294,12 +294,13 @@ class NYU2_Labeled(DataLayer):
     def getDataAndLabels(self, patchSize, number, seed = None):
         approxMbCachefile = prod(patchSize) * number * 4.0 / 1000000
         if approxMbCachefile < MAX_CACHE_SIZE_MB:
+            print 'NYU2_Labeled layer:: Predicted approx size of %f MB, using cache' % (approxMbCachefile)
             patches, labels = cached(loadNYU2Data, patchSize = patchSize, number = number,
                                      rgbColors = self.colorChannels, depthChannels = self.depthChannels,
                                      seed = seed)
         else:
             # Skip cache, just run
-            print 'Skipping cache, approx size of %f MB > max cache size of %s MB' % (approxMbCachefile, repr(MAX_CACHE_SIZE_MB))
+            print 'NYU2_Labeled layer:: Skipping cache, approx size of %f MB > max cache size of %s MB' % (approxMbCachefile, repr(MAX_CACHE_SIZE_MB))
             patches, labels = loadNYU2Data(patchSize = patchSize, number = number,
                                            rgbColors = self.colorChannels, depthChannels = self.depthChannels,
                                            seed = seed)

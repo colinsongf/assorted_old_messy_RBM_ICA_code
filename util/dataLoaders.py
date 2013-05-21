@@ -6,7 +6,8 @@ from numpy import array, zeros, reshape, random, vstack, concatenate, copy, dot
 import gzip
 import cPickle as pickle
 import h5py
-import ipdb
+import pdb
+import sys
 
 
 
@@ -68,7 +69,6 @@ def loadCifarDataSubsets(cifarDirectory, size, topLeftCoords):
     datasets, classNames = loadCifarData(cifarDirectory)
 
     print 'Abandoned for now... pick up later, maybe'
-    ipdb.set_trace()
 
 
 
@@ -146,7 +146,8 @@ def loadNYU2Data(patchSize, number, rgbColors = 3, depthChannels = 1, seed = Non
     
     if not loadNYU2Data._loaded:
         # load data into memory, only once. Takes ~1 min.
-        print 'loading', filename, '(could take a while)'
+        print 'loadNYU2Data: loading', filename, '(could take a while)',
+        sys.stdout.flush()
         ff = h5py.File(filename, 'r')
         loadNYU2Data._depths = array(ff['depths'])
         loadNYU2Data._images = array(ff['images'])
@@ -185,9 +186,14 @@ def loadNYU2Data(patchSize, number, rgbColors = 3, depthChannels = 1, seed = Non
 
     rgb2L = array([.299, .587, .114])  # same as PIL
 
+    print 'loadNYU2Data: grabbing', number, 'samples (could take a while)',
+    sys.stdout.flush()
+
     for count, sample in enumerate(randomSamples):
         idx, ii, jj = sample
-        print 'Image idx:', idx
+        if count % 10000 == 0:
+            #print 'loadNYU2Data: %d / %d' % (count, number)
+            pass
 
         if rgbColors > 0:
             # Grab imgRegion
@@ -216,8 +222,9 @@ def loadNYU2Data(patchSize, number, rgbColors = 3, depthChannels = 1, seed = Non
         imageMatrix[count,:] = concatRegion.flatten()
 
         labelRegion = copy(loadNYU2Data._labels[idx, jj:(jj+patchSize[1]),ii:(ii+patchSize[0])].T, order='C')
-        labelMatrix[count:] = labelRegion.flatten()
+        labelMatrix[count,:] = labelRegion.flatten()
 
+    print 'done.'
     # one example per column
     return imageMatrix.T, labelMatrix.T
 
