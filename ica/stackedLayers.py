@@ -132,7 +132,7 @@ class StackedLayers(object):
                 print 'training layer %d - %s (%s)' % (layerIdx, layer.name, layer.layerType)
                 print '*' * 40 + '\n'
 
-                layer.initialize()
+                layer.initialize(seed = 0)
 
                 layerTrainParams = trainParams[layer.name]
                 numExamples = layerTrainParams['examples']
@@ -147,7 +147,10 @@ class StackedLayers(object):
                 # Get data
                 print 'gc.collect found', gc.collect(), 'objects'
                 trainRawDataLargePatches, trainRawDataPatches = self.getDataForLayer(layerIdx, numExamples)
-                print 'Memory used to store trainRawDataPatches: %g MB' % (trainRawDataPatches.nbytes/1e6)
+                print 'Memory used to store trainRawDataLargePatches: %g MB' % (trainRawDataLargePatches.nbytes/1e6)
+                print 'Memory used to store trainRawDataPatches:      %g MB' % (trainRawDataPatches.nbytes/1e6)
+                del trainRawDataLargePatches
+                print 'gc.collect found', gc.collect(), 'objects'
 
                 # Push data through N-1 layers
                 dataArrangementLayer0 = DataArrangement(layerShape = layer.seesPatches, nLayers = numExamples)
@@ -157,7 +160,6 @@ class StackedLayers(object):
                 print 'Memory used to store trainPrevLayerData: %g MB' % (trainPrevLayerData.nbytes/1e6)
 
                 # Free the raw patches from memory
-                del trainRawDataLargePatches
                 del trainRawDataPatches
                 print 'gc.collect found', gc.collect(), 'objects'
 
@@ -250,9 +252,13 @@ class StackedLayers(object):
         plotTopActivations(activations, rawDataLargePatches, seesPixels, saveDir = saveDir,
                            nActivations = 50, nSamples = 20, prefix = prefix + '1_topact')
 
-    def visAllTica(self, layerIdx, saveDir = None):
+    def visAll(self, saveDir = None):
         # NOTE: untested...
         for layerIdx, layer in enumerate(self.layers):
-            if layer.type == 'tica' and layer.isTrained:
-                print 'vis layer %2d: %s' % (layerIdx, layer.name)
+            if layer.layerType == 'tica' and not layer.isTrained:
+                print '\nvis layer %2d: %s is tica and not trained, so stopping' % (layerIdx, layer.name)
+                return
+
+            if layer.layerType in ('tica', 'downsample', 'lcn'):
+                print '\nvis layer %2d: %s' % (layerIdx, layer.name)
                 self.visLayer(layerIdx, saveDir)

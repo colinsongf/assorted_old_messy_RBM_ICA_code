@@ -159,13 +159,13 @@ class TrainableLayer(NonDataLayer):
         self.isInitialized = False
         self.isTrained = False
 
-    def initialize(self):
+    def initialize(self, seed = None):
         if self.isInitialized:
             raise Exception('Layer was already initialized')
-        self._initialize()
+        self._initialize(seed = seed)
         self.isInitialized = True
 
-    def _initialize(self):
+    def _initialize(self, seed = None):
         '''Default no-op version. Override in derived class.'''
         pass
 
@@ -356,38 +356,41 @@ class TicaLayer(TrainableLayer):
     def _calculateOutputSize(self, inputSize):
         return self.hiddenSize
 
+    def _initialize(self, seed = None):
+        '''Default no-op version. Override in derived class.'''
+        # Learn model
+        self.tica = TICA(nInputs            = prod(self.inputSize),
+                         hiddenLayerShape   = self.hiddenSize,
+                         neighborhoodParams = self.neighborhood,
+                         lambd              = self.lambd,
+                         epsilon            = self.epsilon,
+                         initWW             = False)
+        self.tica.initWW(seed)
+
     def _train(self, data, dataArrangement, trainParams, quick = False):
         maxFuncCalls = trainParams['maxFuncCalls']
         if quick:
             print 'QUICK MODE: chopping maxFuncCalls from %d to 1!' % maxFuncCalls
             maxFuncCalls = 1
             
-        # Learn model
-        tica = TICA(nInputs            = prod(self.inputSize),
-                    hiddenLayerShape   = self.hiddenSize,
-                    neighborhoodParams = self.neighborhood,
-                    lambd              = self.lambd,
-                    epsilon            = self.epsilon)
 
         tic = time.time()
-        tica.learn(data, maxFun = maxFuncCalls)
+        self.tica.learn(data, maxFun = maxFuncCalls)
         execTime = time.time() - tic
         #if logDir:
         #    saveToFile(os.path.join(logDir, (prefix if prefix else '') + 'tica.pkl.gz'), tica)    # save learned model
 
-        beginTotalCost, beginPoolingCost, beginReconstructionCost = tica.costLog[0]
-        endTotalCost,   endPoolingCost,   endReconstructionCost   = tica.costLog[-1]
+        beginTotalCost, beginPoolingCost, beginReconstructionCost = self.tica.costLog[0]
+        endTotalCost,   endPoolingCost,   endReconstructionCost   = self.tica.costLog[-1]
 
         print 'Training stats:'
         print '  begin {totalCost, poolingCost, reconCost} = %f, %f, %f' % (beginTotalCost, beginPoolingCost, beginReconstructionCost)
         print '    end {totalCost, poolingCost, reconCost} = %f, %f, %f' % (endTotalCost, endPoolingCost, endReconstructionCost)
-        print '  Number of cost evals:', len(tica.costLog)
+        print '  Number of cost evals:', len(self.tica.costLog)
         print '  Training time (wall)', execTime
 
         # Plot some results
         #plotImageRicaWW(tica.WW, imgShape, saveDir, tileShape = hiddenLayerShape, prefix = pc('WW_iterFinal'))
-
-        self.tica = tica
 
     def _forwardProp(self, data, dataArrangement):
         hidden, absPooledActivations = self.tica.getRepresentation(data)

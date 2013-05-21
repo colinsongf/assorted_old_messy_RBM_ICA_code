@@ -62,8 +62,9 @@ class RICA(object):
             self.initWW()
 
 
-    def initWW(self):
-        WW = random.normal(0, 1, self.WWshape)
+    def initWW(self, seed = None):
+        rng = random.RandomState(seed)      # if seed is None, this takes its seed from timer
+        WW = rng.normal(0, 1, self.WWshape)
         self.WW = (WW.T / sqrt(sum(WW ** 2, 1))).T
         #self.WW = WW.flatten()
         
