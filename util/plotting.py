@@ -272,13 +272,23 @@ def tile_raster_images(X, img_shape, tile_shape, tile_spacing = (0,0),
 
 
 
-def pil_imagesc(arr, epsilon = 1e-8, saveto = None, cmap = None):
+def imagesc(arr, shape = None, epsilon = 1e-8, saveto = None, cmap = None, show = True, scaleto = 200, peg0 = False):
     '''Like imagesc for Octave/Matlab, but using PIL.'''
 
+    if shape is None and len(arr.shape) == 1:
+        print 'If providing imagesc with a column or row vector, must specify shape manually.'
+        return
+    if shape is None:
+        shape = arr.shape
     imarray = numpy.array(arr, dtype = numpy.float32, copy=True)
-    imarray -= imarray.min()
-    imarray /= (imarray.max() + epsilon)
-    if len(arr.shape) > 2:
+    if peg0:
+        imarray /= 2 * (max(-imarray.min(), imarray.max()) + epsilon)
+        imarray += .5
+    else:
+        imarray -= imarray.min()
+        imarray /= (imarray.max() + epsilon)
+    imarray = reshape(imarray, shape)
+    if len(shape) > 2:
         # color image given
         arr = array(imarray * 255, dtype='uint8')
         image = Image.fromarray(arr)
@@ -294,5 +304,12 @@ def pil_imagesc(arr, epsilon = 1e-8, saveto = None, cmap = None):
 
     if saveto:
         image.save(saveto)
+    if show:
+        factor = max([scaleto / x for x in image.size] + [1])
+        imshow  = image.resize([x * factor for x in image.size])
+        imshow.show()
     return image
 
+
+
+pil_imagesc = imagesc

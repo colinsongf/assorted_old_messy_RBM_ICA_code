@@ -22,35 +22,46 @@ from util.cache import cached
 
 
 
-def plotImageData(data, imgShape, saveDir = None, prefix = 'imgdata', tileShape = (20,30)):
+def plotImageData(data, imgShape, saveDir = None, prefix = 'imgdata', tileShape = (20,30), show = False):
     isColor = (len(imgShape) > 2)
+    image = Image.fromarray(tile_raster_images(
+        X = data.T, img_shape = imgShape,
+        tile_shape = tileShape, tile_spacing=(1,1),
+        scale_rows_to_unit_interval = False))
     if saveDir:
-        image = Image.fromarray(tile_raster_images(
-            X = data.T, img_shape = imgShape,
-            tile_shape = tileShape, tile_spacing=(1,1),
-            scale_rows_to_unit_interval = False))
         image.save(os.path.join(saveDir, '%s.png' % prefix))
+    if show:
+        image.show()
+    image = Image.fromarray(tile_raster_images(
+        X = data.T, img_shape = imgShape,
+        tile_shape = tileShape, tile_spacing=(1,1),
+        scale_rows_to_unit_interval = True,
+        scale_colors_together = True))
+    if saveDir:
+        image.save(os.path.join(saveDir, '%s_rescale.png' % prefix))
+    if show:
+        image.show()
+    if isColor:
         image = Image.fromarray(tile_raster_images(
             X = data.T, img_shape = imgShape,
             tile_shape = tileShape, tile_spacing=(1,1),
             scale_rows_to_unit_interval = True,
-            scale_colors_together = True))
-        image.save(os.path.join(saveDir, '%s_rescale.png' % prefix))
-        if isColor:
-            image = Image.fromarray(tile_raster_images(
-                X = data.T, img_shape = imgShape,
-                tile_shape = tileShape, tile_spacing=(1,1),
-                scale_rows_to_unit_interval = True,
-                scale_colors_together = False))
+            scale_colors_together = False))
+        if saveDir:
             image.save(os.path.join(saveDir, '%s_rescale_indiv.png' % prefix))
+        if show:
+            image.show()
 
 
 
-def plotCov(data, saveDir = None, prefix = 'imgdata'):
-    if saveDir:
-        cv = cached(cov, data)
-        #cv = cov(data)
-        pil_imagesc(cv, saveto = os.path.join(saveDir, '%s_cov.png' % prefix))
+def plotCov(data, saveDir = None, prefix = 'imgdata', show = False):
+    cv = cached(cov, data)
+    #cv = cov(data)
+    saveto = os.path.join(saveDir, '%s_cov.png' % prefix) if saveDir else None
+    image = pil_imagesc(cv, saveto = saveto, show = False)
+    if show:
+        image.show()
+    return cv
 
 
 
