@@ -4,30 +4,31 @@
 
 tp = {}
 
+# For slow growth, we can use many more examples
 for ii in range(5):
-    tp['whitener%d' % ii] = {'examples': 250000}
+    tp['whitener%d' % ii] = {'examples': 500000}
     
-tp['tica1'] = {'examples': 250000,
+tp['tica1'] = {'examples': 500000,
                'method': 'lbfgs',
                'maxFuncCalls': 300,
                }
 
-tp['tica2'] = {'examples': 250000,
+tp['tica2'] = {'examples': 500000,
                'method': 'lbfgs',
                'maxFuncCalls': 300,
                }
 
-tp['tica3'] = {'examples': 250000,
+tp['tica3'] = {'examples': 500000,
                'method': 'lbfgs',
                'maxFuncCalls': 300,
                }
 
-tp['tica4'] = {'examples': 250000,
+tp['tica4'] = {'examples': 500000,
                'method': 'lbfgs',
                'maxFuncCalls': 300,
                }
 
-tp['tica5'] = {'examples': 250000,
+tp['tica5'] = {'examples': 500000,
                'method': 'lbfgs',
                'maxFuncCalls': 300,
                }
