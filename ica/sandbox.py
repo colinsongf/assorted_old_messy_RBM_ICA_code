@@ -25,6 +25,17 @@ def nyu():
 
 
 
+def upson():
+    dataLayer = UpsonData3({'name': 'data',
+                            'type': 'data',
+                            'imageSize': (240,320),
+                            'patchSize': (10,10),
+                            'stride': (10,10),
+                            'colors': 1})
+    return dataLayer
+
+
+
 def excessAbs(filt, dat, negate = False):
     '''dat: examples are in columns'''
     nfilt = filt / norm(filt)   # don't give credit for making filt bigger or smaller norm
@@ -38,6 +49,8 @@ def excessAbs(filt, dat, negate = False):
     actualAbs   = 1.0/NN * sqrt(actsq + 1e-6).sum()   # for 1e-6, same as above to within 1e-3
     
     excessAbs   = (actualAbs - expectedAbs) / expectedAbs
+    #excessAbs   = (actualAbs - expectedAbs)
+    #excessAbs   = actualAbs
     return excessAbs * (-1 if negate else 1)
 
 
