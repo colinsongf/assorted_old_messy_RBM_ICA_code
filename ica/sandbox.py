@@ -1,6 +1,7 @@
 #! /usr/bin/env ipythonpl
 
 from matplotlib import *
+figure = pyplot.figure    # for convenience
 from numpy import *
 from scipy.linalg import norm
 import Image
