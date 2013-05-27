@@ -71,7 +71,9 @@ def negAvgTwoNorm(vv, XX):
     grad_c_wrtw  = -2.0 / NN * dot(XX, act)
 
     # remove radial portion of gradient
-    grad = grad_c_wrtw - ww * dot(ww, grad_c_wrtw / norm(grad_c_wrtw))
+    #grad = grad_c_wrtw - ww * dot(ww, grad_c_wrtw / norm(grad_c_wrtw))
+    grad = grad_c_wrtw - ww * dot(grad_c_wrtw, ww)    # norm(ww) = 1
+    
     # shink or grow by relative size of vv vs ww
     grad /= norm(vv)
 
@@ -89,7 +91,7 @@ def wwOfvv(vv):
 
     
 
-def main():
+def check_negAvgTwoNorm():
     random.seed(0)
     dim = 100
     NN  = 1000
@@ -99,30 +101,27 @@ def main():
     kk = 0
 
     cost,anaGrad = negAvgTwoNorm(vv, XX)
-    print 'cost:', cost
-    print 'analytical grad:', anaGrad
-
     gradFn = Gradient(lambda v: negAvgTwoNorm(v, XX)[0])
     numGrad = gradFn(vv)
-    print 'numerical:', numGrad
 
-    print 'anaDiv / numDiv =', anaDiv / numDiv
-    print 'norm(vv)/2 =', norm(vv)/2
-    
+    if any(abs(anaGrad - numGrad) > 10 * gradFn.error_estimate) or gradFn.error_estimate.max() > 1e-10:
+        print 'Possible failure!'
 
-    gradfn = Gradient(lambda xx : negAvgTwoNorm(xx, XX))
-    
-    anaDiv = negAvgTwoNorm(vv, XX, 0, kk)[1]
-    print 'returned:', negAvgTwoNorm(vv, XX, 0, kk)
+        print 'cost:', cost
+        print '\nanalytical grad:', anaGrad
+        print '\nnumerical grad:', numGrad
+        print '\nanalytical / numerical:', anaGrad / numGrad
 
-    dfun = Derivative(lambda delta : negAvgTwoNorm(vv, XX, delta, kk)[0])
-    numDiv = dfun(0)
-    print 'numerical:', numDiv
+        print 'largest error estimate:', gradFn.error_estimate.max()
+        print 'errors / error_estimate:', abs(anaGrad - numGrad) / gradFn.error_estimate
+    else:
+        print 'Test passed! (max error: %s)' % abs(anaGrad - numGrad).max()
 
-    print 'anaDiv / numDiv =', anaDiv / numDiv
-    print 'norm(vv)/2 =', norm(vv)/2
-    
-    #embed()
+
+
+def main():
+    check_negAvgTwoNorm()
+
 
 
 if __name__ == '__main__':
