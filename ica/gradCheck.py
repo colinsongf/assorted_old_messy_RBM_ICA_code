@@ -12,8 +12,6 @@ from IPython import embed
 from numdifftools import Derivative, Gradient
 import pdb
 
-from cost import *
-
 
 
 ############################
@@ -40,7 +38,7 @@ def numericalCheckVectorGrad(costGradFunction, xx, otherArgs):
 
     #if any(abs(anaGrad - numGrad) > 10 * gradFn.error_estimate) or gradFn.error_estimate.max() > 1e-10:
     if abs(anaGrad - numGrad).max() > 1e-8:
-        print '%s: Possible failure!' % costGradFunction.__name__
+        print '[ERROR] %s: Possible failure!' % costGradFunction.__name__
 
         print 'cost:', cost
         print '\nanalytical grad:', anaGrad
@@ -50,7 +48,7 @@ def numericalCheckVectorGrad(costGradFunction, xx, otherArgs):
         print 'largest error estimate:', gradFn.error_estimate.max()
         print 'errors / error_estimate:', abs(anaGrad - numGrad) / gradFn.error_estimate
     else:
-        print '%s: Vector analytical gradient matches numerical approximation! (max diff: %s)' % (costGradFunction.__name__, abs(anaGrad - numGrad).max())
+        print '[OK]    %s: Vector analytical gradient matches numerical approximation (max diff: %s).' % (costGradFunction.__name__, abs(anaGrad - numGrad).max())
 
 
 
@@ -75,7 +73,7 @@ def numericalCheckMatrixGrad(costGradFunction, XX, otherArgs):
 
     #if any(abs(anaGrad - numGrad).flatten() > 10 * gradFn.error_estimate) or gradFn.error_estimate.max() > 1e-10:
     if abs(anaGrad - numGrad).max() > 1e-8:
-        print '%s: Possible failure!' % costGradFunction.__name__
+        print '[ERROR] %s: Possible failure!' % costGradFunction.__name__
 
         print 'cost:', cost
         print '\nanalytical grad:', anaGrad
@@ -85,59 +83,36 @@ def numericalCheckMatrixGrad(costGradFunction, XX, otherArgs):
         print 'largest error estimate:', gradFn.error_estimate.max()
         print 'errors / error_estimate:', abs(anaGrad - numGrad).flatten() / gradFn.error_estimate
     else:
-        print '%s: Matrix analytical gradient matches numerical approximation! (max diff: %s)' % (costGradFunction.__name__, abs(anaGrad - numGrad).max())
+        print '[OK]    %s: Matrix analytical gradient matches numerical approximation (max diff: %s).' % (costGradFunction.__name__, abs(anaGrad - numGrad).max())
 
 
 
-############################
-#
-#  Actual tests
-#
-############################
+def checkVectorMatrixGradientsEqual(costGradFunction_vec, costGradFunction_mat, XX, otherArgs):
+    '''For costGradFunction_vec of the form:
 
+    vCost, vGrad = costGradFunction_vec(xx, *otherArgs)
 
+    where xx and grad are vectors of the same shape, and
 
-def check_negAvgTwoNorm_vec():
-    random.seed(0)
-    dim = 100
-    NN  = 1000
-    XX = random.normal(0, 1, (dim,NN))
-    vv = random.normal(0, 1, (dim,))
-    
-    numericalCheckVectorGrad(negAvgTwoNorm_vec, vv, (XX,))
-    
-    
+    mCost, mGrad = costGradFunction_mat(XX, *otherArgs)
 
-def check_negAvgTwoNorm_mat():
-    random.seed(0)
-    dim = 10
-    NN  = 100
-    kk = 40
-    XX = random.normal(0, 1, (dim,NN))
-    VV = random.normal(0, 1, (dim,kk))
+    where XX and grad are matrices of the same shape, this function checks
+    that each column jj of mGrad is equal to vGrad for xx = XX[:,jj] and that
+    mCost = the total of vCost over all columns.
+    '''
 
-    numericalCheckMatrixGrad(negAvgTwoNorm_mat, VV, (XX,))
+    mCost,mGrad = costGradFunction_mat(XX, *otherArgs)
 
+    nColumns = XX.shape[1]
 
-
-def check_vs_vec_negAvgTwoNorm_mat():
-    random.seed(0)
-    dim = 100
-    NN  = 1000
-    kk = 400
-    XX = random.normal(0, 1, (dim,NN))
-    VV = random.normal(0, 1, (dim,kk))
-
-    cost,anaGrad = negAvgTwoNorm_mat(VV, XX)
-
-    vcostTotal = 0
+    vCostTotal = 0
     failure = False
-    for colIdx in range(kk):
-        vcost, vgrad = negAvgTwoNorm_vec(VV[:,colIdx], XX)
-        vcostTotal += vcost
-        if not all(abs(vgrad - anaGrad[:,colIdx]) < 1e-10):
+    for colIdx in range(nColumns):
+        vCost, vGrad = costGradFunction_vec(XX[:,colIdx], *otherArgs)
+        vCostTotal += vCost
+        if abs(vGrad - mGrad[:,colIdx]).max() > 1e-10:
             if not failure:
-                print 'Possible failure with column %d!' % colIdx
+                print '[ERROR] %s vs %s: Possible failure with column %d!' % (costGradFunction_vec.__name__, costGradFunction_mat.__name__, colIdx)
 
                 print 'cost:', cost
                 print '\ncol grad:', vgrad
@@ -148,20 +123,7 @@ def check_vs_vec_negAvgTwoNorm_mat():
                 print '(further errors supressed)'
             failure = True
     if not failure:
-        print 'Gradient tests passed!'
-    if abs(cost - vcostTotal) > kk * 1e-12:
-        print 'Costs do not match: %s != %s' % (cost, vcostTotal)
+        print '[OK]    %s vs %s: columns of matrix gradient match vector version.' % (costGradFunction_vec.__name__, costGradFunction_mat.__name__)
+    if abs(mCost - vCostTotal) > nColumns * 1e-12:
+        print '[ERROR] %s vs %s: Costs do not match: %s != %s' % (costGradFunction_vec.__name__, costGradFunction_mat.__name__, mCost, vCostTotal)
 
-    #embed()
-
-
-
-def main():
-    #check_negAvgTwoNorm_vec()
-    #check_negAvgTwoNorm_mat()
-    #check_vs_vec_negAvgTwoNorm_mat()
-
-    check_negAvgTwoNorm_mat2()
-
-if __name__ == '__main__':
-    main()

@@ -12,6 +12,8 @@ from IPython import embed
 from numdifftools import Derivative, Gradient
 import pdb
 
+from gradCheck import numericalCheckVectorGrad, numericalCheckMatrixGrad, checkVectorMatrixGradientsEqual
+
 
 
 ############################
@@ -80,8 +82,53 @@ def negAvgTwoNorm_mat(VV, XX):
 
 
 
-def negAvgTwoNorm_matflat(VVflat, XX, VVshape):
-    return negAvgTwoNorm_mat(reshape(VVflat, VVshape), XX)
+############################
+#
+#  Gradient checks
+#
+############################
 
 
+
+def check_negAvgTwoNorm_vec():
+    random.seed(0)
+    dim = 100
+    NN  = 1000
+    XX = random.normal(0, 1, (dim,NN))
+    vv = random.normal(0, 1, (dim,))
+    
+    numericalCheckVectorGrad(negAvgTwoNorm_vec, vv, (XX,))
+    
+def check_negAvgTwoNorm_mat():
+    random.seed(0)
+    dim = 10
+    NN  = 100
+    kk = 40
+    XX = random.normal(0, 1, (dim,NN))
+    VV = random.normal(0, 1, (dim,kk))
+
+    numericalCheckMatrixGrad(negAvgTwoNorm_mat, VV, (XX,))
+
+def check_negAvgTwoNorm_vecVmat():
+    random.seed(0)
+    dim = 100
+    NN  = 1000
+    kk = 400
+    XX = random.normal(0, 1, (dim,NN))
+    VV = random.normal(0, 1, (dim,kk))
+
+    checkVectorMatrixGradientsEqual(negAvgTwoNorm_vec, negAvgTwoNorm_mat, VV, (XX,))
+
+
+
+def tests():
+    # negAvgTwoNorm_*
+    check_negAvgTwoNorm_vec()
+    check_negAvgTwoNorm_mat()
+    check_negAvgTwoNorm_vecVmat()
+
+
+
+if __name__ == '__main__':
+    tests()
 
