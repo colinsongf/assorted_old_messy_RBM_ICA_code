@@ -46,6 +46,7 @@ class DataArrangement(object):
 class Layer(object):
 
     trainable = False      # default
+    nSublayers = 1         # default
     
     def __init__(self, params):
         self.name = params['name']
@@ -104,7 +105,7 @@ class NonDataLayer(Layer):
         tuple.'''
         return prevDistToNeighbor
 
-    def forwardProp(self, data, dataArrangement):
+    def forwardProp(self, data, dataArrangement, sublayer = None):
         '''
         Input:
         data - one example per column
@@ -121,13 +122,16 @@ class NonDataLayer(Layer):
             raise Exception('Must initialize %s layer first' % self.name)
         if self.trainable and not self.isTrained:
             print 'WARNING: forwardProp through untrained layer, might not be desired'
+        if sublayer is None: sublayer = self.nSublayers-1  # prop through all sublayers by default
+        if sublayer not in range(self.nSublayers):
+            raise Exception('sublayer must be None or in %s, but it is %s' % (repr(range(self.nSublayers)), repr(sublayer)))
         inDimension, numExamples = data.shape
         if inDimension != prod(self.inputSize):
             raise Exception('Layer %s expects examples of shape %s = %s rows but got %s data matrix'
                             % (self.name, self.inputSize, prod(self.inputSize), data.shape))
         self._checkDataArrangement(data, dataArrangement)
 
-        representation, newDataArrangement = self._forwardProp(data, dataArrangement)
+        representation, newDataArrangement = self._forwardProp(data, dataArrangement, sublayer)
 
         self._checkDataArrangement(representation, newDataArrangement)
         if len(dataArrangement.layerShape) != len(newDataArrangement.layerShape):
@@ -138,7 +142,7 @@ class NonDataLayer(Layer):
                             % (self.name, self.outputSize, prod(self.outputSize), representation.shape))
         return representation, newDataArrangement
 
-    def _forwardProp(self, data, dataArrangement):
+    def _forwardProp(self, data, dataArrangement, sublayer):
         '''Default pass through version. Override in derived classes
         if desired.'''
         return data, dataArrangement
@@ -328,7 +332,7 @@ class PCAWhiteningLayer(WhiteningLayer):
     def _train(self, data, dataArrangement, trainParams = None, quick = False):
         self.pcaWhiteningDataNormalizer = PCAWhiteningDataNormalizer(data)
 
-    def _forwardProp(self, data, dataArrangement):
+    def _forwardProp(self, data, dataArrangement, sublayer):
         dataWhite, junk = self.pcaWhiteningDataNormalizer.raw2normalized(data, unitNorm = True)
         return dataWhite, dataArrangement
 
@@ -339,6 +343,8 @@ class PCAWhiteningLayer(WhiteningLayer):
 ######################
 
 class TicaLayer(TrainableLayer):
+
+    nSublayers = 2   # hidden representation + pooled representation
 
     def __init__(self, params):
         super(TicaLayer, self).__init__(params)
@@ -392,9 +398,14 @@ class TicaLayer(TrainableLayer):
         # Plot some results
         #plotImageRicaWW(tica.WW, imgShape, saveDir, tileShape = hiddenLayerShape, prefix = pc('WW_iterFinal'))
 
-    def _forwardProp(self, data, dataArrangement):
+    def _forwardProp(self, data, dataArrangement, sublayer):
         hidden, absPooledActivations = self.tica.getRepresentation(data)
-        return absPooledActivations, dataArrangement
+        if sublayer == 0:
+            return hidden, dataArrangement
+        elif sublayer == 1:
+            return absPooledActivations, dataArrangement
+        else:
+            raise Exception('Unknown sublayer: %s' % sublayer)
 
     def _plot(self, data, dataArrangement, saveDir = None, prefix = None):
         '''Default no-op version. Override in derived class. It is up to the layer
@@ -434,7 +445,7 @@ class DownsampleLayer(NonDataLayer):
             else: # length 2
                 return (inputSize[0]/self.factor[0], inputSize[1]/self.factor[1])
 
-    def _forwardProp(self, data, dataArrangement):
+    def _forwardProp(self, data, dataArrangement, sublayer):
         dimension, numExamples = data.shape
 
         patches = reshape(data, self.inputSize + (numExamples,))
@@ -462,7 +473,7 @@ class LcnLayer(NonDataLayer):
         super(LcnLayer, self).__init__(params)
         self.gaussWidth = params['gaussWidth']
 
-    def _forwardProp(self, data, dataArrangement):
+    def _forwardProp(self, data, dataArrangement, sublayer):
         dimension, numExamples = data.shape
 
         gaussNeighbors = neighborMatrix(self.inputSize, self.gaussWidth, gaussian=True)
@@ -525,7 +536,7 @@ class ConcatenationLayer(NonDataLayer):
         else:
             raise Exception('logic error')
 
-    def _forwardProp(self, data, dataArrangement):
+    def _forwardProp(self, data, dataArrangement, sublayer):
         '''This is where the concatenation actually takes place.'''
 
         newLayerShape = tuple([1+(layerShape - concat) / stride for layerShape,concat,stride

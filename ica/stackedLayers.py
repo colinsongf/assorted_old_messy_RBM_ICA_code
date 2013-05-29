@@ -91,20 +91,25 @@ class StackedLayers(object):
             else:
                 print '--'
 
-    def forwardProp(self, data, dataArrangement, layerIdx = None):
+    def forwardProp(self, data, dataArrangement, layerIdx = None, sublayer = None):
         '''Push the given data through the layers 0, 1, ..., layerIdx.
         If layerIdx is None, set layerIdx = max
         '''
 
         if layerIdx is None: layerIdx = len(self.layers)-1
+        if sublayer is None: sublayer = self.layers[layerIdx].nSublayers-1
 
-        print 'forwardProp from layer 1 through %d' % (layerIdx)
+        print 'forwardProp from layer 1 through %d (s%d)' % (layerIdx, sublayer)
         currentRep = data
         currentArrangement = dataArrangement
         for ii in range(1, layerIdx+1):
             layer = self.layers[ii]
             print '  fp through layer %d - %s (%s)' % (ii, layer.name, layer.layerType)
-            newRep, newArrangement = layer.forwardProp(currentRep, currentArrangement)
+            if ii == layerIdx:
+                # only pass sublayer selection to last layer
+                newRep, newArrangement = layer.forwardProp(currentRep, currentArrangement, sublayer)
+            else:
+                newRep, newArrangement = layer.forwardProp(currentRep, currentArrangement)
             print ('    layer transformed data from\n      %s, %s ->\n      %s, %s'
                    % (currentRep.shape, currentArrangement, newRep.shape, newArrangement))
             currentRep = newRep
@@ -230,35 +235,37 @@ class StackedLayers(object):
 
         return rawDataLargePatches, rawDataPatches
     
-    def visLayer(self, layerIdx, saveDir = None):
+    def visLayer(self, layerIdx, sublayer = None, saveDir = None, show = False):
         layer     = self.layers[layerIdx]
+        if sublayer is None: sublayer = layer.nSublayers - 1  # max by default
         dataLayer = self.layers[0]
 
         numExamples = 100000
-        prefix = 'layer_%02d_%s_' % (layerIdx, layer.name)
+        prefix = 'layer_%02d_%s_s%d_' % (layerIdx, layer.name, sublayer)
         seesPixels = self._seesPixels(layer, dataLayer)
 
         # Get data and forward prop
         rawDataLargePatches, rawDataPatches = self.getDataForLayer(layerIdx, numExamples)
         dataArrangementLayer0 = DataArrangement(layerShape = layer.seesPatches, nLayers = numExamples)
         tic = Tic('forward prop')
-        activations, dataArrangement = self.forwardProp(rawDataPatches, dataArrangementLayer0, layerIdx)
+        activations, dataArrangement = self.forwardProp(rawDataPatches, dataArrangementLayer0, layerIdx, sublayer)
         tic()
-        
+
         # 0. Inputs
-        plotImageData(rawDataLargePatches, seesPixels, saveDir, prefix = prefix + '0_input', tileShape = (10,10))
+        plotImageData(rawDataLargePatches, seesPixels, saveDir, prefix = prefix + '0_input',
+                      tileShape = (10,10), show = show)
 
         # 1. Top activations
         plotTopActivations(activations, rawDataLargePatches, seesPixels, saveDir = saveDir,
-                           nActivations = 50, nSamples = 20, prefix = prefix + '1_topact')
+                           nActivations = 50, nSamples = 20, prefix = prefix + '1_topact', show = show)
 
     def visAll(self, saveDir = None):
-        # NOTE: untested...
         for layerIdx, layer in enumerate(self.layers):
-            if layer.layerType == 'tica' and not layer.isTrained:
-                print '\nvis layer %2d: %s is tica and not trained, so stopping' % (layerIdx, layer.name)
+            if layer.trainable and not layer.isTrained:
+                print '\nvis layer %2d: %s is trainable but not trained, so stopping' % (layerIdx, layer.name)
                 return
 
             if layer.layerType in ('tica', 'downsample', 'lcn'):
-                print '\nvis layer %2d: %s' % (layerIdx, layer.name)
-                self.visLayer(layerIdx, saveDir)
+                for sublayer in range(layer.nSublayers):
+                    print '\nvis layer %2d (s%d): %s' % (layerIdx, sublayer, layer.name)
+                    self.visLayer(layerIdx, sublayer, saveDir)
