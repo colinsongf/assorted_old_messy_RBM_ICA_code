@@ -81,6 +81,10 @@ def negAvgTwoNorm_mat(VV, XX):
     return cost, grad
 
 
+def unflatWrapper(xflat, func, xshape, *args):
+    # This might not quite work? See Evernote [Tuesday, May 28, 2013,  1:42 pm]
+    return func(reshape(xflat, xshape), *args)
+
 
 ############################
 #

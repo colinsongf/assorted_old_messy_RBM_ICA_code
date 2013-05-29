@@ -11,6 +11,7 @@ from scipy.optimize import minimize
 from stackedLayers import *
 from layers import *
 from util.plotting import *
+from cost import *
 
 
 
