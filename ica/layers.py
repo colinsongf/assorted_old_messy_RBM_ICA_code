@@ -105,7 +105,7 @@ class NonDataLayer(Layer):
         tuple.'''
         return prevDistToNeighbor
 
-    def forwardProp(self, data, dataArrangement, sublayer = None):
+    def forwardProp(self, data, dataArrangement, sublayer = None, withGradMatrix = False):
         '''
         Input:
         data - one example per column
@@ -113,6 +113,12 @@ class NonDataLayer(Layer):
         dataArrangement - specifies how the data should be interpreted.
         Many classes will not care about the arrangement
         of the data, in which case they can ignore dataArrangement
+
+        withGradMatrix - True to also return the matrix of partial
+        derivatives of the output w.r.t. the input. Note: for a single
+        input where data.shape = (N,1), this will return a matrix of
+        shape (inputSize,outputSize). For M inputs, the return will be
+        of shape (M, inputSize, outputSize).
 
         Returns:
         representation, newDataArrangement
@@ -131,8 +137,17 @@ class NonDataLayer(Layer):
                             % (self.name, self.inputSize, prod(self.inputSize), data.shape))
         self._checkDataArrangement(data, dataArrangement)
 
-        representation, newDataArrangement = self._forwardProp(data, dataArrangement, sublayer)
+        if withGradMatrix:
+            raise Exception('withGradMatrix is not really production ready yet. Do not use.')
 
+        output = self._forwardProp(data, dataArrangement, sublayer, withGradMatrix)
+
+        if withGradMatrix:
+            representation, newDataArrangement, gradMatrix = output
+        else:
+            representation, newDataArrangement = output
+
+            
         self._checkDataArrangement(representation, newDataArrangement)
         if len(dataArrangement.layerShape) != len(newDataArrangement.layerShape):
             raise Exception('Conversion from %s to %s is invalid'
@@ -142,10 +157,13 @@ class NonDataLayer(Layer):
                             % (self.name, self.outputSize, prod(self.outputSize), representation.shape))
         return representation, newDataArrangement
 
-    def _forwardProp(self, data, dataArrangement, sublayer):
+    def _forwardProp(self, data, dataArrangement, sublayer, withGradMatrix):
         '''Default pass through version. Override in derived classes
         if desired.'''
-        return data, dataArrangement
+        if withGradMatrix:
+            return data, dataArrangement
+        else:
+            return data, dataArrangement, tile(eye(data.shape[0]), (data.shape[1],1,1))
 
     def _checkDataArrangement(self, data, dataArrangement):
         if dataArrangement.totalPatches() != data.shape[1]:
@@ -332,7 +350,9 @@ class PCAWhiteningLayer(WhiteningLayer):
     def _train(self, data, dataArrangement, trainParams = None, quick = False):
         self.pcaWhiteningDataNormalizer = PCAWhiteningDataNormalizer(data)
 
-    def _forwardProp(self, data, dataArrangement, sublayer):
+    def _forwardProp(self, data, dataArrangement, sublayer, withGradMatrix):
+        if withGradMatrix:
+            raise Exception('Not yet implemented')
         dataWhite, junk = self.pcaWhiteningDataNormalizer.raw2normalized(data, unitNorm = True)
         return dataWhite, dataArrangement
 
@@ -398,8 +418,11 @@ class TicaLayer(TrainableLayer):
         # Plot some results
         #plotImageRicaWW(tica.WW, imgShape, saveDir, tileShape = hiddenLayerShape, prefix = pc('WW_iterFinal'))
 
-    def _forwardProp(self, data, dataArrangement, sublayer):
+    def _forwardProp(self, data, dataArrangement, sublayer, withGradMatrix):
         hidden, absPooledActivations = self.tica.getRepresentation(data)
+
+        HERE
+        
         if sublayer == 0:
             return hidden, dataArrangement
         elif sublayer == 1:
@@ -445,7 +468,9 @@ class DownsampleLayer(NonDataLayer):
             else: # length 2
                 return (inputSize[0]/self.factor[0], inputSize[1]/self.factor[1])
 
-    def _forwardProp(self, data, dataArrangement, sublayer):
+    def _forwardProp(self, data, dataArrangement, sublayer, withGradMatrix):
+        if withGradMatrix:
+            raise Exception('not yet implemented')
         dimension, numExamples = data.shape
 
         patches = reshape(data, self.inputSize + (numExamples,))
@@ -473,7 +498,9 @@ class LcnLayer(NonDataLayer):
         super(LcnLayer, self).__init__(params)
         self.gaussWidth = params['gaussWidth']
 
-    def _forwardProp(self, data, dataArrangement, sublayer):
+    def _forwardProp(self, data, dataArrangement, sublayer, withGradMatrix):
+        if withGradMatrix:
+            raise Exception('not yet implemented')
         dimension, numExamples = data.shape
 
         gaussNeighbors = neighborMatrix(self.inputSize, self.gaussWidth, gaussian=True)
@@ -536,8 +563,11 @@ class ConcatenationLayer(NonDataLayer):
         else:
             raise Exception('logic error')
 
-    def _forwardProp(self, data, dataArrangement, sublayer):
+    def _forwardProp(self, data, dataArrangement, sublayer, withGradMatrix):
         '''This is where the concatenation actually takes place.'''
+
+        if withGradMatrix:
+            raise Exception('not yet implemented')
 
         newLayerShape = tuple([1+(layerShape - concat) / stride for layerShape,concat,stride
                                in zip(dataArrangement.layerShape, self.concat, self.stride)])
