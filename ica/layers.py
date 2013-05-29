@@ -419,9 +419,10 @@ class TicaLayer(TrainableLayer):
         #plotImageRicaWW(tica.WW, imgShape, saveDir, tileShape = hiddenLayerShape, prefix = pc('WW_iterFinal'))
 
     def _forwardProp(self, data, dataArrangement, sublayer, withGradMatrix):
-        hidden, absPooledActivations = self.tica.getRepresentation(data)
+        if withGradMatrix:
+            raise Exception('not yet implemented')
 
-        HERE
+        hidden, absPooledActivations = self.tica.getRepresentation(data)
         
         if sublayer == 0:
             return hidden, dataArrangement

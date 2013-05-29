@@ -3,7 +3,9 @@
 import pdb
 import os
 import gc
-from numpy import zeros, prod, reshape
+from numpy import zeros, ones, prod, reshape
+from scipy.optimize import minimize
+from scipy.linalg import norm
 from IPython import embed
 
 from util.dataLoaders import loadFromPklGz, saveToFile
@@ -91,27 +93,49 @@ class StackedLayers(object):
             else:
                 print '--'
 
-    def forwardProp(self, data, dataArrangement, layerIdx = None, sublayer = None):
-        '''Push the given data through the layers 0, 1, ..., layerIdx.
-        If layerIdx is None, set layerIdx = max
+    def forwardPropPixelSamples(self, data, startLayerIdx = 0, layerIdx = None, sublayer = None, quiet = False):
+        '''Push the given large pixel samples through the layers startLayerIdx, startLayerIdx+1, ..., layerIdx.
+        Assume the sample is from layer startLayerIdx (default: 0, or dataLayer).
+        If layerIdx is None, set layerIdx = max.
+        If sublayer is None, set sublayer = max.
         '''
 
         if layerIdx is None: layerIdx = len(self.layers)-1
         if sublayer is None: sublayer = self.layers[layerIdx].nSublayers-1
 
-        print 'forwardProp from layer 1 through %d (s%d)' % (layerIdx, sublayer)
+        layer = self.layers[layerIdx]
+        dataLayer = self.layers[0]
+
+        dataArrangement = DataArrangement(layerShape = layer.seesPatches, nLayers = data.shape[1])
+        dataPatches = self.getSampledAndStackedPatches(data, layer, dataLayer)
+
+        return self.forwardProp(dataPatches, dataArrangement, startLayerIdx, layerIdx, sublayer, quiet = quiet)
+            
+    def forwardProp(self, data, dataArrangement, startLayerIdx = 0, layerIdx = None, sublayer = None, quiet = False):
+        '''Push the given data through the layers 0, 1, ..., layerIdx.
+        If layerIdx is None, set layerIdx = max.
+        If sublayer is None, set sublayer = max.
+        '''
+
+        if layerIdx is None: layerIdx = len(self.layers)-1
+        if sublayer is None: sublayer = self.layers[layerIdx].nSublayers-1
+
+        if not quiet:
+            print 'forwardProp from layer %d through %d (s%d)' % (startLayerIdx+1, layerIdx, sublayer)
         currentRep = data
         currentArrangement = dataArrangement
-        for ii in range(1, layerIdx+1):
+        for ii in range(startLayerIdx+1, layerIdx+1):
             layer = self.layers[ii]
-            print '  fp through layer %d - %s (%s)' % (ii, layer.name, layer.layerType)
+            if not quiet:
+                print '  fp through layer %d - %s (%s)' % (ii, layer.name, layer.layerType)
             if ii == layerIdx:
                 # only pass sublayer selection to last layer
                 newRep, newArrangement = layer.forwardProp(currentRep, currentArrangement, sublayer)
             else:
                 newRep, newArrangement = layer.forwardProp(currentRep, currentArrangement)
-            print ('    layer transformed data from\n      %s, %s ->\n      %s, %s'
-                   % (currentRep.shape, currentArrangement, newRep.shape, newArrangement))
+            if not quiet:
+                print ('    layer transformed data from\n      %s, %s ->\n      %s, %s'
+                       % (currentRep.shape, currentArrangement, newRep.shape, newArrangement))
             currentRep = newRep
             currentArrangement = newArrangement
         return currentRep, currentArrangement
@@ -209,8 +233,16 @@ class StackedLayers(object):
         rawDataLargePatches = dataLayer.getData(seesPixels, numExamples, seed = 0)
         tic()
 
+        rawDataPatches = self.getSampledAndStackedPatches(rawDataLargePatches, layer, dataLayer)
+
+        return rawDataLargePatches, rawDataPatches
+
+    def getSampledAndStackedPatches(self, largePatches, layer, dataLayer):
+        seesPixels = self._seesPixels(layer, dataLayer)
+        numExamples = largePatches.shape[1]
+
         # Reshape into patches
-        rawDataPatches = zeros((prod(dataLayer.patchSize), prod(layer.seesPatches)*numExamples))
+        stackedPatches = zeros((prod(dataLayer.patchSize), prod(layer.seesPatches)*numExamples))
 
         # BEGIN: 2D data assumption
         # Note: this only works for 2D data! Add other cases if needed.
@@ -219,21 +251,50 @@ class StackedLayers(object):
         sp0,sp1 = layer.seesPatches
         ps0,ps1 = dataLayer.patchSize
         st0,st1 = dataLayer.stride
-        for largePatchIdx in xrange(rawDataLargePatches.shape[1]):
-            thisLargePatch = reshape(rawDataLargePatches[:,largePatchIdx], seesPixels)
+        for largePatchIdx in xrange(largePatches.shape[1]):
+            thisLargePatch = reshape(largePatches[:,largePatchIdx], seesPixels)
             # Note: this code flattens in the default numpy
             # flattening order: C-order, or row-major order.
             for ii in xrange(sp0):
                 for jj in xrange(sp1):
-                    rawDataPatches[:,counter] = thisLargePatch[(ii*st0):(ii*st0+ps0),(jj*st1):(jj*st1+ps1)].flatten()
+                    stackedPatches[:,counter] = thisLargePatch[(ii*st0):(ii*st0+ps0),(jj*st1):(jj*st1+ps1)].flatten()
                     counter += 1
-        # just check last patch 
-        assert rawDataPatches.shape[0] == len(thisLargePatch[(ii*st0):(ii*st0+ps0),(jj*st1):(jj*st1+ps1)].flatten())
-        assert rawDataPatches.shape[1] == counter
+        # just check last patch
+        assert stackedPatches.shape[0] == len(thisLargePatch[(ii*st0):(ii*st0+ps0),(jj*st1):(jj*st1+ps1)].flatten())
+        assert stackedPatches.shape[1] == counter
         # END: 2D data assumption
-        #################
 
-        return rawDataLargePatches, rawDataPatches
+        return stackedPatches
+
+    def optimalInputForUnit(self, unitIdx, startLayerIdx = 0, layerIdx = None, sublayer = None):
+        if layerIdx is None: layerIdx = len(self.layers)-1
+        layer = self.layers[layerIdx]
+        if sublayer is None: sublayer = layer.nSublayers - 1  # max by default
+        dataLayer = self.layers[0]
+
+        seesPixels = self._seesPixels(layer, dataLayer)
+
+        if self.layers[startLayerIdx].seesPatches != dataLayer.seesPatches:
+            raise Exception('Probably starting too high in the network')
+
+        x0 = ones(seesPixels)
+        #currentRep, currentArrangement = self.forwardPropPixelSamples(data, startLayerIdx = 0, layerIdx = None, sublayer = None):
+        #activationFunction = lambda x : self.forwardPropPixelSamples(x, startLayerIdx, layerIdx, sublayer)[0].flatten()[unitIdx]
+        def activationFunction(xx):
+            pixelPatch = reshape(xx.copy(), (prod(seesPixels), 1))
+            pixelPatch /= (norm(pixelPatch) + 1e-12)
+            rep, arrangement = self.forwardPropPixelSamples(pixelPatch, startLayerIdx = startLayerIdx,
+                                                            layerIdx = layerIdx, sublayer = sublayer, quiet = True)
+            return -rep.flatten()[unitIdx]   # negate to maximize!
+        
+        results = minimize(activationFunction,
+                           x0.flatten(),
+                           jac = False,    # have to estimate gradient
+                           method = 'L-BFGS-B',
+                           options = {'maxiter': 200, 'disp': True})
+        xOpt = results['x']
+
+        return xOpt
     
     def visLayer(self, layerIdx, sublayer = None, saveDir = None, show = False):
         layer     = self.layers[layerIdx]
