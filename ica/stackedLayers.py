@@ -140,7 +140,7 @@ class StackedLayers(object):
             currentArrangement = newArrangement
         return currentRep, currentArrangement
 
-    def train(self, trainParams, saveDir = None, quick = False):
+    def train(self, trainParams, saveDir = None, quick = False, maxlayer = -1):
         # check to make sure each trainParam matches a known layer...
         for layerName in trainParams.keys():
             if layerName not in self.layerNames:
@@ -153,8 +153,10 @@ class StackedLayers(object):
 
         dataLayer = self.layers[0]
 
+        if maxlayer == -1:
+            maxlayer = len(self.layers)-1
         trainedSomething = False
-        for layerIdx, layer in enumerate(self.layers):
+        for layerIdx, layer in enumerate(self.layers[:maxlayer+1]):
             if layer.trainable and not layer.isTrained:
                 trainedSomething = True
                 print '\n' + '*' * 40
