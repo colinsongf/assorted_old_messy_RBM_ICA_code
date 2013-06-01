@@ -11,7 +11,7 @@ from IPython import embed
 from util.dataLoaders import loadFromPklGz, saveToFile
 from util.misc import dictPrettyPrint, relhack, Tic
 from layers import layerClassNames, DataArrangement, Layer, DataLayer, UpsonData3, NYU2_Labeled, WhiteningLayer, PCAWhiteningLayer, TicaLayer, DownsampleLayer, LcnLayer, ConcatenationLayer
-from visualize import plotImageData, plotTopActivations
+from visualize import plotImageData, plotTopActivations, plotGrayActivations, plotReshapedActivations, plotActHist
 
 
 
@@ -184,7 +184,7 @@ class StackedLayers(object):
                 # Push data through N-1 layers
                 dataArrangementLayer0 = DataArrangement(layerShape = layer.seesPatches, nLayers = numExamples)
                 tic = Tic('forward prop')
-                trainPrevLayerData, dataArrangementPrevLayer = self.forwardProp(trainRawDataPatches, dataArrangementLayer0, layerIdx-1)
+                trainPrevLayerData, dataArrangementPrevLayer = self.forwardProp(trainRawDataPatches, dataArrangementLayer0, layerIdx=layerIdx-1)
                 tic()
                 print 'Memory used to store trainPrevLayerData: %g MB' % (trainPrevLayerData.nbytes/1e6)
 
@@ -291,12 +291,12 @@ class StackedLayers(object):
                            x0.flatten(),
                            jac = False,    # have to estimate gradient
                            method = 'L-BFGS-B',
-                           options = {'maxiter': 200, 'disp': True})
+                           options = {'maxiter': 50, 'disp': False})
         xOpt = results['x']
 
         return xOpt
     
-    def visLayer(self, layerIdx, sublayer = None, saveDir = None, show = False):
+    def visLayer(self, layerIdx, sublayer = None, startLayerIdx = 0, saveDir = None, show = False):
         layer     = self.layers[layerIdx]
         if sublayer is None: sublayer = layer.nSublayers - 1  # max by default
         dataLayer = self.layers[0]
@@ -309,7 +309,7 @@ class StackedLayers(object):
         rawDataLargePatches, rawDataPatches = self.getDataForLayer(layerIdx, numExamples)
         dataArrangementLayer0 = DataArrangement(layerShape = layer.seesPatches, nLayers = numExamples)
         tic = Tic('forward prop')
-        activations, dataArrangement = self.forwardProp(rawDataPatches, dataArrangementLayer0, layerIdx, sublayer)
+        activations, dataArrangement = self.forwardProp(rawDataPatches, dataArrangementLayer0, layerIdx=layerIdx, sublayer=sublayer)
         tic()
 
         # 0. Inputs
@@ -320,6 +320,35 @@ class StackedLayers(object):
         plotTopActivations(activations, rawDataLargePatches, seesPixels, saveDir = saveDir,
                            nActivations = 50, nSamples = 20, prefix = prefix + '1_topact', show = show)
 
+        # 2. Numerically optimized inputs
+        if layer.layerType == 'tica' and sublayer == 0:
+            embeddingShape = layer.tica.hiddenLayerShape
+        else:
+            embeddingShape = layer.outputSize
+
+        optInputs = zeros((prod(seesPixels), prod(embeddingShape)))
+        unitsToVis = prod(embeddingShape)
+        QUICKHACK = True
+        if QUICKHACK:
+            unitsToVis = 0
+            print 'QUICKHACK: only visualizing first %d units!' % unitsToVis
+        for ii in range(unitsToVis):
+            optInputs[:,ii] = self.optimalInputForUnit(ii, startLayerIdx = startLayerIdx, layerIdx = layerIdx, sublayer = sublayer)
+        plotImageData(optInputs, seesPixels, saveDir, prefix = prefix + '2_numopt',
+                      tileShape = embeddingShape, show = show, onlyRescaled = True)
+
+        # 3. layer activations
+        plotActHist(activations, saveDir = saveDir, prefix = prefix + '3_acthist', show = show)
+
+        # 4. layer activations
+        plotGrayActivations(activations, number = 500, saveDir = saveDir, prefix = prefix + '4_actunroll', show = show)
+
+        # 5. reshaped activations
+        plotReshapedActivations(activations, tileShape = (20,30), embeddingShape = embeddingShape,
+                                prefix = prefix + '5_actembed', saveDir = saveDir, show = show)
+
+        
+
     def visAll(self, saveDir = None):
         for layerIdx, layer in enumerate(self.layers):
             if layer.trainable and not layer.isTrained:
@@ -329,4 +358,4 @@ class StackedLayers(object):
             if layer.layerType in ('tica', 'downsample', 'lcn'):
                 for sublayer in range(layer.nSublayers):
                     print '\nvis layer %2d (s%d): %s' % (layerIdx, sublayer, layer.name)
-                    self.visLayer(layerIdx, sublayer, saveDir)
+                    self.visLayer(layerIdx, sublayer, startLayerIdx = 1, saveDir = saveDir)    # hardcoded to 1!!

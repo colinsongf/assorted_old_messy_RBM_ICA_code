@@ -14,7 +14,7 @@ import os
 import sys
 import ipdb as pdb
 from PIL import Image, ImageFont, ImageDraw
-from matplotlib import cm
+from matplotlib import cm, pyplot
 from numpy import *
 
 from util.plotting import tile_raster_images, pil_imagesc, scale_some_rows_to_unit_interval, scale_rows_together_to_unit_interval
@@ -22,16 +22,17 @@ from util.cache import cached
 
 
 
-def plotImageData(data, imgShape, saveDir = None, prefix = 'imgdata', tileShape = (20,30), show = False):
+def plotImageData(data, imgShape, saveDir = None, prefix = 'imgdata', tileShape = (20,30), show = False, onlyRescaled = False):
     isColor = (len(imgShape) > 2)
-    image = Image.fromarray(tile_raster_images(
-        X = data.T, img_shape = imgShape,
-        tile_shape = tileShape, tile_spacing=(1,1),
-        scale_rows_to_unit_interval = False))
-    if saveDir:
-        image.save(os.path.join(saveDir, '%s.png' % prefix))
-    if show:
-        image.show()
+    if not onlyRescaled:
+        image = Image.fromarray(tile_raster_images(
+            X = data.T, img_shape = imgShape,
+            tile_shape = tileShape, tile_spacing=(1,1),
+            scale_rows_to_unit_interval = False))
+        if saveDir:
+            image.save(os.path.join(saveDir, '%s.png' % prefix))
+        if show:
+            image.show()
     image = Image.fromarray(tile_raster_images(
         X = data.T, img_shape = imgShape,
         tile_shape = tileShape, tile_spacing=(1,1),
@@ -118,6 +119,35 @@ def plotRicaActivations(WW, data, saveDir = None, prefix = 'activations'):
         image.save(os.path.join(saveDir, '%s_data.png' % prefix))
         image = Image.fromarray((hiddenActivationsRandom.T + 1) * 128).convert('L')
         image.save(os.path.join(saveDir, '%s_random.png' % prefix))
+
+
+
+def plotGrayActivations(activations, number = 200, saveDir = None, prefix = 'activations', show = False):
+    '''activations: one example per column'''
+    image = Image.fromarray((activations[:,:number]+1) * 128).convert('L')
+    if saveDir:
+        image.save(os.path.join(saveDir, '%s.png' % prefix))
+    if show:
+        image.show()
+
+
+
+def plotReshapedActivations(act, tileShape, embeddingShape, prefix, saveDir = None, show = False):
+    number = prod(tileShape)
+    dat = act[:,:number].copy()
+    dat -= dat.min()
+    dat /- dat.max()
+    plotImageData(dat, imgShape = embeddingShape, prefix = prefix, saveDir = saveDir, show = show)
+
+
+
+def plotActHist(act, bins = 50, prefix = 'acthist', saveDir = None, show = False):
+    pyplot.clf()
+    pyplot.hist(act.flatten(), bins = bins)
+    if saveDir:
+        pyplot.savefig(os.path.join(saveDir, '%s.png' % prefix))
+    if show:
+        pyplot.show()
 
 
 
