@@ -14,6 +14,7 @@ from util.dataPrep import PCAWhiteningDataNormalizer
 from util.dataLoaders import loadNYU2Data
 from makeData import makeUpsonRovio3
 from tica import TICA, neighborMatrix
+from cost import autoencoderCost, autoencoderRepresentation
 
 
 
@@ -383,8 +384,7 @@ class TicaLayer(TrainableLayer):
         return self.hiddenSize
 
     def _initialize(self, seed = None):
-        '''Default no-op version. Override in derived class.'''
-        # Learn model
+        # Set up untrained TICA
         self.tica = TICA(nInputs            = prod(self.inputSize),
                          hiddenLayerShape   = self.hiddenSize,
                          neighborhoodParams = self.neighborhood,
@@ -437,6 +437,110 @@ class TicaLayer(TrainableLayer):
         '''
         if saveDir:
             self.tica.plotCostLog(saveDir, prefix)
+
+
+
+class SparseAELayer(TrainableLayer):
+
+    ##nSublayers = 2   # hidden representation + pooled representation
+
+    def __init__(self, params):
+        super(SparseAELayer, self).__init__(params)
+
+        self.hiddenSize = params['hiddenSize']
+        self.beta       = params['lambd']
+        self.rho        = params['rho']
+
+        self.W1 = None
+        self.b1 = None
+        self.W2 = None
+        self.b2 = None
+        self.W1shape = None
+        self.b1shape = None
+        self.W2shape = None
+        self.b2shape = None
+
+        self.costLog = None
+
+        assert not isinstance(self.hiddenSize, tuple)  # should just be a number
+
+    def _calculateOutputSize(self, inputSize):
+        return (self.hiddenSize, )    # return as tuple
+
+    def _initialize(self, seed = None):
+        # Initialize weights
+
+        self.W1shape = (self.hiddenSize, self.inputSize)
+        self.b1shape = (self.hiddenSize,)
+        self.W2shape = (self.inputSize, self.hiddenSize)
+        self.b2shape = (self.inputSize,)
+
+        radius = sqrt(6 / (self.inputSize + self.outputSize + 1))
+        self.W1 = random.uniform(-radius, radius, self.W1shape)
+        self.b1 = zeros(self.b1shape)
+        self.W2 = random.uniform(-radius, radius, self.W2shape)
+        self.b2 = zeros(self.b2shape)
+
+        #theta = concatenate((W1.flatten(), b1.flatten(), W2.flatten(), b2.flatten()))
+
+    def _train(self, data, dataArrangement, trainParams, quick = False):
+        maxFuncCalls = trainParams['maxFuncCalls']
+        if quick:
+            print 'QUICK MODE: chopping maxFuncCalls from %d to 1!' % maxFuncCalls
+            maxFuncCalls = 1
+            
+
+        tic = time.time()
+
+        theta0 = concatenate((self.W1.flatten(), self.b1.flatten(), self.W2.flatten(), self.b2.flatten()))
+
+        results = minimize(autoencoderCost,
+                           theta0,
+                           (data, self.hiddenSize, self.beta, self.rho),
+                           jac = True,    # cost function retuns both value and gradient
+                           method = 'L-BFGS-B',
+                           options = {'maxiter': maxFun, 'disp': True})
+        
+        fval = results['fun']
+        wallSeconds = time.time() - startWall
+        print 'Optimization results:'
+        for key in ['status', 'nfev', 'success', 'fun', 'message']:
+            print '  %20s: %s' % (key, results[key])
+        print '  %20s: %s' % ('fval', fval)
+        print '  %20s: %s' % ('fval/example', fval/data.shape[1])
+        print '  %20s: %s' % ('wall time', fmtSeconds(wallSeconds))
+        print '  %20s: %s' % ('wall time/funcall', fmtSeconds(wallSeconds / results['nfev']))
+
+        theta = results['x']
+
+        # Unpack theta into W and b parameters
+        begin = 0
+        W1 = reshape(theta[begin:begin+prod(self.W1shape)], self.W1shape);    begin += prod(self.W1shape)
+        b1 = reshape(theta[begin:begin+prod(self.b1shape)], self.b1shape);    begin += prod(self.b1shape)
+        W2 = reshape(theta[begin:begin+prod(self.W2shape)], self.W2shape);    begin += prod(self.W2shape)
+        b2 = reshape(theta[begin:begin+prod(self.b2shape)], self.b2shape);
+        
+        execTime = time.time() - tic
+
+        print 'Training stats:'
+        print '  Number of cost evals:', len(self.costLog)
+        print '  Training time (wall)', execTime
+
+    def _forwardProp(self, data, dataArrangement, sublayer, withGradMatrix):
+        if withGradMatrix:
+            raise Exception('not yet implemented')
+
+        if sublayer != 0:
+            raise Exception('Unknown sublayer: %s' % sublayer)
+
+        a2 = autoencoderRepresentation(self.W1, self.b1, data)
+        return a2, dataArrangement
+        
+    def _plot(self, data, dataArrangement, saveDir = None, prefix = None):
+        '''Default no-op version. Override in derived class. It is up to the layer
+        what to plot.
+        '''
+        pass
 
 
 
@@ -620,6 +724,7 @@ class ConcatenationLayer(NonDataLayer):
 layerClassNames = {'data':       'dataClass',       # load the class specified by DataClass
                    'whitener':   'whitenerClass',   # load the class specified by whitenerClass 
                    'tica':       TicaLayer,
+                   'ae':         SparseAELayer,
                    'downsample': DownsampleLayer,
                    'lcn':        LcnLayer,
                    'concat':     ConcatenationLayer,

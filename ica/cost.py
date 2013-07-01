@@ -89,8 +89,21 @@ def unflatWrapper(xflat, func, xshape, *args):
 
 
 
+def autoencoderRepresentation(W1, b1, XX):
+    '''Paired with autoencoderCost.
+
+    Returns the hidden layer representation of XX given weights (W1, b1). Uses sigmoid activation with range 0 to 1.'''
+
+    # Forward prop
+    a1 = XX
+    
+    z2 = (dot(W1, a1).T + b1).T
+    a2 = sigmoid01(z2)
+
+    return a2
+
 def autoencoderCost(thetaFlat, XX, hiddenLayerSize, beta = 0, rho = .05):
-    '''Cost for a single hidden layer autoencoder with sigmoid activation function. Uses sigmoid with range -1 to 1.
+    '''Cost for a single hidden layer autoencoder with sigmoid activation function. Uses sigmoid with range of 0 to 1.
 
     thetaFlat: (W1, b1, W2, b2).flatten()
     XX: one example per column'''
