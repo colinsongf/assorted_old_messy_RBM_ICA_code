@@ -89,7 +89,7 @@ def unflatWrapper(xflat, func, xshape, *args):
 
 
 
-def autoencoderCost(thetaFlat, XX, hiddenLayerSize):
+def autoencoderCost(thetaFlat, XX, hiddenLayerSize, beta = 0, rho = .05):
     '''Cost for a single hidden layer autoencoder with sigmoid activation function. Uses sigmoid with range -1 to 1.
 
     thetaFlat: (W1, b1, W2, b2).flatten()
@@ -107,23 +107,32 @@ def autoencoderCost(thetaFlat, XX, hiddenLayerSize):
     W2 = reshape(thetaFlat[begin:begin+prod(W2shape)], W2shape);    begin += prod(W2shape)
     b2 = reshape(thetaFlat[begin:begin+prod(b2shape)], b2shape);    begin += prod(W1shape)
 
+    #seterr(all = 'raise')
+    #pdb.set_trace()
+
     # Forward prop
     a1 = XX
     
     z2 = (dot(W1, a1).T + b1).T
-    a2, dSig_dz2 = sigmoidAndDeriv11(z2)
+    a2, dSig_dz2 = sigmoidAndDeriv01(z2)
+
+    rho_hat = a2.mean(1)
+    #print 'rho_hat', rho_hat
+    klDiv = rho * (log(rho) - log(rho_hat)) + (1-rho) * log((1-rho) / (1-rho_hat))   # sparsity term
+    #print 'klDiv', klDiv
 
     z3 = (dot(W2, a2).T + b2).T
-    a3, dSig_dz3 = sigmoidAndDeriv11(z3)
+    a3, dSig_dz3 = sigmoidAndDeriv01(z3)
 
     diffs = a3-XX
 
-    cost = 1.0/numExamples * .5 * (diffs**2).sum()
+    cost = 1.0/numExamples * .5 * (diffs**2).sum() + beta * klDiv.sum()
 
     # Backward prop
     delta3 = diffs * dSig_dz3
 
-    delta2 = dSig_dz2 * dot(W2.T, delta3)
+    klDivDerivTerm = beta * (-rho/rho_hat + (1-rho)/(1-rho_hat))
+    delta2 = dSig_dz2 * (dot(W2.T, delta3).T + klDivDerivTerm).T
 
     # Average gradients across examples
     W1grad = dot(delta2, a1.T)  / numExamples
@@ -194,15 +203,15 @@ def check_autoencoderCost():
     b2 = random.normal(0, .1, (dim,))
     theta = concatenate((W1.flatten(), b1.flatten(), W2.flatten(), b2.flatten()))
 
-    numericalCheckVectorGrad(autoencoderCost, theta, (XX, hiddenLayerSize))
+    numericalCheckVectorGrad(autoencoderCost, theta, (XX, hiddenLayerSize, .1, .05))
 
 
 
 def tests():
     # negAvgTwoNorm_*
-    check_negAvgTwoNorm_vec()
-    check_negAvgTwoNorm_mat()
-    check_negAvgTwoNorm_vecVmat()
+    #check_negAvgTwoNorm_vec()
+    #check_negAvgTwoNorm_mat()
+    #check_negAvgTwoNorm_vecVmat()
 
     check_autoencoderCost()
 
