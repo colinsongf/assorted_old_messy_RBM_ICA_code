@@ -13,6 +13,7 @@ from numdifftools import Derivative, Gradient
 import pdb
 
 from gradCheck import numericalCheckVectorGrad, numericalCheckMatrixGrad, checkVectorMatrixGradientsEqual
+from util.misc import sigmoidAndDeriv01, sigmoidAndDeriv11
 
 
 
@@ -81,9 +82,59 @@ def negAvgTwoNorm_mat(VV, XX):
     return cost, grad
 
 
+
 def unflatWrapper(xflat, func, xshape, *args):
     # This might not quite work? See Evernote [Tuesday, May 28, 2013,  1:42 pm]
     return func(reshape(xflat, xshape), *args)
+
+
+
+def autoencoderCost(thetaFlat, XX, hiddenLayerSize):
+    '''Cost for a single hidden layer autoencoder with sigmoid activation function. Uses sigmoid with range -1 to 1.
+
+    thetaFlat: (W1, b1, W2, b2).flatten()
+    XX: one example per column'''
+
+    dim, numExamples = XX.shape
+    W1shape = (hiddenLayerSize, dim)
+    b1shape = (hiddenLayerSize,)
+    W2shape = (dim, hiddenLayerSize)
+    b2shape = (dim,)
+
+    begin = 0
+    W1 = reshape(thetaFlat[begin:begin+prod(W1shape)], W1shape);    begin += prod(W1shape)
+    b1 = reshape(thetaFlat[begin:begin+prod(b1shape)], b1shape);    begin += prod(b1shape)
+    W2 = reshape(thetaFlat[begin:begin+prod(W2shape)], W2shape);    begin += prod(W2shape)
+    b2 = reshape(thetaFlat[begin:begin+prod(b2shape)], b2shape);    begin += prod(W1shape)
+
+    # Forward prop
+    a1 = XX
+    
+    z2 = (dot(W1, a1).T + b1).T
+    a2, dSig_dz2 = sigmoidAndDeriv11(z2)
+
+    z3 = (dot(W2, a2).T + b2).T
+    a3, dSig_dz3 = sigmoidAndDeriv11(z3)
+
+    diffs = a3-XX
+
+    cost = 1.0/numExamples * .5 * (diffs**2).sum()
+
+    # Backward prop
+    delta3 = diffs * dSig_dz3
+
+    delta2 = dSig_dz2 * dot(W2.T, delta3)
+
+    # Average gradients across examples
+    W1grad = dot(delta2, a1.T)  / numExamples
+    b1grad = delta2.sum(1)      / numExamples
+    W2grad = dot(delta3, a2.T)  / numExamples
+    b2grad = delta3.sum(1)      / numExamples
+    
+    grad = concatenate((W1grad.flatten(), b1grad.flatten(), W2grad.flatten(), b2grad.flatten()))
+
+    return cost, grad
+
 
 
 ############################
@@ -125,12 +176,35 @@ def check_negAvgTwoNorm_vecVmat():
 
 
 
+def check_autoencoderCost():
+    ########### HERE
+    random.seed(0)
+
+    hiddenLayerSize = 2
+    dim = 3
+    numExamples = 4
+
+    # random data
+    XX = random.normal(.5, .25, (dim, numExamples))
+
+    # random params
+    W1 = random.normal(0, .1, (hiddenLayerSize, dim))
+    b1 = random.normal(0, .1, (hiddenLayerSize,))
+    W2 = random.normal(0, .1, (dim, hiddenLayerSize))
+    b2 = random.normal(0, .1, (dim,))
+    theta = concatenate((W1.flatten(), b1.flatten(), W2.flatten(), b2.flatten()))
+
+    numericalCheckVectorGrad(autoencoderCost, theta, (XX, hiddenLayerSize))
+
+
+
 def tests():
     # negAvgTwoNorm_*
     check_negAvgTwoNorm_vec()
     check_negAvgTwoNorm_mat()
     check_negAvgTwoNorm_vecVmat()
 
+    check_autoencoderCost()
 
 
 if __name__ == '__main__':

@@ -6,11 +6,48 @@ from numpy import tanh
 
 
 
-def sigmoid(xx):
-    '''Compute the logistic/sigmoid in a numerically stable way (using tanh).'''
+def sigmoid01(xx):
+    '''Compute the logistic/sigmoid in a numerically stable way (using tanh).
+
+    Range: 0 to 1'''
     #return 1. / (1 + exp(-xx))
     #print 'returning', .5 * (1 + tanh(xx / 2.))
     return .5 * (1 + tanh(xx / 2.))
+
+
+
+def sigmoidAndDeriv01(xx):
+    '''Compute the logistic/sigmoid in a numerically stable way (using tanh).
+    Returns the value and derivative at the given locations
+
+    Range: 0 to 1'''
+    
+    #return 1. / (1 + exp(-xx))
+    #print 'returning', .5 * (1 + tanh(xx / 2.))
+    val = .5 * (1 + tanh(xx / 2.))
+    deriv = val * (1-val)
+    return val, deriv
+
+
+
+def sigmoid11(xx):
+    '''Compute the logistic/sigmoid in a numerically stable way (using tanh).
+
+    Range: -1 to 1'''
+
+    return tanh(xx)
+
+
+
+def sigmoidAndDeriv11(xx):
+    '''Compute the logistic/sigmoid in a numerically stable way (using tanh).
+    Returns the value and derivative at the given locations
+
+    Range: -1 to 1'''
+    
+    val = tanh(xx)
+    deriv = 1 - val**2
+    return val, deriv
 
 
 
