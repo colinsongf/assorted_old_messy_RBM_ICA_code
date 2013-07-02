@@ -7,9 +7,10 @@ import argparse
 import types
 import time
 from numpy import *
+from scipy.optimize import minimize
 
 from util.cache import cached, PersistentHasher
-from GitResultsManager import resman
+from GitResultsManager import resman, fmtSeconds
 from util.dataPrep import PCAWhiteningDataNormalizer
 from util.dataLoaders import loadNYU2Data
 from makeData import makeUpsonRovio3
@@ -448,7 +449,7 @@ class SparseAELayer(TrainableLayer):
         super(SparseAELayer, self).__init__(params)
 
         self.hiddenSize = params['hiddenSize']
-        self.beta       = params['lambd']
+        self.beta       = params['beta']
         self.rho        = params['rho']
 
         self.W1 = None
@@ -470,12 +471,12 @@ class SparseAELayer(TrainableLayer):
     def _initialize(self, seed = None):
         # Initialize weights
 
-        self.W1shape = (self.hiddenSize, self.inputSize)
+        self.W1shape = (self.hiddenSize, prod(self.inputSize))
         self.b1shape = (self.hiddenSize,)
-        self.W2shape = (self.inputSize, self.hiddenSize)
-        self.b2shape = (self.inputSize,)
+        self.W2shape = (prod(self.inputSize), self.hiddenSize)
+        self.b2shape = (prod(self.inputSize),)
 
-        radius = sqrt(6 / (self.inputSize + self.outputSize + 1))
+        radius = sqrt(6 / (prod(self.inputSize) + prod(self.outputSize) + 1))
         self.W1 = random.uniform(-radius, radius, self.W1shape)
         self.b1 = zeros(self.b1shape)
         self.W2 = random.uniform(-radius, radius, self.W2shape)
@@ -499,10 +500,10 @@ class SparseAELayer(TrainableLayer):
                            (data, self.hiddenSize, self.beta, self.rho),
                            jac = True,    # cost function retuns both value and gradient
                            method = 'L-BFGS-B',
-                           options = {'maxiter': maxFun, 'disp': True})
+                           options = {'maxiter': maxFuncCalls, 'disp': True})
         
         fval = results['fun']
-        wallSeconds = time.time() - startWall
+        wallSeconds = time.time() - tic
         print 'Optimization results:'
         for key in ['status', 'nfev', 'success', 'fun', 'message']:
             print '  %20s: %s' % (key, results[key])
@@ -520,12 +521,6 @@ class SparseAELayer(TrainableLayer):
         W2 = reshape(theta[begin:begin+prod(self.W2shape)], self.W2shape);    begin += prod(self.W2shape)
         b2 = reshape(theta[begin:begin+prod(self.b2shape)], self.b2shape);
         
-        execTime = time.time() - tic
-
-        print 'Training stats:'
-        print '  Number of cost evals:', len(self.costLog)
-        print '  Training time (wall)', execTime
-
     def _forwardProp(self, data, dataArrangement, sublayer, withGradMatrix):
         if withGradMatrix:
             raise Exception('not yet implemented')

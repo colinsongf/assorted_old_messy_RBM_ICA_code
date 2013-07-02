@@ -13,7 +13,7 @@ from numdifftools import Derivative, Gradient
 import pdb
 
 from gradCheck import numericalCheckVectorGrad, numericalCheckMatrixGrad, checkVectorMatrixGradientsEqual
-from util.misc import sigmoidAndDeriv01, sigmoidAndDeriv11
+from util.misc import sigmoid01, sigmoidAndDeriv01, sigmoid11, sigmoidAndDeriv11
 
 
 

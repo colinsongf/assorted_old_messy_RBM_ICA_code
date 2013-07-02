@@ -20,7 +20,6 @@ from matplotlib import pyplot
 
 from util.plotting import tile_raster_images, pil_imagesc, scale_some_rows_to_unit_interval
 from util.dataLoaders import loadFromPklGz, saveToFile
-from util.misc import sigmoid
 from util.cache import cached
 
 
