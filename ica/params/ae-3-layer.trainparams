@@ -4,19 +4,19 @@
 
 tp = {}
 
-#tp['whitener'] = {'examples': 500000}
+tp['whitener0'] = {'examples': 100000}
 
-tp['ae1'] = {'examples': 10000,
+tp['ae1'] = {'examples': 100000,
              'method': 'lbfgs',
              'maxFuncCalls': 300,
              }
 
-tp['ae2'] = {'examples': 10000,
+tp['ae2'] = {'examples': 100000,
              'method': 'lbfgs',
              'maxFuncCalls': 300,
              }
 
-tp['ae3'] = {'examples': 10000,
+tp['ae3'] = {'examples': 100000,
              'method': 'lbfgs',
              'maxFuncCalls': 300,
              }

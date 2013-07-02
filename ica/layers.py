@@ -6,6 +6,8 @@ import pdb
 import argparse
 import types
 import time
+import os
+from matplotlib import pyplot
 from numpy import *
 from scipy.optimize import minimize
 
@@ -461,7 +463,7 @@ class SparseAELayer(TrainableLayer):
         self.W2shape = None
         self.b2shape = None
 
-        self.costLog = None
+        self.costLog = []
 
         assert not isinstance(self.hiddenSize, tuple)  # should just be a number
 
@@ -476,32 +478,29 @@ class SparseAELayer(TrainableLayer):
         self.W2shape = (prod(self.inputSize), self.hiddenSize)
         self.b2shape = (prod(self.inputSize),)
 
-        radius = sqrt(6 / (prod(self.inputSize) + prod(self.outputSize) + 1))
+        radius = sqrt(6.0 / (prod(self.inputSize) + prod(self.outputSize) + 1))
         self.W1 = random.uniform(-radius, radius, self.W1shape)
         self.b1 = zeros(self.b1shape)
         self.W2 = random.uniform(-radius, radius, self.W2shape)
         self.b2 = zeros(self.b2shape)
-
-        #theta = concatenate((W1.flatten(), b1.flatten(), W2.flatten(), b2.flatten()))
 
     def _train(self, data, dataArrangement, trainParams, quick = False):
         maxFuncCalls = trainParams['maxFuncCalls']
         if quick:
             print 'QUICK MODE: chopping maxFuncCalls from %d to 1!' % maxFuncCalls
             maxFuncCalls = 1
-            
 
         tic = time.time()
 
         theta0 = concatenate((self.W1.flatten(), self.b1.flatten(), self.W2.flatten(), self.b2.flatten()))
 
-        results = minimize(autoencoderCost,
+        results = minimize(self._costAndLog,
                            theta0,
                            (data, self.hiddenSize, self.beta, self.rho),
                            jac = True,    # cost function retuns both value and gradient
                            method = 'L-BFGS-B',
                            options = {'maxiter': maxFuncCalls, 'disp': True})
-        
+
         fval = results['fun']
         wallSeconds = time.time() - tic
         print 'Optimization results:'
@@ -516,10 +515,21 @@ class SparseAELayer(TrainableLayer):
 
         # Unpack theta into W and b parameters
         begin = 0
-        W1 = reshape(theta[begin:begin+prod(self.W1shape)], self.W1shape);    begin += prod(self.W1shape)
-        b1 = reshape(theta[begin:begin+prod(self.b1shape)], self.b1shape);    begin += prod(self.b1shape)
-        W2 = reshape(theta[begin:begin+prod(self.W2shape)], self.W2shape);    begin += prod(self.W2shape)
-        b2 = reshape(theta[begin:begin+prod(self.b2shape)], self.b2shape);
+        self.W1 = reshape(theta[begin:begin+prod(self.W1shape)], self.W1shape);    begin += prod(self.W1shape)
+        self.b1 = reshape(theta[begin:begin+prod(self.b1shape)], self.b1shape);    begin += prod(self.b1shape)
+        self.W2 = reshape(theta[begin:begin+prod(self.W2shape)], self.W2shape);    begin += prod(self.W2shape)
+        self.b2 = reshape(theta[begin:begin+prod(self.b2shape)], self.b2shape);
+
+    def _costAndLog(self, theta, data, hiddenSize, beta, rho):
+        #if len(self.costLog) in (0, 100):
+        #    print 'At iteration %d, stopping' % len(self.costLog)
+        #    pdb.set_trace()
+        cost, grad = autoencoderCost(theta, data, hiddenSize, beta, rho)
+
+        self.costLog.append(cost)
+        print 'f =', cost, '|grad| =', linalg.norm(grad)
+
+        return cost, grad        
         
     def _forwardProp(self, data, dataArrangement, sublayer, withGradMatrix):
         if withGradMatrix:
@@ -535,7 +545,16 @@ class SparseAELayer(TrainableLayer):
         '''Default no-op version. Override in derived class. It is up to the layer
         what to plot.
         '''
-        pass
+        if saveDir:
+            # plot sparsity/reconstruction costs over time
+            costs = self.costLog
+            #self.costLog = None    # disabled this reset.
+            pyplot.figure()
+            pyplot.plot(self.costLog, 'b-')
+            pyplot.xlabel('iteration'); pyplot.ylabel('cost')
+            pyplot.savefig(os.path.join(saveDir, (prefix if prefix else '') + 'cost.png'))
+            pyplot.savefig(os.path.join(saveDir, (prefix if prefix else '') + 'cost.pdf'))
+            pyplot.close()
 
 
 

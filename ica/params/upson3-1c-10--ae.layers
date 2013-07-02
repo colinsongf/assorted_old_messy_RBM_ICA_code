@@ -13,10 +13,10 @@ ll.append({'name':      'data',
            'colors':    1,
            })
 
-#ll.append({'name':          'whitener0',
-#           'type':          'whitener',
-#           'whitenerClass': 'PCAWhiteningLayer',
-#           'unitNorm':      True})
+ll.append({'name':          'whitener0',
+           'type':          'whitener',
+           'whitenerClass': 'PCAWhiteningLayer',
+           'unitNorm':      True})
 
 
 nAE = 3
@@ -25,7 +25,7 @@ for ii in range(1,nAE+1):
     ll.append({'name':         'ae%d' % ii,
                'type':         'ae',
                'hiddenSize':   25,      # output size is same as hidden size
-               'beta':         1.0,
+               'beta':         3.0,
                'rho':          .01,
                })
 
