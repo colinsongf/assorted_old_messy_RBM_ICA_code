@@ -14,7 +14,7 @@ from scipy.optimize import minimize
 from util.cache import cached, PersistentHasher
 from GitResultsManager import resman, fmtSeconds
 from util.dataPrep import PCAWhiteningDataNormalizer
-from util.dataLoaders import loadNYU2Data
+from util.dataLoaders import loadNYU2Data, loadCS294Images
 from makeData import makeUpsonRovio3
 from tica import TICA, neighborMatrix
 from cost import autoencoderCost, autoencoderRepresentation
@@ -334,6 +334,30 @@ class NYU2_Labeled(DataLayer):
 
 
 
+class CS294Images(DataLayer):
+    '''
+    Loads pre-whitened patches from this dataset: http://www.stanford.edu/class/cs294a/handouts.html
+    Whitened range roughly -2.03 to 2.86.
+    '''
+
+    def __init__(self, params):
+        super(CS294Images, self).__init__(params)
+
+        self.colors = params['colors']
+
+        assert self.imageSize == (512,512)
+        assert self.colors == 1
+
+    def getOutputSize(self):
+        return self.patchSize
+
+    def getData(self, patchSize, number, seed = None):
+        patches = cached(loadCS294Images, patchSize = patchSize, number = number, seed = seed)
+
+        return patches
+
+
+
 ######################
 # Whitening
 ######################
@@ -359,6 +383,34 @@ class PCAWhiteningLayer(WhiteningLayer):
             raise Exception('Not yet implemented')
         dataWhite, junk = self.pcaWhiteningDataNormalizer.raw2normalized(data, unitNorm = True)
         return dataWhite, dataArrangement
+
+
+
+######################
+# Stretch
+######################
+
+class StretchingLayer(TrainableLayer):
+    '''Stretches the data in each dimension to have a given min/max'''
+
+    def __init__(self, params):
+        super(StretchingLayer, self).__init__(params)
+        self.minVal = float(params['min'])
+        self.maxVal = float(params['max'])
+
+    def _train(self, data, dataArrangement, trainParams = None, quick = False):
+        self.dataMin = data.min(1)
+        self.dataMax = data.max(1)
+
+    def _forwardProp(self, data, dataArrangement, sublayer, withGradMatrix):
+        '''ret = mm * data + bb'''
+        epsilon = 1e-8  # for dimensions with 0 variance
+        mm = (self.maxVal - self.minVal) / (self.dataMax - self.dataMin + epsilon)
+        bb = self.minVal - mm * self.dataMin
+
+        scaledData = (data.T * mm + bb).T
+
+        return scaledData, dataArrangement
 
 
 
@@ -453,6 +505,7 @@ class SparseAELayer(TrainableLayer):
         self.hiddenSize = params['hiddenSize']
         self.beta       = params['beta']
         self.rho        = params['rho']
+        self.lambd      = params['lambd']
 
         self.W1 = None
         self.b1 = None
@@ -472,6 +525,7 @@ class SparseAELayer(TrainableLayer):
 
     def _initialize(self, seed = None):
         # Initialize weights
+        rng = random.RandomState(seed)      # if seed is None, this takes its seed from timer
 
         self.W1shape = (self.hiddenSize, prod(self.inputSize))
         self.b1shape = (self.hiddenSize,)
@@ -479,12 +533,16 @@ class SparseAELayer(TrainableLayer):
         self.b2shape = (prod(self.inputSize),)
 
         radius = sqrt(6.0 / (prod(self.inputSize) + prod(self.outputSize) + 1))
-        self.W1 = random.uniform(-radius, radius, self.W1shape)
+        self.W1 = rng.uniform(-radius, radius, self.W1shape)
         self.b1 = zeros(self.b1shape)
-        self.W2 = random.uniform(-radius, radius, self.W2shape)
+        self.W2 = rng.uniform(-radius, radius, self.W2shape)
+        #self.W2 = self.W1.T.copy()
         self.b2 = zeros(self.b2shape)
 
     def _train(self, data, dataArrangement, trainParams, quick = False):
+
+        #pdb.set_trace()
+        
         maxFuncCalls = trainParams['maxFuncCalls']
         if quick:
             print 'QUICK MODE: chopping maxFuncCalls from %d to 1!' % maxFuncCalls
@@ -496,7 +554,7 @@ class SparseAELayer(TrainableLayer):
 
         results = minimize(self._costAndLog,
                            theta0,
-                           (data, self.hiddenSize, self.beta, self.rho),
+                           (data, self.hiddenSize, self.beta, self.rho, self.lambd),
                            jac = True,    # cost function retuns both value and gradient
                            method = 'L-BFGS-B',
                            options = {'maxiter': maxFuncCalls, 'disp': True})
@@ -520,11 +578,11 @@ class SparseAELayer(TrainableLayer):
         self.W2 = reshape(theta[begin:begin+prod(self.W2shape)], self.W2shape);    begin += prod(self.W2shape)
         self.b2 = reshape(theta[begin:begin+prod(self.b2shape)], self.b2shape);
 
-    def _costAndLog(self, theta, data, hiddenSize, beta, rho):
+    def _costAndLog(self, theta, data, hiddenSize, beta, rho, lambd):
         #if len(self.costLog) in (0, 100):
         #    print 'At iteration %d, stopping' % len(self.costLog)
         #    pdb.set_trace()
-        cost, grad = autoencoderCost(theta, data, hiddenSize, beta, rho)
+        cost, grad = autoencoderCost(theta, data, hiddenSize, beta, rho, lambd)
 
         self.costLog.append(cost)
         print 'f =', cost, '|grad| =', linalg.norm(grad)
@@ -736,7 +794,8 @@ class ConcatenationLayer(NonDataLayer):
 
 
 layerClassNames = {'data':       'dataClass',       # load the class specified by DataClass
-                   'whitener':   'whitenerClass',   # load the class specified by whitenerClass 
+                   'whitener':   'whitenerClass',   # load the class specified by whitenerClass
+                   'stretch':    StretchingLayer,
                    'tica':       TicaLayer,
                    'ae':         SparseAELayer,
                    'downsample': DownsampleLayer,

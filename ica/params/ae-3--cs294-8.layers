@@ -6,22 +6,11 @@ ll = []
 
 ll.append({'name':      'data',
            'type':      'data',
-           'dataClass': 'UpsonData3',   # provides 240x320 images
-           'imageSize': (240,320),
-           'patchSize': (8,8),          # not including colors
+           'dataClass': 'CS294Images',   # provides 512x512 images
+           'imageSize': (512,512),
+           'patchSize': (8,8),
            'stride':    (4,4),
            'colors':    1,
-           })
-
-ll.append({'name':          'whitener',
-           'type':          'whitener',
-           'whitenerClass': 'PCAWhiteningLayer',
-           'unitNorm':      True})
-
-ll.append({'name':      'stretch',
-           'type':      'stretch',
-           'min':       .1,
-           'max':       .9,
            })
 
 nAE = 3
@@ -32,6 +21,7 @@ for ii in range(1,nAE+1):
                'hiddenSize':   25,      # output size is same as hidden size
                'beta':         3.0,
                'rho':          .01,
+               'lambd':        .0001,
                })
 
 layers = ll

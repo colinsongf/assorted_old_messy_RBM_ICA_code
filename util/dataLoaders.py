@@ -2,12 +2,14 @@
 
 import cPickle as pickle
 import numpy
-from numpy import array, zeros, reshape, random, vstack, concatenate, copy, dot
+from numpy import array, zeros, reshape, random, vstack, concatenate, copy, dot, minimum, maximum
 import gzip
 import cPickle as pickle
 import h5py
 import pdb
 import sys
+import scipy
+import scipy.io
 
 
 
@@ -146,7 +148,7 @@ def loadNYU2Data(patchSize, number, rgbColors = 3, depthChannels = 1, seed = Non
     
     if not loadNYU2Data._loaded:
         # load data into memory, only once. Takes ~1 min.
-        print 'loadNYU2Data: loading', filename, '(could take a while)',
+        print 'loadNYU2Data: loading', filename, '(could take a while)...',
         sys.stdout.flush()
         ff = h5py.File(filename, 'r')
         loadNYU2Data._depths = array(ff['depths'])
@@ -186,7 +188,7 @@ def loadNYU2Data(patchSize, number, rgbColors = 3, depthChannels = 1, seed = Non
 
     rgb2L = array([.299, .587, .114])  # same as PIL
 
-    print 'loadNYU2Data: grabbing', number, 'samples (could take a while)',
+    print 'loadNYU2Data: grabbing', number, 'samples (could take a while)...',
     sys.stdout.flush()
 
     for count, sample in enumerate(randomSamples):
@@ -238,3 +240,56 @@ loadNYU2Data._labels = None
 loadNYU2Data._names = None
 loadNYU2Data._scenes = None
 loadNYU2Data._sceneTypes = None
+
+
+
+def loadCS294Images(patchSize = (8,8), number = 10000, seed = None, filename = '../data/stanford_cs294a_images.mat'):
+    '''Load pre-whitened patches from CS294 dataset directly from the nyu_depth_v2_labeled.mat file.
+    See: http://www.stanford.edu/class/cs294a/handouts.html
+    '''
+
+    loaded = scipy.io.loadmat(filename)
+    images = loaded['IMAGES']
+
+    rng = random.RandomState(seed)      # if seed is None, this takes its seed from timer
+
+    # loadNYU2Data._images.shape = (1449, 3, 640, 480)  <-- note this is jj,ii
+    # loadNYU2Data._depths.shape = (1449, 640, 480)     <-- note this is jj,ii
+    # loadNYU2Data._labels.shape = (1449, 640, 480)     <-- note this is jj,ii
+    Nimages = images.shape[2]
+    maxI = images.shape[0] - patchSize[0]
+    maxJ = images.shape[1] - patchSize[1]
+
+    randomSamples = vstack((rng.randint(0, Nimages, number),
+                            rng.randint(0, maxI+1, number),
+                            rng.randint(0, maxJ+1, number))).T
+    singleChannelLength = patchSize[0] * patchSize[1]
+    imageMatrix = zeros((number, singleChannelLength), dtype = numpy.float32)
+
+    print 'loadCS294Images: grabbing', number, 'samples (could take a while)...',
+    sys.stdout.flush()
+
+    for count, sample in enumerate(randomSamples):
+        idx, ii, jj = sample
+        if count % 10000 == 0:
+            #print 'loadNYU2Data: %d / %d' % (count, number)
+            pass
+
+        # Grab imgRegion
+        imgRegion = array(images[ii:(ii+patchSize[0]), jj:(jj+patchSize[1]), idx],
+                          order = 'C', copy = True, dtype = numpy.float32)
+
+        imageMatrix[count,:] = imgRegion.flatten()
+
+    print 'done.'
+
+    # convert to one example per column
+    patches = imageMatrix.T
+
+    # normalize as in sampleIMAGES.m from CS294
+    patches -= patches.mean(0)
+    thresh = patches.std() * 3
+    patches = maximum(minimum(patches, thresh), -thresh) / thresh   # scale to -1 to 1
+    patches = (patches + 1) * 0.4 + 0.1   #rescale to .1 to .9
+
+    return patches
