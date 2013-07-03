@@ -102,7 +102,7 @@ def autoencoderRepresentation(W1, b1, XX):
 
     return a2
 
-def autoencoderCost(thetaFlat, XX, hiddenLayerSize, beta = 0, rho = .05):
+def autoencoderCost(thetaFlat, XX, hiddenLayerSize, beta = 0, rho = .05, lambd = 0):
     '''Cost for a single hidden layer autoencoder with sigmoid activation function. Uses sigmoid with range of 0 to 1.
 
     thetaFlat: (W1, b1, W2, b2).flatten()
@@ -123,23 +123,39 @@ def autoencoderCost(thetaFlat, XX, hiddenLayerSize, beta = 0, rho = .05):
     #seterr(all = 'raise')
     #pdb.set_trace()
 
+    #############
+    # Cost
+    #############
+
+    # Recon cost
     # Forward prop
     a1 = XX
     
     z2 = (dot(W1, a1).T + b1).T
     a2, dSig_dz2 = sigmoidAndDeriv01(z2)
 
-    rho_hat = a2.mean(1)
-    #print 'rho_hat', rho_hat
-    klDiv = rho * (log(rho) - log(rho_hat)) + (1-rho) * log((1-rho) / (1-rho_hat))   # sparsity term
-    #print 'klDiv', klDiv
-
     z3 = (dot(W2, a2).T + b2).T
     a3, dSig_dz3 = sigmoidAndDeriv01(z3)
 
     diffs = a3-XX
 
-    cost = 1.0/numExamples * .5 * (diffs**2).sum() + beta * klDiv.sum()
+    reconCost = 1.0/numExamples * .5 * (diffs**2).sum()
+
+    # Sparsity cost
+    rho_hat = a2.mean(1)
+    klDiv = rho * (log(rho) - log(rho_hat)) + (1-rho) * log((1-rho) / (1-rho_hat))   # sparsity term
+
+    sparseCost = beta * klDiv.sum()
+
+    # Weight decay cost
+
+    weightCost = lambd / 2.0 * ((W1**2).sum() + (W2**2).sum())
+
+    cost = reconCost + sparseCost + weightCost
+    
+    #############
+    # Gradient
+    #############
 
     # Backward prop
     delta3 = diffs * dSig_dz3
@@ -148,9 +164,9 @@ def autoencoderCost(thetaFlat, XX, hiddenLayerSize, beta = 0, rho = .05):
     delta2 = dSig_dz2 * (dot(W2.T, delta3).T + klDivDerivTerm).T
 
     # Average gradients across examples
-    W1grad = dot(delta2, a1.T)  / numExamples
+    W1grad = dot(delta2, a1.T)  / numExamples + lambd * W1
     b1grad = delta2.sum(1)      / numExamples
-    W2grad = dot(delta3, a2.T)  / numExamples
+    W2grad = dot(delta3, a2.T)  / numExamples + lambd * W2
     b2grad = delta3.sum(1)      / numExamples
     
     grad = concatenate((W1grad.flatten(), b1grad.flatten(), W2grad.flatten(), b2grad.flatten()))
@@ -199,7 +215,6 @@ def check_negAvgTwoNorm_vecVmat():
 
 
 def check_autoencoderCost():
-    ########### HERE
     random.seed(0)
 
     hiddenLayerSize = 2
@@ -217,6 +232,8 @@ def check_autoencoderCost():
     theta = concatenate((W1.flatten(), b1.flatten(), W2.flatten(), b2.flatten()))
 
     numericalCheckVectorGrad(autoencoderCost, theta, (XX, hiddenLayerSize, .1, .05))
+
+    numericalCheckVectorGrad(autoencoderCost, theta, (XX, hiddenLayerSize, .1, .05, 0.01))
 
 
 
