@@ -363,17 +363,17 @@ class CS294Images(DataLayer):
 
 
 ######################
-# Whitening
+# Whitening and other normalization
 ######################
 
-class WhiteningLayer(TrainableLayer):
+class NormalizingLayer(TrainableLayer):
 
     def __init__(self, params):
-        super(WhiteningLayer, self).__init__(params)
+        super(NormalizingLayer, self).__init__(params)
 
 
 
-class PCAWhiteningLayer(WhiteningLayer):
+class PCAWhiteningLayer(NormalizingLayer):
 
     def __init__(self, params):
         super(PCAWhiteningLayer, self).__init__(params)
@@ -387,6 +387,37 @@ class PCAWhiteningLayer(WhiteningLayer):
             raise Exception('Not yet implemented')
         dataWhite, junk = self.pcaWhiteningDataNormalizer.raw2normalized(data, unitNorm = True)
         return dataWhite, dataArrangement
+
+
+
+class ScaleClipLayer(NormalizingLayer):
+    '''Subtracts mean of each example (not each dimension), clips to some
+    multiple of S, where S is the the overall standard devation, then
+    scales to the given [min, max] range. Same normalization as in CS294
+    (see last few lines of loadCS294Images() function).
+    '''
+
+    def __init__(self, params):
+        super(ScaleClipLayer, self).__init__(params)
+        self.minVal  = float(params['min'])
+        self.maxVal  = float(params['max'])
+        self.clipStd = float(params['clipStd'])
+        assert self.maxVal > self.minVal
+        assert self.clipStd > 0
+
+        self.thresh = None
+
+    def _train(self, data, dataArrangement, trainParams = None, quick = False):
+        dataNormed = data - data.mean(0)
+        self.thresh = dataNormed.std() * self.clipStd
+
+    def _forwardProp(self, data, dataArrangement, sublayer, withGradMatrix):
+        if withGradMatrix:
+            raise Exception('Not yet implemented')
+        dataNormed = data - data.mean(0)
+        dataNormed = maximum(minimum(dataNormed, self.thresh), -self.thresh) / self.thresh   # scale to -1 to 1
+        dataNormed = (dataNormed + 1) * ((self.maxVal-self.minVal)/2.0) + self.minVal        # rescale to minVal to maxVal
+        return dataNormed, dataArrangement
 
 
 
@@ -830,12 +861,13 @@ class ConcatenationLayer(NonDataLayer):
 
 
 
-layerClassNames = {'data':       'dataClass',       # load the class specified by DataClass
-                   'whitener':   'whitenerClass',   # load the class specified by whitenerClass
-                   'stretch':    StretchingLayer,
-                   'tica':       TicaLayer,
-                   'ae':         SparseAELayer,
-                   'downsample': DownsampleLayer,
-                   'lcn':        LcnLayer,
-                   'concat':     ConcatenationLayer,
+layerClassNames = {'data':           'dataClass',       # load the class specified by DataClass
+                   'whitener':       'whitenerClass',   # load the class specified by whitenerClass
+                   'scaleclip':       ScaleClipLayer,
+                   'stretch':         StretchingLayer,
+                   'tica':            TicaLayer,
+                   'ae':              SparseAELayer,
+                   'downsample':      DownsampleLayer,
+                   'lcn':             LcnLayer,
+                   'concat':          ConcatenationLayer,
                    }

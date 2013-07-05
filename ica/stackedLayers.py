@@ -11,7 +11,7 @@ from IPython import embed
 from util.dataLoaders import loadFromPklGz, saveToFile
 from util.misc import dictPrettyPrint, relhack, Tic
 from layers import layerClassNames, DataArrangement, Layer, DataLayer, UpsonData3, NYU2_Labeled, CS294Images
-from layers import WhiteningLayer, PCAWhiteningLayer, TicaLayer, DownsampleLayer, LcnLayer, ConcatenationLayer
+from layers import NormalizingLayer, PCAWhiteningLayer, TicaLayer, DownsampleLayer, LcnLayer, ConcatenationLayer
 from visualize import plotImageData, plotTopActivations, plotGrayActivations, plotReshapedActivations, plotActHist, plotActLines
 
 
