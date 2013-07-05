@@ -5,8 +5,8 @@
 tp = {}
 
 tp['ae1'] = {'examples': 10000,
-             'initb1': 'zero',        # 'zero' for 0s, or 'approx' for an approx value to start at avg activation of rho
-             'initW2asW1_T': False,
+             'initb1': 'approx',        # 'zero' for 0s, or 'approx' for an approx value to start at avg activation of rho
+             'initW2asW1_T': True,
              'method': 'lbfgs',
              'maxFuncCalls': 300,
              }
