@@ -10,7 +10,8 @@ from numpy import *
 from scipy.linalg import norm
 from IPython import embed
 from numdifftools import Derivative, Gradient
-import pdb
+import ipdb as pdb
+#import pdb
 
 from gradCheck import numericalCheckVectorGrad, numericalCheckMatrixGrad, checkVectorMatrixGradientsEqual
 from util.misc import sigmoid01, sigmoidAndDeriv01, sigmoid11, sigmoidAndDeriv11
@@ -102,11 +103,13 @@ def autoencoderRepresentation(W1, b1, XX):
 
     return a2
 
-def autoencoderCost(thetaFlat, XX, hiddenLayerSize, beta = 0, rho = .05, lambd = 0):
+def autoencoderCost(thetaFlat, XX, hiddenLayerSize, beta = 0, rho = .05, lambd = 0, fullOutput = False):
     '''Cost for a single hidden layer autoencoder with sigmoid activation function. Uses sigmoid with range of 0 to 1.
 
     thetaFlat: (W1, b1, W2, b2).flatten()
-    XX: one example per column'''
+    XX: one example per column
+
+    if fullOutput, also return three components of cost separately.'''
 
     dim, numExamples = XX.shape
     W1shape = (hiddenLayerSize, dim)
@@ -171,7 +174,10 @@ def autoencoderCost(thetaFlat, XX, hiddenLayerSize, beta = 0, rho = .05, lambd =
     
     grad = concatenate((W1grad.flatten(), b1grad.flatten(), W2grad.flatten(), b2grad.flatten()))
 
-    return cost, grad
+    if fullOutput:
+        return cost, grad, reconCost, sparseCost, weightCost
+    else:
+        return cost, grad
 
 
 

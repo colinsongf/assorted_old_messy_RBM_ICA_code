@@ -1,18 +1,29 @@
+
 #! /usr/bin/env python
 
 import os, errno
 import time
-from numpy import tanh
+from numpy import tanh, arctanh
 
 
 
 def sigmoid01(xx):
     '''Compute the logistic/sigmoid in a numerically stable way (using tanh).
 
+    Domain: -inf to inf
     Range: 0 to 1'''
     #return 1. / (1 + exp(-xx))
     #print 'returning', .5 * (1 + tanh(xx / 2.))
     return .5 * (1 + tanh(xx / 2.))
+
+
+
+def invSigmoid01(ss):
+    '''Compute the inverse of the logistic/sigmoid.
+
+    Domain: 0 to 1
+    Range: -inf to inf'''
+    return 2 * arctanh(2*ss - 1)
 
 
 
@@ -48,6 +59,15 @@ def sigmoidAndDeriv11(xx):
     val = tanh(xx)
     deriv = 1 - val**2
     return val, deriv
+
+
+
+def invSigmoid11(ss):
+    '''Compute the inverse of the logistic/sigmoid.
+
+    Domain: -1 to 1
+    Range: -inf to inf'''
+    return arctanh(ss)
 
 
 

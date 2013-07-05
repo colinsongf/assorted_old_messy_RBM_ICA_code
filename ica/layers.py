@@ -2,22 +2,26 @@
 
 import sys
 import imp
-import pdb
+#import pdb
+import ipdb as pdb
 import argparse
 import types
 import time
 import os
+from IPython import embed
 from matplotlib import pyplot
 from numpy import *
 from scipy.optimize import minimize
 
 from util.cache import cached, PersistentHasher
+from util.misc import invSigmoid01
 from GitResultsManager import resman, fmtSeconds
 from util.dataPrep import PCAWhiteningDataNormalizer
 from util.dataLoaders import loadNYU2Data, loadCS294Images
 from makeData import makeUpsonRovio3
 from tica import TICA, neighborMatrix
 from cost import autoencoderCost, autoencoderRepresentation
+from visualize import plotImageData
 
 
 
@@ -185,13 +189,13 @@ class TrainableLayer(NonDataLayer):
         self.isInitialized = False
         self.isTrained = False
 
-    def initialize(self, seed = None):
+    def initialize(self, trainParams = None, seed = None):
         if self.isInitialized:
             raise Exception('Layer was already initialized')
-        self._initialize(seed = seed)
+        self._initialize(trainParams = trainParams, seed = seed)
         self.isInitialized = True
 
-    def _initialize(self, seed = None):
+    def _initialize(self, trainParams = None, seed = None):
         '''Default no-op version. Override in derived class.'''
         pass
 
@@ -438,7 +442,7 @@ class TicaLayer(TrainableLayer):
     def _calculateOutputSize(self, inputSize):
         return self.hiddenSize
 
-    def _initialize(self, seed = None):
+    def _initialize(self, trainParams = None, seed = None):
         # Set up untrained TICA
         self.tica = TICA(nInputs            = prod(self.inputSize),
                          hiddenLayerShape   = self.hiddenSize,
@@ -485,7 +489,7 @@ class TicaLayer(TrainableLayer):
             return absPooledActivations, dataArrangement
         else:
             raise Exception('Unknown sublayer: %s' % sublayer)
-
+    
     def _plot(self, data, dataArrangement, saveDir = None, prefix = None):
         '''Default no-op version. Override in derived class. It is up to the layer
         what to plot.
@@ -516,15 +520,21 @@ class SparseAELayer(TrainableLayer):
         self.W2shape = None
         self.b2shape = None
 
-        self.costLog = []
+        self._costLog = []    # this version is a list. The property costLog returns a numpy array.
 
         assert not isinstance(self.hiddenSize, tuple)  # should just be a number
 
     def _calculateOutputSize(self, inputSize):
         return (self.hiddenSize, )    # return as tuple
 
-    def _initialize(self, seed = None):
+    def _initialize(self, trainParams = None, seed = None):
         # Initialize weights
+
+        initb1     = trainParams['initb1']
+        initW2Tied = trainParams['initW2asW1_T']
+        assert initb1 in ('zero', 'approx')
+        assert initW2asW1_T in (True, False)
+        
         rng = random.RandomState(seed)      # if seed is None, this takes its seed from timer
 
         self.W1shape = (self.hiddenSize, prod(self.inputSize))
@@ -534,13 +544,17 @@ class SparseAELayer(TrainableLayer):
 
         radius = sqrt(6.0 / (prod(self.inputSize) + prod(self.outputSize) + 1))
         self.W1 = rng.uniform(-radius, radius, self.W1shape)
-        self.b1 = zeros(self.b1shape)
-        self.W2 = rng.uniform(-radius, radius, self.W2shape)
-        #self.W2 = self.W1.T.copy()
+        if initb1 == 'zero':
+            self.b1 = zeros(self.b1shape)
+        else:  # 'approx'
+            self.b1 = invSigmoid01(self.rho) * ones(self.b1shape)
+        if initW2asW1_T:
+            self.W2 = self.W1.T.copy()
+        else:
+            self.W2 = rng.uniform(-radius, radius, self.W2shape)
         self.b2 = zeros(self.b2shape)
 
     def _train(self, data, dataArrangement, trainParams, quick = False):
-
         #pdb.set_trace()
         
         maxFuncCalls = trainParams['maxFuncCalls']
@@ -582,12 +596,13 @@ class SparseAELayer(TrainableLayer):
         #if len(self.costLog) in (0, 100):
         #    print 'At iteration %d, stopping' % len(self.costLog)
         #    pdb.set_trace()
-        cost, grad = autoencoderCost(theta, data, hiddenSize, beta, rho, lambd)
+        output = autoencoderCost(theta, data, hiddenSize, beta, rho, lambd, fullOutput = True)
+        cost, grad, reconCost, sparseCost, weightCost = output
 
-        self.costLog.append(cost)
+        self._costLog.append([cost, reconCost, sparseCost, weightCost])
         print 'f =', cost, '|grad| =', linalg.norm(grad)
 
-        return cost, grad        
+        return cost, grad
         
     def _forwardProp(self, data, dataArrangement, sublayer, withGradMatrix):
         if withGradMatrix:
@@ -599,20 +614,42 @@ class SparseAELayer(TrainableLayer):
         a2 = autoencoderRepresentation(self.W1, self.b1, data)
         return a2, dataArrangement
         
+    @property
+    def costLog(self):
+        return array(self._costLog)
+    
     def _plot(self, data, dataArrangement, saveDir = None, prefix = None):
-        '''Default no-op version. Override in derived class. It is up to the layer
-        what to plot.
-        '''
+        if prefix is None:
+            prefix = ''
         if saveDir:
             # plot sparsity/reconstruction costs over time
-            costs = self.costLog
-            #self.costLog = None    # disabled this reset.
+            costs = self.costLog    # costs is [cost, reconCost, sparseCost, weightCost]
             pyplot.figure()
-            pyplot.plot(self.costLog, 'b-')
+            pyplot.hold(True)
+            pyplot.plot(costs[:,1], 'r-', costs[:,2], 'b-', costs[:,3], 'g-', costs[:,0], 'k-')
             pyplot.xlabel('iteration'); pyplot.ylabel('cost')
-            pyplot.savefig(os.path.join(saveDir, (prefix if prefix else '') + 'cost.png'))
-            pyplot.savefig(os.path.join(saveDir, (prefix if prefix else '') + 'cost.pdf'))
+            pyplot.legend(('recon', 'sparsity', 'weight', 'total'))
+            pyplot.savefig(os.path.join(saveDir, prefix + 'cost.png'))
+            pyplot.savefig(os.path.join(saveDir, prefix + 'cost.pdf'))
+
+            pyplot.ylim((pyplot.ylim()[0], percentile(costs[:,0], 90)))   # rescale to show only the smallest 90% of the data
+            pyplot.savefig(os.path.join(saveDir, prefix + 'cost_zoom.png'))
+            pyplot.savefig(os.path.join(saveDir, prefix + 'cost_zoom.pdf'))
+
             pyplot.close()
+
+            if len(self.inputSize) > 1:
+                imgShape = self.inputSize
+                tileSideLength = int(ceil(sqrt(self.hiddenSize)))
+                tileShape = (tileSideLength, tileSideLength)
+                plotImageData(self.W1.T, imgShape, saveDir=saveDir, prefix=prefix + 'direct_W1', tileShape=tileShape, onlyRescaled=True)
+                plotImageData(self.W2,   imgShape, saveDir=saveDir, prefix=prefix + 'direct_W2', tileShape=tileShape, onlyRescaled=True)
+            else:
+                # For now: skip plotting the W1 and W2 for layers with non-visualizable inputs
+                pass
+                #imgSizeLength = int(ceil(sqrt(self.inputSize)))
+                #imgShape = (imgSizeLength, imgSizeLength)
+                
 
 
 
