@@ -530,8 +530,8 @@ class SparseAELayer(TrainableLayer):
     def _initialize(self, trainParams = None, seed = None):
         # Initialize weights
 
-        initb1     = trainParams['initb1']
-        initW2Tied = trainParams['initW2asW1_T']
+        initb1       = trainParams['initb1']
+        initW2asW1_T = trainParams['initW2asW1_T']
         assert initb1 in ('zero', 'approx')
         assert initW2asW1_T in (True, False)
         
