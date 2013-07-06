@@ -309,7 +309,8 @@ class StackedLayers(object):
         if sublayer is None: sublayer = layer.nSublayers - 1  # max by default
         dataLayer = self.layers[0]
 
-        prefix = 'layer_%02d_%s_s%d_' % (layerIdx, layer.name, sublayer)
+        prefix = 'layer_%02d_%s_' % (layerIdx, layer.name)
+        if layer.nSublayers > 1: prefix += 's%d_' % sublayer
         seesPixels = self._seesPixels(layer, dataLayer)
 
         if quick:

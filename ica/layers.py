@@ -10,6 +10,7 @@ import time
 import os
 from IPython import embed
 from matplotlib import pyplot
+import matplotlib.cm as cm
 from numpy import *
 from scipy.optimize import minimize
 
@@ -627,7 +628,7 @@ class SparseAELayer(TrainableLayer):
         #if len(self.costLog) in (0, 100):
         #    print 'At iteration %d, stopping' % len(self.costLog)
         #    pdb.set_trace()
-        output = autoencoderCost(theta, data, hiddenSize, beta, rho, lambd, fullOutput = True)
+        output = autoencoderCost(theta, data, hiddenSize, beta, rho, lambd, output = 'sepcosts')
         cost, grad, reconCost, sparseCost, weightCost = output
 
         self._costLog.append([cost, reconCost, sparseCost, weightCost])
@@ -667,20 +668,56 @@ class SparseAELayer(TrainableLayer):
             pyplot.savefig(os.path.join(saveDir, prefix + 'cost_zoom.png'))
             pyplot.savefig(os.path.join(saveDir, prefix + 'cost_zoom.pdf'))
 
-            pyplot.close()
+            # plot (in, weight, rep, weight, out) histograms
+            theta = concatenate((self.W1.flatten(), self.b1.flatten(), self.W2.flatten(), self.b2.flatten()))
+            output = autoencoderCost(theta, data, self.hiddenSize, self.beta, self.rho, self.lambd, output='full')
+            cost, grad, reconCost, sparseCost, weightCost, z2, a2, z3, a3, rho_hat = output
+            pyplot.clf()
+            pyplot.subplot(5,1,1); pyplot.hist(data.flatten(), bins=20)
+            pyplot.subplot(5,2,3); pyplot.hist(self.W1.flatten(), bins=20)
+            pyplot.subplot(5,2,4); pyplot.hist(self.b1.flatten(), bins=20)
+            pyplot.subplot(5,1,3); pyplot.hist(a2.flatten(), bins=20)
+            pyplot.subplot(5,2,7); pyplot.hist(self.W2.flatten(), bins=20)
+            pyplot.subplot(5,2,8); pyplot.hist(self.b2.flatten(), bins=20)
+            pyplot.subplot(5,1,5); pyplot.hist(a3.flatten(), bins=20)
 
+            pyplot.savefig(os.path.join(saveDir, prefix + 'ae_hists.png'))
+            pyplot.savefig(os.path.join(saveDir, prefix + 'ae_hists.pdf'))
+                                    
             if len(self.inputSize) > 1:
+                # Plot W1 and W2
                 imgShape = self.inputSize
                 tileSideLength = int(ceil(sqrt(self.hiddenSize)))
                 tileShape = (tileSideLength, tileSideLength)
                 plotImageData(self.W1.T, imgShape, saveDir=saveDir, prefix=prefix + 'direct_W1', tileShape=tileShape, onlyRescaled=True)
                 plotImageData(self.W2,   imgShape, saveDir=saveDir, prefix=prefix + 'direct_W2', tileShape=tileShape, onlyRescaled=True)
+
+                # Plot 
+                rows = 12
+                cols = 1
+                width = 4    # how many spaces for each window
+                pyplot.figure(figsize = (cols*width*2,rows*2))
+                for ii in range(rows * cols):
+                    start = width*ii
+                    pyplot.subplot(rows, width*cols, start+1)
+                    pyplot.imshow(reshape(data[:,ii], self.inputSize), vmin=0, vmax=1, cmap = cm.Greys_r, interpolation = 'nearest')
+                    pyplot.subplot(rows, width*cols, start+2)
+                    pyplot.hold(True)
+                    pyplot.vlines(arange(a2.shape[0]), 0, a2[:,ii], 'b')
+                    pyplot.plot(a2[:,ii], 'bo')
+                    pyplot.subplot(rows, width*cols, start+3)
+                    pyplot.imshow(reshape(a3[:,ii], self.inputSize), vmin=0, vmax=1, cmap = cm.Greys_r, interpolation = 'nearest')
+                    st = 'R: %g' % (.5 * ((a3[:,ii] - data[:,ii])**2).sum())
+                    pyplot.text(self.inputSize[1], 1, st)
+                pyplot.savefig(os.path.join(saveDir, prefix + 'recon.png'))
+                pyplot.savefig(os.path.join(saveDir, prefix + 'recon.pdf'))
             else:
                 # For now: skip plotting the W1 and W2 for layers with non-visualizable inputs
                 pass
                 #imgSizeLength = int(ceil(sqrt(self.inputSize)))
                 #imgShape = (imgSizeLength, imgSizeLength)
                 
+            pyplot.close()
 
 
 

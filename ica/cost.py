@@ -103,13 +103,13 @@ def autoencoderRepresentation(W1, b1, XX):
 
     return a2
 
-def autoencoderCost(thetaFlat, XX, hiddenLayerSize, beta = 0, rho = .05, lambd = 0, fullOutput = False):
+def autoencoderCost(thetaFlat, XX, hiddenLayerSize, beta = 0, rho = .05, lambd = 0, output = 'costgrad'):
     '''Cost for a single hidden layer autoencoder with sigmoid activation function. Uses sigmoid with range of 0 to 1.
 
     thetaFlat: (W1, b1, W2, b2).flatten()
     XX: one example per column
-
-    if fullOutput, also return three components of cost separately.'''
+    output: 'costgrad', 'sepcosts', 'full'
+    '''
 
     dim, numExamples = XX.shape
     W1shape = (hiddenLayerSize, dim)
@@ -174,10 +174,14 @@ def autoencoderCost(thetaFlat, XX, hiddenLayerSize, beta = 0, rho = .05, lambd =
     
     grad = concatenate((W1grad.flatten(), b1grad.flatten(), W2grad.flatten(), b2grad.flatten()))
 
-    if fullOutput:
-        return cost, grad, reconCost, sparseCost, weightCost
-    else:
+    if output == 'costgrad':
         return cost, grad
+    elif output == 'sepcosts':
+        return cost, grad, reconCost, sparseCost, weightCost
+    elif output == 'full':
+        return cost, grad, reconCost, sparseCost, weightCost, z2, a2, z3, a3, rho_hat
+    else:
+        raise Exception('Unknown output parameter: %s' % repr(output))
 
 
 
