@@ -136,7 +136,7 @@ def plotReshapedActivations(act, tileShape, embeddingShape, prefix, saveDir = No
     number = prod(tileShape)
     dat = act[:,:number].copy()
     dat -= dat.min()
-    dat /- dat.max()
+    dat /- dat.max()        HERE BUG
     plotImageData(dat, imgShape = embeddingShape, prefix = prefix, saveDir = saveDir, show = show)
 
 
