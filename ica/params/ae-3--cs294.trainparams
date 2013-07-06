@@ -4,10 +4,6 @@
 
 tp = {}
 
-tp['whitener'] = {'examples': 100000}
-
-tp['stretch'] = {'examples': 100000}
-
 tp['ae1'] = {'examples': 10000,
              'method': 'lbfgs',
              'maxFuncCalls': 300,

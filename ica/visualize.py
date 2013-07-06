@@ -151,6 +151,36 @@ def plotActHist(act, bins = 50, prefix = 'acthist', saveDir = None, show = False
 
 
 
+def plotActLines(act, prefix = 'actlines', nUnits = (3,4), saveDir = None, show = False):
+    pyplot.clf()
+    maxVal = -9999
+
+    for counter,iijj in enumerate(((ii,jj) for ii in range(nUnits[0]) for jj in range(nUnits[1]))):
+        ii,jj = iijj
+        pyplot.subplot(nUnits[0], nUnits[1], counter+1)
+        pyplot.hold(True)
+        pyplot.vlines(arange(act.shape[0]), 0, act[:,counter], 'b')
+        pyplot.plot(act[:,counter], 'bo')
+        maxVal = max(maxVal, pyplot.ylim()[1])
+        #pyplot.xlabel('unit'); pyplot.ylabel('activation')
+
+    if saveDir:
+        pyplot.savefig(os.path.join(saveDir, '%s.png' % prefix))
+        pyplot.savefig(os.path.join(saveDir, '%s.pdf' % prefix))
+
+    for counter,iijj in enumerate(((ii,jj) for ii in range(nUnits[0]) for jj in range(nUnits[1]))):
+        pyplot.subplot(nUnits[0], nUnits[1], counter+1)
+        pyplot.ylim((0, maxVal))
+
+    if saveDir:
+        pyplot.savefig(os.path.join(saveDir, '%s_samemax.png' % prefix))
+        pyplot.savefig(os.path.join(saveDir, '%s_samemax.pdf' % prefix))
+
+    if show:
+        pyplot.show()
+
+
+
 def plotRicaReconstructions(rica, data, imgShape, saveDir = None, unwhitener = None, tileShape = None, number = 50, prefix = 'recon', onlyHilights = False, hilightCmap = None):
     '''Plots reconstructions for some randomly chosen data points.'''
 
@@ -250,6 +280,8 @@ def plotTopActivations(activations, data, imgShape, saveDir = None, nActivations
     '''Plots top and bottom few activations for the first number activations.'''
 
     sortIdx = argsort(activations, 1)
+
+    nActivations = min(nActivations, activations.shape[0])
 
     plotData = zeros((prod(imgShape), nActivations*nSamples))
 

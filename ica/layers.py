@@ -2,19 +2,26 @@
 
 import sys
 import imp
-import pdb
+#import pdb
+import ipdb as pdb
 import argparse
 import types
 import time
+import os
+from IPython import embed
+from matplotlib import pyplot
 from numpy import *
+from scipy.optimize import minimize
 
 from util.cache import cached, PersistentHasher
-from GitResultsManager import resman
+from util.misc import invSigmoid01
+from GitResultsManager import resman, fmtSeconds
 from util.dataPrep import PCAWhiteningDataNormalizer
-from util.dataLoaders import loadNYU2Data
+from util.dataLoaders import loadNYU2Data, loadCS294Images
 from makeData import makeUpsonRovio3
 from tica import TICA, neighborMatrix
 from cost import autoencoderCost, autoencoderRepresentation
+from visualize import plotImageData
 
 
 
@@ -182,13 +189,13 @@ class TrainableLayer(NonDataLayer):
         self.isInitialized = False
         self.isTrained = False
 
-    def initialize(self, seed = None):
+    def initialize(self, trainParams = None, seed = None):
         if self.isInitialized:
             raise Exception('Layer was already initialized')
-        self._initialize(seed = seed)
+        self._initialize(trainParams = trainParams, seed = seed)
         self.isInitialized = True
 
-    def _initialize(self, seed = None):
+    def _initialize(self, trainParams = None, seed = None):
         '''Default no-op version. Override in derived class.'''
         pass
 
@@ -331,18 +338,42 @@ class NYU2_Labeled(DataLayer):
 
 
 
-######################
-# Whitening
-######################
-
-class WhiteningLayer(TrainableLayer):
+class CS294Images(DataLayer):
+    '''
+    Loads pre-whitened patches from this dataset: http://www.stanford.edu/class/cs294a/handouts.html
+    Whitened range roughly -2.03 to 2.86.
+    '''
 
     def __init__(self, params):
-        super(WhiteningLayer, self).__init__(params)
+        super(CS294Images, self).__init__(params)
+
+        self.colors = params['colors']
+
+        assert self.imageSize == (512,512)
+        assert self.colors == 1
+
+    def getOutputSize(self):
+        return self.patchSize
+
+    def getData(self, patchSize, number, seed = None):
+        patches = cached(loadCS294Images, patchSize = patchSize, number = number, seed = seed)
+
+        return patches
 
 
 
-class PCAWhiteningLayer(WhiteningLayer):
+######################
+# Whitening and other normalization
+######################
+
+class NormalizingLayer(TrainableLayer):
+
+    def __init__(self, params):
+        super(NormalizingLayer, self).__init__(params)
+
+
+
+class PCAWhiteningLayer(NormalizingLayer):
 
     def __init__(self, params):
         super(PCAWhiteningLayer, self).__init__(params)
@@ -356,6 +387,65 @@ class PCAWhiteningLayer(WhiteningLayer):
             raise Exception('Not yet implemented')
         dataWhite, junk = self.pcaWhiteningDataNormalizer.raw2normalized(data, unitNorm = True)
         return dataWhite, dataArrangement
+
+
+
+class ScaleClipLayer(NormalizingLayer):
+    '''Subtracts mean of each example (not each dimension), clips to some
+    multiple of S, where S is the the overall standard devation, then
+    scales to the given [min, max] range. Same normalization as in CS294
+    (see last few lines of loadCS294Images() function).
+    '''
+
+    def __init__(self, params):
+        super(ScaleClipLayer, self).__init__(params)
+        self.minVal  = float(params['min'])
+        self.maxVal  = float(params['max'])
+        self.clipStd = float(params['clipStd'])
+        assert self.maxVal > self.minVal
+        assert self.clipStd > 0
+
+        self.thresh = None
+
+    def _train(self, data, dataArrangement, trainParams = None, quick = False):
+        dataNormed = data - data.mean(0)
+        self.thresh = dataNormed.std() * self.clipStd
+
+    def _forwardProp(self, data, dataArrangement, sublayer, withGradMatrix):
+        if withGradMatrix:
+            raise Exception('Not yet implemented')
+        dataNormed = data - data.mean(0)
+        dataNormed = maximum(minimum(dataNormed, self.thresh), -self.thresh) / self.thresh   # scale to -1 to 1
+        dataNormed = (dataNormed + 1) * ((self.maxVal-self.minVal)/2.0) + self.minVal        # rescale to minVal to maxVal
+        return dataNormed, dataArrangement
+
+
+
+######################
+# Stretch
+######################
+
+class StretchingLayer(TrainableLayer):
+    '''Stretches the data in each dimension to have a given min/max'''
+
+    def __init__(self, params):
+        super(StretchingLayer, self).__init__(params)
+        self.minVal = float(params['min'])
+        self.maxVal = float(params['max'])
+
+    def _train(self, data, dataArrangement, trainParams = None, quick = False):
+        self.dataMin = data.min(1)
+        self.dataMax = data.max(1)
+
+    def _forwardProp(self, data, dataArrangement, sublayer, withGradMatrix):
+        '''ret = mm * data + bb'''
+        epsilon = 1e-8  # for dimensions with 0 variance
+        mm = (self.maxVal - self.minVal) / (self.dataMax - self.dataMin + epsilon)
+        bb = self.minVal - mm * self.dataMin
+
+        scaledData = (data.T * mm + bb).T
+
+        return scaledData, dataArrangement
 
 
 
@@ -383,7 +473,7 @@ class TicaLayer(TrainableLayer):
     def _calculateOutputSize(self, inputSize):
         return self.hiddenSize
 
-    def _initialize(self, seed = None):
+    def _initialize(self, trainParams = None, seed = None):
         # Set up untrained TICA
         self.tica = TICA(nInputs            = prod(self.inputSize),
                          hiddenLayerShape   = self.hiddenSize,
@@ -430,7 +520,7 @@ class TicaLayer(TrainableLayer):
             return absPooledActivations, dataArrangement
         else:
             raise Exception('Unknown sublayer: %s' % sublayer)
-
+    
     def _plot(self, data, dataArrangement, saveDir = None, prefix = None):
         '''Default no-op version. Override in derived class. It is up to the layer
         what to plot.
@@ -448,8 +538,9 @@ class SparseAELayer(TrainableLayer):
         super(SparseAELayer, self).__init__(params)
 
         self.hiddenSize = params['hiddenSize']
-        self.beta       = params['lambd']
+        self.beta       = params['beta']
         self.rho        = params['rho']
+        self.lambd      = params['lambd']
 
         self.W1 = None
         self.b1 = None
@@ -460,49 +551,61 @@ class SparseAELayer(TrainableLayer):
         self.W2shape = None
         self.b2shape = None
 
-        self.costLog = None
+        self._costLog = []    # this version is a list. The property costLog returns a numpy array.
 
         assert not isinstance(self.hiddenSize, tuple)  # should just be a number
 
     def _calculateOutputSize(self, inputSize):
         return (self.hiddenSize, )    # return as tuple
 
-    def _initialize(self, seed = None):
+    def _initialize(self, trainParams = None, seed = None):
         # Initialize weights
 
-        self.W1shape = (self.hiddenSize, self.inputSize)
-        self.b1shape = (self.hiddenSize,)
-        self.W2shape = (self.inputSize, self.hiddenSize)
-        self.b2shape = (self.inputSize,)
+        initb1       = trainParams['initb1']
+        initW2asW1_T = trainParams['initW2asW1_T']
+        assert initb1 in ('zero', 'approx')
+        assert initW2asW1_T in (True, False)
+        
+        rng = random.RandomState(seed)      # if seed is None, this takes its seed from timer
 
-        radius = sqrt(6 / (self.inputSize + self.outputSize + 1))
-        self.W1 = random.uniform(-radius, radius, self.W1shape)
-        self.b1 = zeros(self.b1shape)
-        self.W2 = random.uniform(-radius, radius, self.W2shape)
+        self.W1shape = (self.hiddenSize, prod(self.inputSize))
+        self.b1shape = (self.hiddenSize,)
+        self.W2shape = (prod(self.inputSize), self.hiddenSize)
+        self.b2shape = (prod(self.inputSize),)
+
+        radius = sqrt(6.0 / (prod(self.inputSize) + prod(self.outputSize) + 1))
+        self.W1 = rng.uniform(-radius, radius, self.W1shape)
+        if initb1 == 'zero':
+            self.b1 = zeros(self.b1shape)
+        else:  # 'approx'
+            self.b1 = invSigmoid01(self.rho) * ones(self.b1shape)
+        if initW2asW1_T:
+            self.W2 = self.W1.T.copy()
+        else:
+            self.W2 = rng.uniform(-radius, radius, self.W2shape)
         self.b2 = zeros(self.b2shape)
 
-        #theta = concatenate((W1.flatten(), b1.flatten(), W2.flatten(), b2.flatten()))
-
     def _train(self, data, dataArrangement, trainParams, quick = False):
+        #pdb.set_trace()
+        
         maxFuncCalls = trainParams['maxFuncCalls']
         if quick:
             print 'QUICK MODE: chopping maxFuncCalls from %d to 1!' % maxFuncCalls
             maxFuncCalls = 1
-            
 
         tic = time.time()
 
         theta0 = concatenate((self.W1.flatten(), self.b1.flatten(), self.W2.flatten(), self.b2.flatten()))
 
-        results = minimize(autoencoderCost,
+        results = minimize(self._costAndLog,
                            theta0,
-                           (data, self.hiddenSize, self.beta, self.rho),
+                           (data, self.hiddenSize, self.beta, self.rho, self.lambd),
                            jac = True,    # cost function retuns both value and gradient
                            method = 'L-BFGS-B',
-                           options = {'maxiter': maxFun, 'disp': True})
-        
+                           options = {'maxiter': maxFuncCalls, 'disp': True})
+
         fval = results['fun']
-        wallSeconds = time.time() - startWall
+        wallSeconds = time.time() - tic
         print 'Optimization results:'
         for key in ['status', 'nfev', 'success', 'fun', 'message']:
             print '  %20s: %s' % (key, results[key])
@@ -515,17 +618,23 @@ class SparseAELayer(TrainableLayer):
 
         # Unpack theta into W and b parameters
         begin = 0
-        W1 = reshape(theta[begin:begin+prod(self.W1shape)], self.W1shape);    begin += prod(self.W1shape)
-        b1 = reshape(theta[begin:begin+prod(self.b1shape)], self.b1shape);    begin += prod(self.b1shape)
-        W2 = reshape(theta[begin:begin+prod(self.W2shape)], self.W2shape);    begin += prod(self.W2shape)
-        b2 = reshape(theta[begin:begin+prod(self.b2shape)], self.b2shape);
+        self.W1 = reshape(theta[begin:begin+prod(self.W1shape)], self.W1shape);    begin += prod(self.W1shape)
+        self.b1 = reshape(theta[begin:begin+prod(self.b1shape)], self.b1shape);    begin += prod(self.b1shape)
+        self.W2 = reshape(theta[begin:begin+prod(self.W2shape)], self.W2shape);    begin += prod(self.W2shape)
+        self.b2 = reshape(theta[begin:begin+prod(self.b2shape)], self.b2shape);
+
+    def _costAndLog(self, theta, data, hiddenSize, beta, rho, lambd):
+        #if len(self.costLog) in (0, 100):
+        #    print 'At iteration %d, stopping' % len(self.costLog)
+        #    pdb.set_trace()
+        output = autoencoderCost(theta, data, hiddenSize, beta, rho, lambd, fullOutput = True)
+        cost, grad, reconCost, sparseCost, weightCost = output
+
+        self._costLog.append([cost, reconCost, sparseCost, weightCost])
+        print 'f =', cost, '|grad| =', linalg.norm(grad)
+
+        return cost, grad
         
-        execTime = time.time() - tic
-
-        print 'Training stats:'
-        print '  Number of cost evals:', len(self.costLog)
-        print '  Training time (wall)', execTime
-
     def _forwardProp(self, data, dataArrangement, sublayer, withGradMatrix):
         if withGradMatrix:
             raise Exception('not yet implemented')
@@ -536,11 +645,42 @@ class SparseAELayer(TrainableLayer):
         a2 = autoencoderRepresentation(self.W1, self.b1, data)
         return a2, dataArrangement
         
+    @property
+    def costLog(self):
+        return array(self._costLog)
+    
     def _plot(self, data, dataArrangement, saveDir = None, prefix = None):
-        '''Default no-op version. Override in derived class. It is up to the layer
-        what to plot.
-        '''
-        pass
+        if prefix is None:
+            prefix = ''
+        if saveDir:
+            # plot sparsity/reconstruction costs over time
+            costs = self.costLog    # costs is [cost, reconCost, sparseCost, weightCost]
+            pyplot.figure()
+            pyplot.hold(True)
+            pyplot.plot(costs[:,1], 'r-', costs[:,2], 'b-', costs[:,3], 'g-', costs[:,0], 'k-')
+            pyplot.xlabel('iteration'); pyplot.ylabel('cost')
+            pyplot.legend(('recon', 'sparsity', 'weight', 'total'))
+            pyplot.savefig(os.path.join(saveDir, prefix + 'cost.png'))
+            pyplot.savefig(os.path.join(saveDir, prefix + 'cost.pdf'))
+
+            pyplot.ylim((pyplot.ylim()[0], percentile(costs[:,0], 90)))   # rescale to show only the smallest 90% of the data
+            pyplot.savefig(os.path.join(saveDir, prefix + 'cost_zoom.png'))
+            pyplot.savefig(os.path.join(saveDir, prefix + 'cost_zoom.pdf'))
+
+            pyplot.close()
+
+            if len(self.inputSize) > 1:
+                imgShape = self.inputSize
+                tileSideLength = int(ceil(sqrt(self.hiddenSize)))
+                tileShape = (tileSideLength, tileSideLength)
+                plotImageData(self.W1.T, imgShape, saveDir=saveDir, prefix=prefix + 'direct_W1', tileShape=tileShape, onlyRescaled=True)
+                plotImageData(self.W2,   imgShape, saveDir=saveDir, prefix=prefix + 'direct_W2', tileShape=tileShape, onlyRescaled=True)
+            else:
+                # For now: skip plotting the W1 and W2 for layers with non-visualizable inputs
+                pass
+                #imgSizeLength = int(ceil(sqrt(self.inputSize)))
+                #imgShape = (imgSizeLength, imgSizeLength)
+                
 
 
 
@@ -721,11 +861,13 @@ class ConcatenationLayer(NonDataLayer):
 
 
 
-layerClassNames = {'data':       'dataClass',       # load the class specified by DataClass
-                   'whitener':   'whitenerClass',   # load the class specified by whitenerClass 
-                   'tica':       TicaLayer,
-                   'ae':         SparseAELayer,
-                   'downsample': DownsampleLayer,
-                   'lcn':        LcnLayer,
-                   'concat':     ConcatenationLayer,
+layerClassNames = {'data':           'dataClass',       # load the class specified by DataClass
+                   'whitener':       'whitenerClass',   # load the class specified by whitenerClass
+                   'scaleclip':       ScaleClipLayer,
+                   'stretch':         StretchingLayer,
+                   'tica':            TicaLayer,
+                   'ae':              SparseAELayer,
+                   'downsample':      DownsampleLayer,
+                   'lcn':             LcnLayer,
+                   'concat':          ConcatenationLayer,
                    }

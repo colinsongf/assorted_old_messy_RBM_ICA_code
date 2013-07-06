@@ -8,7 +8,7 @@ from IPython import embed
 
 from util.dataLoaders import loadFromPklGz, saveToFile
 from util.misc import dictPrettyPrint, importFromFile, relhack
-from layers import layerClassNames, DataArrangement, Layer, DataLayer, UpsonData3, WhiteningLayer, PCAWhiteningLayer, TicaLayer, DownsampleLayer, LcnLayer, ConcatenationLayer
+from layers import layerClassNames, DataArrangement, Layer, DataLayer, UpsonData3, NormalizingLayer, PCAWhiteningLayer, TicaLayer, DownsampleLayer, LcnLayer, ConcatenationLayer
 from GitResultsManager import resman
 from util.dataPrep import PCAWhiteningDataNormalizer
 from stackedLayers import StackedLayers

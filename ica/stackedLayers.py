@@ -3,15 +3,16 @@
 import pdb
 import os
 import gc
-from numpy import zeros, ones, prod, reshape
+from numpy import zeros, ones, prod, reshape, ceil, sqrt
 from scipy.optimize import minimize
 from scipy.linalg import norm
 from IPython import embed
 
 from util.dataLoaders import loadFromPklGz, saveToFile
 from util.misc import dictPrettyPrint, relhack, Tic
-from layers import layerClassNames, DataArrangement, Layer, DataLayer, UpsonData3, NYU2_Labeled, WhiteningLayer, PCAWhiteningLayer, TicaLayer, DownsampleLayer, LcnLayer, ConcatenationLayer
-from visualize import plotImageData, plotTopActivations, plotGrayActivations, plotReshapedActivations, plotActHist
+from layers import layerClassNames, DataArrangement, Layer, DataLayer, UpsonData3, NYU2_Labeled, CS294Images
+from layers import NormalizingLayer, PCAWhiteningLayer, TicaLayer, DownsampleLayer, LcnLayer, ConcatenationLayer
+from visualize import plotImageData, plotTopActivations, plotGrayActivations, plotReshapedActivations, plotActHist, plotActLines
 
 
 
@@ -163,7 +164,7 @@ class StackedLayers(object):
                 print 'training layer %d - %s (%s)' % (layerIdx, layer.name, layer.layerType)
                 print '*' * 40 + '\n'
 
-                layer.initialize(seed = 0)
+                layer.initialize(trainParams[layer.name], seed = 0)
 
                 layerTrainParams = trainParams[layer.name]
                 numExamples = layerTrainParams['examples']
@@ -211,10 +212,15 @@ class StackedLayers(object):
                     self.printStatus()
                     print '... to %s' % fileFinal
 
-                    tic = Tic('plot')
-                    prefix = 'layer_%02d_%s_' % (layerIdx, layer.name)
-                    layer.plot(trainPrevLayerData, dataArrangementPrevLayer, saveDir, prefix)
+                    print '\n   ' + '*' * 20
+                    print '   * vis layer %d - %s (%s)' % (layerIdx, layer.name, layer.layerType)
+                    print '   ' + '*' * 20 + '\n'
+                    tic = Tic('vis')
+                    #prefix = 'layer_%02d_%s_' % (layerIdx, layer.name)
+                    #layer.plot(trainPrevLayerData, dataArrangementPrevLayer, saveDir, prefix)
+                    self.visLayer(layerIdx, saveDir = saveDir, quick = quick)
                     tic()
+                    print
 
 
         if not trainedSomething:
@@ -298,21 +304,29 @@ class StackedLayers(object):
 
         return xOpt
     
-    def visLayer(self, layerIdx, sublayer = None, startLayerIdx = 0, saveDir = None, show = False):
+    def visLayer(self, layerIdx, sublayer = None, startLayerIdx = 0, numExamples = 100000, saveDir = None, show = False, quick = False):
         layer     = self.layers[layerIdx]
         if sublayer is None: sublayer = layer.nSublayers - 1  # max by default
         dataLayer = self.layers[0]
 
-        numExamples = 100000
         prefix = 'layer_%02d_%s_s%d_' % (layerIdx, layer.name, sublayer)
         seesPixels = self._seesPixels(layer, dataLayer)
 
-        # Get data and forward prop
-        rawDataLargePatches, rawDataPatches = self.getDataForLayer(layerIdx, numExamples)
-        dataArrangementLayer0 = DataArrangement(layerShape = layer.seesPatches, nLayers = numExamples)
-        tic = Tic('forward prop')
-        activations, dataArrangement = self.forwardProp(rawDataPatches, dataArrangementLayer0, layerIdx=layerIdx, sublayer=sublayer)
-        tic()
+        if quick:
+            numExamples = 1000
+            print 'QUICK MODE: chopping visLayer examples to 1000!'
+
+        NODATAYET = True
+        if NODATAYET:
+            # Get data and forward prop
+            rawDataLargePatches, rawDataPatches = self.getDataForLayer(layerIdx, numExamples)
+            dataArrangementLayer0 = DataArrangement(layerShape = layer.seesPatches, nLayers = numExamples)
+        
+            tic = Tic('forward prop')
+            prevLayerData, dataArrangementPrevLayer = self.forwardProp(rawDataPatches, dataArrangementLayer0, layerIdx=layerIdx-1)
+            activations, dataArrangement = self.forwardProp(prevLayerData, dataArrangementPrevLayer,
+                                                            startLayerIdx = layerIdx-1, layerIdx=layerIdx, sublayer=sublayer)
+            tic()
 
         # 0. Inputs
         plotImageData(rawDataLargePatches, seesPixels, saveDir, prefix = prefix + '0_input',
@@ -336,18 +350,30 @@ class StackedLayers(object):
             print 'QUICKHACK: only visualizing first %d units!' % unitsToVis
         for ii in range(unitsToVis):
             optInputs[:,ii] = self.optimalInputForUnit(ii, startLayerIdx = startLayerIdx, layerIdx = layerIdx, sublayer = sublayer)
+        tileShape = embeddingShape
+        if len(tileShape) == 1:
+            # single dimensional, so no meaningful embedding. Reshape to rougly 1.5:1 aspect ratio
+            totalNum = prod(tileShape)
+            rows = int(sqrt(totalNum * 1.5)) + 1
+            tileShape = (int(ceil(totalNum/float(rows))), rows)
         plotImageData(optInputs, seesPixels, saveDir, prefix = prefix + '2_numopt',
-                      tileShape = embeddingShape, show = show, onlyRescaled = True)
+                      tileShape = tileShape, show = show, onlyRescaled = True)
 
         # 3. layer activations
         plotActHist(activations, saveDir = saveDir, prefix = prefix + '3_acthist', show = show)
+        plotActLines(activations, saveDir = saveDir, prefix = prefix + '3_actlines', show = show)
 
         # 4. layer activations
         plotGrayActivations(activations, number = 500, saveDir = saveDir, prefix = prefix + '4_actunroll', show = show)
 
         # 5. reshaped activations
-        plotReshapedActivations(activations, tileShape = (20,30), embeddingShape = embeddingShape,
-                                prefix = prefix + '5_actembed', saveDir = saveDir, show = show)
+        if len(embeddingShape) > 1:
+            # Doesn't really make sense for 1D embeddings / non-embedded data
+            plotReshapedActivations(activations, tileShape = (20,30), embeddingShape = embeddingShape,
+                                    prefix = prefix + '5_actembed', saveDir = saveDir, show = show)
+
+        # 6. Custom stuff per layer
+        layer.plot(prevLayerData, dataArrangementPrevLayer, saveDir = saveDir, prefix = prefix + '9_layer_')
 
         
 

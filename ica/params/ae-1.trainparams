@@ -1,0 +1,14 @@
+#! /usr/bin/env python
+#
+# This is a training parameters file. It must define one object: trainParams
+
+tp = {}
+
+tp['ae1'] = {'examples': 10000,
+             'initb1': 'approx',        # 'zero' for 0s, or 'approx' for an approx value to start at avg activation of rho
+             'initW2asW1_T': True,
+             'method': 'lbfgs',
+             'maxFuncCalls': 300,
+             }
+
+trainParams = tp

@@ -1,0 +1,37 @@
+#! /usr/bin/env python
+#
+# This is a layers parameter file. It must define one object: layers.
+
+ll = []
+
+ll.append({'name':      'data',
+           'type':      'data',
+           'dataClass': 'UpsonData3',   # provides 240x320 images
+           'imageSize': (240,320),
+           'patchSize': (8,8),          # not including colors
+           'stride':    (4,4),
+           'colors':    1,
+           })
+
+ll.append({'name':          'whitener',
+           'type':          'whitener',
+           'whitenerClass': 'PCAWhiteningLayer',
+           'unitNorm':      True})
+
+ll.append({'name':      'stretch',
+           'type':      'stretch',
+           'min':       .1,
+           'max':       .9,
+           })
+
+nAE = 3
+for ii in range(1,nAE+1):
+    # layer - AE
+    ll.append({'name':         'ae%d' % ii,
+               'type':         'ae',
+               'hiddenSize':   25,      # output size is same as hidden size
+               'beta':         3.0,
+               'rho':          .01,
+               })
+
+layers = ll
