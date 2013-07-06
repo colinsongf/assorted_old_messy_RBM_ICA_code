@@ -153,6 +153,7 @@ def plotActHist(act, bins = 50, prefix = 'acthist', saveDir = None, show = False
 
 def plotActLines(act, prefix = 'actlines', nUnits = (3,4), saveDir = None, show = False):
     pyplot.clf()
+    minVal = 9999
     maxVal = -9999
 
     for counter,iijj in enumerate(((ii,jj) for ii in range(nUnits[0]) for jj in range(nUnits[1]))):
@@ -161,6 +162,7 @@ def plotActLines(act, prefix = 'actlines', nUnits = (3,4), saveDir = None, show 
         pyplot.hold(True)
         pyplot.vlines(arange(act.shape[0]), 0, act[:,counter], 'b')
         pyplot.plot(act[:,counter], 'bo')
+        minVal = min(minVal, pyplot.ylim()[0])
         maxVal = max(maxVal, pyplot.ylim()[1])
         #pyplot.xlabel('unit'); pyplot.ylabel('activation')
 
@@ -170,11 +172,11 @@ def plotActLines(act, prefix = 'actlines', nUnits = (3,4), saveDir = None, show 
 
     for counter,iijj in enumerate(((ii,jj) for ii in range(nUnits[0]) for jj in range(nUnits[1]))):
         pyplot.subplot(nUnits[0], nUnits[1], counter+1)
-        pyplot.ylim((0, maxVal))
+        pyplot.ylim((minVal, maxVal))
 
     if saveDir:
-        pyplot.savefig(os.path.join(saveDir, '%s_samemax.png' % prefix))
-        pyplot.savefig(os.path.join(saveDir, '%s_samemax.pdf' % prefix))
+        pyplot.savefig(os.path.join(saveDir, '%s_samerange.png' % prefix))
+        pyplot.savefig(os.path.join(saveDir, '%s_samerange.pdf' % prefix))
 
     if show:
         pyplot.show()
