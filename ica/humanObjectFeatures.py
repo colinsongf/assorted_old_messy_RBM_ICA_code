@@ -11,16 +11,17 @@ from PIL import Image
 
 from GitResultsManager import resman
 
+from layers import DataArrangement
 #from util.misc import dictPrettyPrint, importFromFile, relhack
 #from util.dataPrep import PCAWhiteningDataNormalizer
-#from util.dataLoaders import loadFromPklGz, saveToFile
+from util.dataLoaders import loadFromPklGz, saveToFile, approxNormalizeCS294
 #from layers import layerClassNames, DataArrangement, Layer, DataLayer, UpsonData3, NormalizingLayer, PCAWhiteningLayer, TicaLayer, DownsampleLayer, LcnLayer, ConcatenationLayer
 #from stackedLayers import StackedLayers
 #from visualize import plotImageData, plotTopActivations, plotGrayActivations, plotReshapedActivations, plotActHist
 
 
 
-def makeFeats(dataDir, featsFilename, outputFilename, saveDir = None, quick = False):
+def makeFeats(dataDir, featsFilename, outputFilename, saveDir = None, quick = False, stackedLayers = None):
     nLines = 0
     nMismatchedIds = 0
     output = []
@@ -44,9 +45,11 @@ def makeFeats(dataDir, featsFilename, outputFilename, saveDir = None, quick = Fa
         objBoundingBox = [int(st) for st in features[:4]]
         imPath = os.path.join(dataDir, 'by_id', activityId, 'RGB_%d.png' % frameNum)
 
+        # Get chosen features:
         #newFeats = featConst(5)
-        #newFeats = featRand(5)
+        #newFeats = featRand(20)
         #newFeats = featAvgIntensity(imPath, objId, objBoundingBox)
+        newFeats = featSLRep(imPath, objId, objBoundingBox, stackedLayers)
 
         output.append((line, newFeats))
         #print ii, '%s + %s' % (line, newFeats)
@@ -111,6 +114,46 @@ def featAvgIntensity(imPath, objId, objBoundingBox):
 
 
 
+def featSLRep(imPath, objId, objBoundingBox, stackedLayers):
+    '''Returns the representation of the patch using the provided StackedLayers object'''
+
+    if not stackedLayers:
+        raise Exception('Need a StackedLayers object, but None was provided! (Make sure you load one using the relevant command line option).')
+
+    slInputSize = stackedLayers.layers[1].inputSize
+    slOutputSize = prod(stackedLayers.layers[-1].outputSize)
+
+    if '0505003751' in imPath or '0510181539' in imPath:
+        # Missing images...
+        return [0] * slOutputSize
+
+    im = Image.open(imPath)
+    objCrop = im.crop(objBoundingBox)
+    left,upper,right,lower = objBoundingBox
+
+    # Check for null bounding box (e.g. when object is occluded)
+    if left == right or upper == lower:
+        return [0] * slOutputSize
+
+    objCrop.thumbnail(slInputSize, Image.ANTIALIAS)
+    objCropGray = objCrop.convert('L')
+    arr = array(objCropGray, dtype='float')
+
+    paddingAmounts = [goal-cur for goal,cur in zip(slInputSize, arr.shape)]
+    paddingWidths = [(pa/2, int(round((pa+.5)/2))) for pa in paddingAmounts]   # To approximately center in each direction
+
+    # Pad with mean to appropriate size
+    arrpad = pad(arr, paddingWidths, mode='constant', constant_values=(arr.mean(),))
+    arrnrm = approxNormalizeCS294(arrpad, 255)
+    
+    rep, dataArrangement = stackedLayers.forwardProp(reshape(arrnrm.flatten(), (-1,1)), DataArrangement((1,1), 1), quiet = True)
+
+    #embed()
+
+    return rep.flatten().tolist()
+
+
+
 def main():
     parser = argparse.ArgumentParser(description='Makes features for the human activity deteciton dataset. Example usage:\n./humanObjectFeatures.py /path/to/data_obj_feats.txt')
     parser.add_argument('--name', type = str, default = 'junk',
@@ -123,6 +166,8 @@ def main():
     #parser.add_argument('command', type = str, default = 'embed', choices = ['visall', 'embed'], nargs='?',
     #                    help = 'What to do: one of {visall (save all plots), embed (drop into shell)}. Default: embed.')
 
+    parser.add_argument('--stackedlayers', type = str, default = '',
+                        help = 'Path to a *.pkl.gz file containing a pickeled StackedLayers object to load (default: None)')
     parser.add_argument('--outfile', type = str, default = 'data_objs_feats_plus.txt',
                         help = 'What to name the output file (default: data_objs_feats_plus.txt)')
     parser.add_argument('dataDir', type = str, default = 'data',
@@ -140,8 +185,13 @@ def main():
     #print 'Loaded these StackedLayers:'
     #sl.printStatus()
 
+    stackedLayers = None
+    if args.stackedlayers:
+        stackedLayers = loadFromPklGz(args.stackedlayers)
+
     makeFeats(dataDir = args.dataDir, featsFilename = args.data_obj_feats_file,
-              saveDir = saveDir, outputFilename = args.outfile, quick = args.quick)
+              saveDir = saveDir, outputFilename = args.outfile, quick = args.quick,
+              stackedLayers = stackedLayers)
     
     resman.stop()
 

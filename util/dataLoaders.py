@@ -286,10 +286,30 @@ def loadCS294Images(patchSize = (8,8), number = 10000, seed = None, filename = '
     # convert to one example per column
     patches = imageMatrix.T
 
-    # normalize as in sampleIMAGES.m from CS294
-    patches -= patches.mean(0)
-    thresh = patches.std() * 3
-    patches = maximum(minimum(patches, thresh), -thresh) / thresh   # scale to -1 to 1
-    patches = (patches + 1) * 0.4 + 0.1   #rescale to .1 to .9
+    patches = normalizeCS294(patches)
 
     return patches
+
+
+
+def normalizeCS294(patches):
+    # normalize as in sampleIMAGES.m from CS294
+    ret = patches.copy()
+    ret -= ret.mean(0)
+    thresh = ret.std() * 3
+    ret = maximum(minimum(ret, thresh), -thresh) / thresh   # scale to -1 to 1
+    ret = (ret + 1) * 0.4 + 0.1   #rescale to .1 to .9
+    return ret
+
+
+
+def approxNormalizeCS294(patches, thresh):
+    # normalize approximately as in sampleIMAGES.m from CS294 (but
+    # without using values from data, to allow 1. processing test set
+    # at the same time as training set, and 2. processing single
+    # patches at a time.)
+    ret = patches.copy()
+    ret -= ret.mean(0)
+    ret = maximum(minimum(ret, thresh), -thresh) / thresh   # scale to -1 to 1
+    ret = (ret + 1) * 0.4 + 0.1   #rescale to .1 to .9
+    return ret
