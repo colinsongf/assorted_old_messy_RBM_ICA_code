@@ -19,10 +19,12 @@ from util.dataLoaders import loadFromPklGz, saveToFile, approxNormalizeCS294
 #from stackedLayers import StackedLayers
 #from visualize import plotImageData, plotTopActivations, plotGrayActivations, plotReshapedActivations, plotActHist
 
+AFFORDANCE_CLASSES = 12
 
 
-def makeFeats(dataDir, featsFilename, outputFilename, saveDir = None, quick = False, stackedLayers = None,
-              featsBase = True, featsConst = 0, featsRand = 0, featsSL = False):
+
+def makeFeats(dataDir, featsFilename, outputFilename, saveDir = None, quick = False, stackedLayers = None, formattedDataDir = '',
+              featsBase = True, featsConst = 0, featsRand = 0, featsSL = False, featsTruth = False):
     nLines = 0
     nMismatchedIds = 0
     output = []
@@ -58,6 +60,8 @@ def makeFeats(dataDir, featsFilename, outputFilename, saveDir = None, quick = Fa
             feats.extend(featRand(featsRand))
         if featsSL:
             feats.extend(featSLRep(imPath, objId, objBoundingBox, stackedLayers))
+        if featsTruth:
+            feats.extend(featTruth(activityId, segId, objId, formattedDataDir))
             
         output.append((linePrefix, feats))
         #print ii, '%s + %s' % (linePrefix, feats)
@@ -136,6 +140,32 @@ def featAvgIntensity(imPath, objId, objBoundingBox):
 
 
 
+def featTruth(activityId, segId, objId, formattedDataDir):
+    '''Returns 10 features perfectly correlated with the true affordance labelings.'''
+
+    #if '0505003751' in imPath or '0510181539' in imPath:
+    #    # Missing images...
+    #    return [0]
+
+    feats = [0] * AFFORDANCE_CLASSES
+
+    if activityId in ('0505003751','0510181539'):
+        return feats
+
+    segmentFilename = os.path.join(formattedDataDir, '%s_%d.txt' % (activityId, segId))
+    with open(segmentFilename, 'r') as ff:
+        lines = ff.readlines()
+
+    trueAffordance = int(lines[objId].split()[0])
+
+    assert (trueAffordance >= 1 and trueAffordance <= AFFORDANCE_CLASSES), 'Unknown affordance class'
+
+    feats[trueAffordance-1] = 1
+        
+    return feats
+
+
+
 def featSLRep(imPath, objId, objBoundingBox, stackedLayers):
     '''Returns the representation of the patch using the provided StackedLayers object'''
 
@@ -190,6 +220,8 @@ def main():
 
     parser.add_argument('--stackedlayers', type = str, default = '',
                         help = 'Path to a *.pkl.gz file containing a pickeled StackedLayers object to load (default: None)')
+    parser.add_argument('--fdata', type = str, default = '',
+                        help = 'Path to a "..../formatted/data/method_name" directory containing files like 0510175829_1.txt. Needed only if adding truth labels. (default: None)')
     parser.add_argument('--outfile', type = str, default = 'data_objs_feats_plus.txt',
                         help = 'What to name the output file (default: data_objs_feats_plus.txt)')
     parser.add_argument('dataDir', type = str, default = 'data',
@@ -213,8 +245,8 @@ def main():
 
     makeFeats(dataDir = args.dataDir, featsFilename = args.data_obj_feats_file,
               saveDir = saveDir, outputFilename = args.outfile, quick = args.quick,
-              stackedLayers = stackedLayers,
-              featsBase = True, featsConst = 0, featsRand = 0, featsSL = False)
+              stackedLayers = stackedLayers, formattedDataDir = args.fdata,
+              featsBase = True, featsConst = 0, featsRand = 0, featsSL = False, featsTruth = False)
     
     resman.stop()
 
