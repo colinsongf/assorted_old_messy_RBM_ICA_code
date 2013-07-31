@@ -11,12 +11,14 @@ import os, sys
 from numpy import *
 from matplotlib import pyplot, mlab
 from PIL import Image
-
-from sklearn.decomposition import FastICA
+# JBY: disabled for now
+#from sklearn.decomposition import FastICA
 
 from GitResultsManager import resman
-from rbm.pca import PCA
-from rbm.utils import tile_raster_images, load_mnist_data, saveToFile, looser
+
+from util.pca import PCA
+from util.plotting import tile_raster_images, looser
+from util.dataLoaders import saveToFile
 
 
 
