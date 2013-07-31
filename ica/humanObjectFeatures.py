@@ -21,7 +21,8 @@ from util.dataLoaders import loadFromPklGz, saveToFile, approxNormalizeCS294
 
 
 
-def makeFeats(dataDir, featsFilename, outputFilename, saveDir = None, quick = False, stackedLayers = None):
+def makeFeats(dataDir, featsFilename, outputFilename, saveDir = None, quick = False, stackedLayers = None,
+              featsBase = True, featsConst = 0, featsRand = 0, featsSL = False):
     nLines = 0
     nMismatchedIds = 0
     output = []
@@ -36,23 +37,30 @@ def makeFeats(dataDir, featsFilename, outputFilename, saveDir = None, quick = Fa
 
         vals = line.split(',')
         intVals = [int(round(float(st))) for st in vals]
-        activityId, segId, objId, frameNum, objIdDup, features = vals[0], intVals[1], intVals[2], intVals[3], intVals[4], vals[5:]
-        assert len(features) == 18
+        linePrefix = vals[:5]
+        activityId, segId, objId, frameNum, objIdDup, baseFeatures = vals[0], intVals[1], intVals[2], intVals[3], intVals[4], vals[5:]
+        assert len(baseFeatures) == 18
         #assert objId == objIdDup
         if objId != objIdDup:
             nMismatchedIds += 1
             #print line.strip()
-        objBoundingBox = [int(st) for st in features[:4]]
+        objBoundingBox = [int(st) for st in baseFeatures[:4]]
         imPath = os.path.join(dataDir, 'by_id', activityId, 'RGB_%d.png' % frameNum)
 
-        # Get chosen features:
-        #newFeats = featConst(5)
-        #newFeats = featRand(20)
-        #newFeats = featAvgIntensity(imPath, objId, objBoundingBox)
-        newFeats = featSLRep(imPath, objId, objBoundingBox, stackedLayers)
-
-        output.append((line, newFeats))
-        #print ii, '%s + %s' % (line, newFeats)
+        feats = []
+        
+        # Get all chosen features:
+        if featsBase:
+            feats.extend(baseFeatures)
+        if featsConst:
+            feats.extend(featConst(featsConst))
+        if featsRand:
+            feats.extend(featRand(featsRand))
+        if featsSL:
+            feats.extend(featSLRep(imPath, objId, objBoundingBox, stackedLayers))
+            
+        output.append((linePrefix, feats))
+        #print ii, '%s + %s' % (linePrefix, feats)
 
         nLines += 1
         if ii == 0:
@@ -63,12 +71,26 @@ def makeFeats(dataDir, featsFilename, outputFilename, saveDir = None, quick = Fa
 
     print 'Read %d lines (%d mismatched obj IDs)' % (nLines, nMismatchedIds)
 
+    nfeats = None
     with open(outputFilename, 'w') as ff:
-        for line, newFeats in output:
-            newFeatureStr = ','.join(['%f' % feat for feat in newFeats])
-            ff.write('%s,%s\n' % (line, newFeatureStr))
+        for linePrefix, feats in output:
+            if nfeats is None:
+                nfeats = len(feats)
+            else:
+                assert nfeats == len(feats), 'Non-uniform number of features.'
+            newFeatureStrList = []
+            for feat in feats:
+                if isinstance(feat, float):
+                    newFeatureStrList.append('%f' % feat)
+                elif isinstance(feat, int):
+                    newFeatureStrList.append('%d' % feat)
+                elif isinstance(feat, basestring):
+                    newFeatureStrList.append('%s' % feat)
+                else:
+                    raise Exception('Unknown feature type: %s' % type(feat))
+            ff.write('%s\n' % ','.join(linePrefix + newFeatureStrList))
 
-    print 'Wrote %d records to %s' % (len(output), outputFilename)
+    print 'Wrote %d lines, %d feats per line, to %s' % (len(output), nfeats, outputFilename)
 
     if saveDir:
         shutil.copy(outputFilename, saveDir)
@@ -191,7 +213,8 @@ def main():
 
     makeFeats(dataDir = args.dataDir, featsFilename = args.data_obj_feats_file,
               saveDir = saveDir, outputFilename = args.outfile, quick = args.quick,
-              stackedLayers = stackedLayers)
+              stackedLayers = stackedLayers,
+              featsBase = True, featsConst = 0, featsRand = 0, featsSL = False)
     
     resman.stop()
 
