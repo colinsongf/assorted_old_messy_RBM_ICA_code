@@ -153,6 +153,7 @@ def autoencoderCost(thetaFlat, XX, hiddenLayerSize, beta = 0, rho = .05, lambd =
     # Weight decay cost
 
     weightCost = lambd / 2.0 * ((W1**2).sum() + (W2**2).sum())
+    #weightCost = lambd / 2.0 * ((W1**2).sum())    # HACK while testing fro1cost !!!!!!!!
 
     cost = reconCost + sparseCost + weightCost
     
@@ -170,6 +171,7 @@ def autoencoderCost(thetaFlat, XX, hiddenLayerSize, beta = 0, rho = .05, lambd =
     W1grad = dot(delta2, a1.T)  / numExamples + lambd * W1
     b1grad = delta2.sum(1)      / numExamples
     W2grad = dot(delta3, a2.T)  / numExamples + lambd * W2
+    #W2grad = dot(delta3, a2.T)  / numExamples       # HACK while testing fro1cost !!!!!!!!
     b2grad = delta3.sum(1)      / numExamples
     
     grad = concatenate((W1grad.flatten(), b1grad.flatten(), W2grad.flatten(), b2grad.flatten()))
@@ -182,6 +184,40 @@ def autoencoderCost(thetaFlat, XX, hiddenLayerSize, beta = 0, rho = .05, lambd =
         return cost, grad, reconCost, sparseCost, weightCost, z2, a2, z3, a3, rho_hat
     else:
         raise Exception('Unknown output parameter: %s' % repr(output))
+
+
+
+def fro1Cost(thetaFlat, XX, WWshape, alpha = 1.0, beta = 1.0, output = 'costgrad'):
+    '''Cost for a fro1 encoder.
+
+    thetaFlat: (WW).flatten()
+    XX: one example per column
+    output: 'costgrad', 'sepcosts', 'full'
+    '''
+
+    dim, numExamples = XX.shape
+    assert WWshape[1] == dim, 'dim mismatch between data and weights'
+    
+    begin = 0
+    WW = reshape(thetaFlat[begin:begin+prod(WWshape)], WWshape);    begin += prod(WWshape)
+
+    #seterr(all = 'raise')
+    #pdb.set_trace()
+
+    #############
+    # Cost
+    #############
+
+    act = dot(WW, XX)
+
+    costsEachNeuron = (pi/2 * abs(act).mean(1)**2) / (act**2).mean(1)
+    avgCostPerNeuron = costsEachNeuron.mean()
+
+    sparsityCost = alpha * avgCostPerNeuron
+
+    grad = zeros(prod(WW.shape))   ######### HACK for now
+    
+    return sparsityCost, grad
 
 
 
@@ -247,6 +283,34 @@ def check_autoencoderCost():
 
 
 
+def check_fro1Cost():
+    random.seed(0)
+
+    dim = 12
+    numExamples = 1000
+    hiddenLayerSize = 9
+    
+    # generate random cov matrix (symmetric, positive semi-def)
+    cv = random.normal(0, 1, (dim,dim))
+    cv += cv.T
+    vals,vecs = linalg.eig(cv)
+    cv += eye(dim) * (-min(vals) + .1)
+    vals,vecs = linalg.eig(cv)
+    assert all(vals > 0)
+
+    XX = random.multivariate_normal(zeros(dim), cv, 1000).T
+
+    # each dimension should have mean 0
+    XX = (XX.T - XX.mean(1)).T
+    
+    # random params
+    WW = random.normal(0, .1, (hiddenLayerSize, dim))
+    theta = concatenate((WW.flatten(),))
+
+    numericalCheckVectorGrad(fro1Cost, theta, (XX, WW.shape, 1.0, 1.0))
+
+
+
 def tests():
     # negAvgTwoNorm_*
     #check_negAvgTwoNorm_vec()
@@ -254,6 +318,7 @@ def tests():
     #check_negAvgTwoNorm_vecVmat()
 
     check_autoencoderCost()
+    #check_fro1Cost()
 
 
 if __name__ == '__main__':

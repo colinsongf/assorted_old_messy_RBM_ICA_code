@@ -673,13 +673,13 @@ class SparseAELayer(TrainableLayer):
             output = autoencoderCost(theta, data, self.hiddenSize, self.beta, self.rho, self.lambd, output='full')
             cost, grad, reconCost, sparseCost, weightCost, z2, a2, z3, a3, rho_hat = output
             pyplot.clf()
-            pyplot.subplot(5,1,1); pyplot.hist(data.flatten(), bins=20)
-            pyplot.subplot(5,2,3); pyplot.hist(self.W1.flatten(), bins=20)
-            pyplot.subplot(5,2,4); pyplot.hist(self.b1.flatten(), bins=20)
-            pyplot.subplot(5,1,3); pyplot.hist(a2.flatten(), bins=20)
-            pyplot.subplot(5,2,7); pyplot.hist(self.W2.flatten(), bins=20)
-            pyplot.subplot(5,2,8); pyplot.hist(self.b2.flatten(), bins=20)
-            pyplot.subplot(5,1,5); pyplot.hist(a3.flatten(), bins=20)
+            pyplot.subplot(5,1,1); pyplot.hist(data.flatten(), bins=30)
+            pyplot.subplot(5,2,3); pyplot.hist(self.W1.flatten(), bins=30)
+            pyplot.subplot(5,2,4); pyplot.hist(self.b1.flatten(), bins=30)
+            pyplot.subplot(5,1,3); pyplot.hist(a2.flatten(), bins=30)
+            pyplot.subplot(5,2,7); pyplot.hist(self.W2.flatten(), bins=30)
+            pyplot.subplot(5,2,8); pyplot.hist(self.b2.flatten(), bins=30)
+            pyplot.subplot(5,1,5); pyplot.hist(a3.flatten(), bins=30)
 
             pyplot.savefig(os.path.join(saveDir, prefix + 'ae_hists.png'))
             pyplot.savefig(os.path.join(saveDir, prefix + 'ae_hists.pdf'))
@@ -718,6 +718,39 @@ class SparseAELayer(TrainableLayer):
                 #imgShape = (imgSizeLength, imgSizeLength)
                 
             pyplot.close()
+
+
+
+class Fro1Layer(TrainableLayer):
+
+    def __init__(self, params):
+        super(Fro1Layer, self).__init__(params)
+
+        self._costLog = []    # this version is a list. The property costLog returns a numpy array.
+
+    def _calculateOutputSize(self, inputSize):
+        return (self.hiddenSize, )    # return as tuple
+
+    def _initialize(self, trainParams = None, seed = None):
+        # Initialize weights
+        pass
+
+    def _train(self, data, dataArrangement, trainParams, quick = False):
+        #pdb.set_trace()
+        pass
+
+    def _costAndLog(self, theta, data, hiddenSize, beta, rho, lambd):
+        return cost, grad
+        
+    def _forwardProp(self, data, dataArrangement, sublayer, withGradMatrix):
+        pass
+        
+    @property
+    def costLog(self):
+        return array(self._costLog)
+    
+    def _plot(self, data, dataArrangement, saveDir = None, prefix = None):
+        print 'TODO: plot'
 
 
 
@@ -904,6 +937,7 @@ layerClassNames = {'data':           'dataClass',       # load the class specifi
                    'stretch':         StretchingLayer,
                    'tica':            TicaLayer,
                    'ae':              SparseAELayer,
+                   'fro1':            Fro1Layer,
                    'downsample':      DownsampleLayer,
                    'lcn':             LcnLayer,
                    'concat':          ConcatenationLayer,
