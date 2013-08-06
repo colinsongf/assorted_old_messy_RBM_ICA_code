@@ -103,6 +103,24 @@ def autoencoderRepresentation(W1, b1, XX):
 
     return a2
 
+def autoencoderBackprop(W1, b1, dqda, XX, activations):
+    '''Paired with autoencoderCost.
+
+    Returns dqdx given dqda, XX, and the parameters W1 and b1. Uses sigmoid activation with range 0 to 1. Ignores activations.'''
+
+    # TODO: verify that this works!
+    
+    # Forward prop and back prop
+    a1 = XX
+    
+    z2 = (dot(W1, a1).T + b1).T
+    a2, da2dz2 = sigmoidAndDeriv01(z2)
+
+    dqdz2 = dqda * da2dz2
+    dqdx = dot(W1.T, dqdz2)   # Can think of W1.T as dz2/dx
+
+    return dqdx
+
 def autoencoderCost(thetaFlat, XX, hiddenLayerSize, beta = 0, rho = .05, lambd = 0, output = 'costgrad'):
     '''Cost for a single hidden layer autoencoder with sigmoid activation function. Uses sigmoid with range of 0 to 1.
 

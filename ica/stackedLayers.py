@@ -1,18 +1,19 @@
 #! /usr/bin/env python
 
-import pdb
+import ipdb as pdb
 import os
 import gc
-from numpy import zeros, ones, prod, reshape, ceil, sqrt
+from numpy import zeros, ones, prod, reshape, ceil, sqrt, random
 from scipy.optimize import minimize
 from scipy.linalg import norm
 from IPython import embed
 
 from util.dataLoaders import loadFromPklGz, saveToFile
 from util.misc import dictPrettyPrint, relhack, Tic
-from layers import layerClassNames, DataArrangement, Layer, DataLayer, UpsonData3, NYU2_Labeled, CS294Images
+from layers import layerClassNames, DataArrangement, Layer, DataLayer, UpsonData3, NYU2_Labeled, CS294Images, DummyDataLayer
 from layers import NormalizingLayer, PCAWhiteningLayer, TicaLayer, DownsampleLayer, LcnLayer, ConcatenationLayer
 from visualize import plotImageData, plotTopActivations, plotGrayActivations, plotReshapedActivations, plotActHist, plotActLines
+from gradCheck import numericalCheckVectorGrad
 
 
 
@@ -107,7 +108,7 @@ class StackedLayers(object):
         layer = self.layers[layerIdx]
         dataLayer = self.layers[0]
 
-        dataArrangement = DataArrangement(layerShape = layer.seesPatches, nLayers = data.shape[1])
+        dataArrangement = DataArrangement(sliceShape = layer.seesPatches, nSlices = data.shape[1])
         dataPatches = self.getSampledAndStackedPatches(data, layer, dataLayer)
 
         return self.forwardProp(dataPatches, dataArrangement, startLayerIdx, layerIdx, sublayer, quiet = quiet)
@@ -131,9 +132,9 @@ class StackedLayers(object):
                 print '  fp through layer %d - %s (%s)' % (ii, layer.name, layer.layerType)
             if ii == layerIdx:
                 # only pass sublayer selection to last layer
-                newRep, newArrangement = layer.forwardProp(currentRep, currentArrangement, sublayer)
+                newRep, newArrangement = layer.forwardProp(currentRep, currentArrangement, sublayer, quiet = quiet)
             else:
-                newRep, newArrangement = layer.forwardProp(currentRep, currentArrangement)
+                newRep, newArrangement = layer.forwardProp(currentRep, currentArrangement, quiet = quiet)
             if not quiet:
                 print ('    layer transformed data from\n      %s, %s ->\n      %s, %s'
                        % (currentRep.shape, currentArrangement, newRep.shape, newArrangement))
@@ -141,7 +142,11 @@ class StackedLayers(object):
             currentArrangement = newArrangement
         return currentRep, currentArrangement
 
-    def train(self, trainParams, saveDir = None, quick = False, maxlayer = -1):
+    def train(self, trainParams, saveDir = None, quick = False, maxlayer = -1, onlyInit = False):
+        '''Train all layers.
+
+        if onlyInit, then do initialization but skip training.'''
+        
         # check to make sure each trainParam matches a known layer...
         for layerName in trainParams.keys():
             if layerName not in self.layerNames:
@@ -161,14 +166,20 @@ class StackedLayers(object):
             if layer.trainable and not layer.isTrained:
                 trainedSomething = True
                 print '\n' + '*' * 40
-                print 'training layer %d - %s (%s)' % (layerIdx, layer.name, layer.layerType)
+                if onlyInit:
+                    print 'just initializing layer %d - %s (%s)' % (layerIdx, layer.name, layer.layerType)
+                else:
+                    print 'training layer %d - %s (%s)' % (layerIdx, layer.name, layer.layerType)
                 print '*' * 40 + '\n'
 
-                layer.initialize(trainParams[layer.name], seed = 0)
-
                 layerTrainParams = trainParams[layer.name]
+                layer.initialize(layerTrainParams, seed = 0)
+
+                if onlyInit:
+                    continue   # Skip training
+
                 numExamples = layerTrainParams['examples']
-                if quick:
+                if quick and numExamples > 1000:
                     numExamples = 1000
                     print 'QUICK MODE: chopping training examples to 1000!'
 
@@ -185,7 +196,7 @@ class StackedLayers(object):
                 print 'gc.collect found', gc.collect(), 'objects'
 
                 # Push data through N-1 layers
-                dataArrangementLayer0 = DataArrangement(layerShape = layer.seesPatches, nLayers = numExamples)
+                dataArrangementLayer0 = DataArrangement(sliceShape = layer.seesPatches, nSlices = numExamples)
                 tic = Tic('forward prop')
                 trainPrevLayerData, dataArrangementPrevLayer = self.forwardProp(trainRawDataPatches, dataArrangementLayer0, layerIdx=layerIdx-1)
                 tic()
@@ -321,7 +332,7 @@ class StackedLayers(object):
         if NODATAYET:
             # Get data and forward prop
             rawDataLargePatches, rawDataPatches = self.getDataForLayer(layerIdx, numExamples)
-            dataArrangementLayer0 = DataArrangement(layerShape = layer.seesPatches, nLayers = numExamples)
+            dataArrangementLayer0 = DataArrangement(sliceShape = layer.seesPatches, nSlices = numExamples)
         
             tic = Tic('forward prop')
             prevLayerData, dataArrangementPrevLayer = self.forwardProp(rawDataPatches, dataArrangementLayer0, layerIdx=layerIdx-1)
@@ -388,3 +399,102 @@ class StackedLayers(object):
                 for sublayer in range(layer.nSublayers):
                     print '\nvis layer %2d (s%d): %s' % (layerIdx, sublayer, layer.name)
                     self.visLayer(layerIdx, sublayer, startLayerIdx = 1, saveDir = saveDir)    # hardcoded to 1!!
+
+
+
+def check_2AE_backprop():
+    random.seed(0)
+
+    dimInput = 3
+    dimRep1  = 2
+    dimRep2  = 4
+    numExamples = 5
+
+    ll = []
+    ll.append({'name':      'data',
+               'type':      'data',
+               'dataClass': 'DummyDataLayer',
+               'outputSize': (dimInput,),
+               #'imageSize': (512,512),
+               #'patchSize': (8,8),
+               #'stride':    (4,4),
+               #'colors':    1,
+               })
+    ll.append({'name':         'ae1',
+               'type':         'ae',
+               'hiddenSize':   dimRep1,
+               'beta':         3.0,
+               'rho':          .01,
+               'lambd':        .0001,
+               })
+    ll.append({'name':         'ae2',
+               'type':         'ae',
+               'hiddenSize':   dimRep2,
+               'beta':         3.0,
+               'rho':          .01,
+               'lambd':        .0001,
+               })
+
+    sl = StackedLayers(ll)
+
+    # random data
+    XX = random.normal(.5, .25, (dimInput, numExamples))
+
+    tp = {}
+    tp['ae1'] = {'examples': 0,
+                'initb1': 'zero',        # 'zero' for 0s, or 'approx' for an approx value to start at avg activation of rho
+                'initW2asW1_T': False,
+                'method': 'lbfgs',
+                'maxFuncCalls': 300,
+             }
+    tp['ae2'] = tp['ae1']
+
+    sl.train(tp, onlyInit = True)
+
+    # Make biases non-zero for more generality
+    sl.layers[1].b1 = random.normal(0, .1, sl.layers[1].b1.shape)
+    sl.layers[1].b2 = random.normal(0, .1, sl.layers[1].b2.shape)
+    sl.layers[2].b1 = random.normal(0, .1, sl.layers[2].b1.shape)
+    sl.layers[2].b2 = random.normal(0, .1, sl.layers[2].b2.shape)
+    
+    #sl.forwardProp(XX, DataArrangement((1,), numExamples))
+
+    singleExampleArrangement = DataArrangement((1,), 1)
+
+    repUnit = 1  # which highest level unit to consider
+    activationFunction = lambda xx : float(sl.forwardProp(xx, singleExampleArrangement, quiet = True)[0][repUnit])
+
+    xx = XX[:,0]
+
+    print 'sl.forwardProp: act is', activationFunction(xx)
+
+    def actAndGrad(xx):
+        reps = [xx]
+        # Forward prop
+        for ii in range(2):
+            rep,newDA = sl.layers[ii+1].forwardProp(reps[ii], singleExampleArrangement, quiet = True)
+            reps.append(rep)
+
+        # Back prop to calculate gradient
+        dqda_top = zeros(dimRep2)
+        dqda_top[repUnit] = 1
+        dqdas = [None, None, dqda_top]
+        for ii in reversed(range(2)):
+            dqda,newDA = sl.layers[ii+1].backProp(dqdas[ii+1], reps[ii], singleExampleArrangement, quiet = True)
+            dqdas[ii] = dqda
+        return float(reps[-1][repUnit]), dqdas[0].flatten()
+
+    print 'manual forwardProp: act is', actAndGrad(xx)[0]
+    
+    numericalCheckVectorGrad(actAndGrad, xx)
+
+
+
+def tests():
+    check_2AE_backprop()
+
+
+
+if __name__ == '__main__':
+    tests()
+

@@ -21,30 +21,35 @@ from util.dataPrep import PCAWhiteningDataNormalizer
 from util.dataLoaders import loadNYU2Data, loadCS294Images
 from makeData import makeUpsonRovio3
 from tica import TICA, neighborMatrix
-from cost import autoencoderCost, autoencoderRepresentation
+from cost import autoencoderCost, autoencoderRepresentation, autoencoderBackprop
 from visualize import plotImageData
 
 
 
+'''
+Temporary notes:
+ - ignore withGradMatrix for now.
+'''
+
 MAX_CACHE_SIZE_MB = 500
 
 class DataArrangement(object):
-    '''Represents a particular arragement of data. Example: 1000 layers of 2 x
+    '''Represents a particular arragement of data. Example: 1000 slices of 2 x
     3 patches each, with each patch of unrolled length N, could be
     represented as an N x 6000 matrix. In this case, we would use
 
     DataArrangement((2,3), 1000)
     '''
     
-    def __init__(self, layerShape, nLayers):
-        self.layerShape = layerShape      # number of patches along i, j, ... e.g.: (2,3)
-        self.nLayers    = nLayers         # number of layers, e.g.: 1000
+    def __init__(self, sliceShape, nSlices):
+        self.sliceShape = sliceShape      # number of patches along i, j, ... e.g.: (2,3)
+        self.nSlices    = nSlices         # number of layers, e.g.: 1000
 
     def __repr__(self):
-        return 'DataArrangement(layerShape = %s, nLayers = %s)' % (repr(self.layerShape), repr(self.nLayers))
+        return 'DataArrangement(sliceShape = %s, nSlices = %s)' % (repr(self.sliceShape), repr(self.nSlices))
 
     def totalPatches(self):
-        return prod(self.layerShape) * self.nLayers
+        return prod(self.sliceShape) * self.nSlices
 
 
 
@@ -114,10 +119,10 @@ class NonDataLayer(Layer):
         tuple.'''
         return prevDistToNeighbor
 
-    def forwardProp(self, data, dataArrangement, sublayer = None, withGradMatrix = False):
+    def forwardProp(self, data, dataArrangement, sublayer = None, withGradMatrix = False, quiet = False):
         '''
         Input:
-        data - one example per column
+        data - one example per column (if single dim: promoted to two)
 
         dataArrangement - specifies how the data should be interpreted.
         Many classes will not care about the arrangement
@@ -135,11 +140,13 @@ class NonDataLayer(Layer):
         
         if self.trainable and not self.isInitialized:
             raise Exception('Must initialize %s layer first' % self.name)
-        if self.trainable and not self.isTrained:
+        if (self.trainable and not self.isTrained) and not quiet:
             print 'WARNING: forwardProp through untrained layer, might not be desired'
         if sublayer is None: sublayer = self.nSublayers-1  # prop through all sublayers by default
         if sublayer not in range(self.nSublayers):
             raise Exception('sublayer must be None or in %s, but it is %s' % (repr(range(self.nSublayers)), repr(sublayer)))
+        if len(data.shape) == 1:
+            data = reshape(data, data.shape + (1,))    # promote to 2-dim at least
         inDimension, numExamples = data.shape
         if inDimension != prod(self.inputSize):
             raise Exception('Layer %s expects examples of shape %s = %s rows but got %s data matrix'
@@ -158,7 +165,7 @@ class NonDataLayer(Layer):
 
             
         self._checkDataArrangement(representation, newDataArrangement)
-        if len(dataArrangement.layerShape) != len(newDataArrangement.layerShape):
+        if len(dataArrangement.sliceShape) != len(newDataArrangement.sliceShape):
             raise Exception('Conversion from %s to %s is invalid'
                             % (dataArrangement, newDataArrangement))
         if representation.shape[0] != prod(self.outputSize):
@@ -174,6 +181,77 @@ class NonDataLayer(Layer):
         else:
             return data, dataArrangement, tile(eye(data.shape[0]), (data.shape[1],1,1))
 
+    def backProp(self, dqda, data, dataArrangement, sublayer = None, activations = None, verifyActivations = False, quiet = False):
+        '''
+        Input:
+
+        dqda - matrix of column vectors (single dim is promoted) of
+               del q / del a_i, where q is some quantity and a_i
+               is the ith output of this layer.
+
+        data, dataArrangement - as in forward prop
+
+        activations - activations produced by the given data
+
+        distrustActivations - if True, forwardProp the given data and check that it produces the given activations
+
+        Returns:
+        dqdx - column vector (or matrix of column vectors) of
+               del q / del x_i, where x_i is the ith input to
+               this layer.
+        '''
+        
+        if self.trainable and not self.isInitialized:
+            raise Exception('Must initialize %s layer first' % self.name)
+        if (self.trainable and not self.isTrained) and not quiet:
+            print 'WARNING: backProp through untrained layer, might not be desired'
+        if sublayer is None: sublayer = 0  # backprop through all sublayers by default
+        if sublayer not in range(self.nSublayers):
+            raise Exception('sublayer must be None or in %s, but it is %s' % (repr(range(self.nSublayers)), repr(sublayer)))
+        # Additional check for now, because backprop to non-zero sublayer is not yet supported:
+        if sublayer != 0:
+            raise Exception('For now, backprop sublayer must be 0.')
+        if len(data.shape) == 1:
+            data = reshape(data, data.shape + (1,))    # promote to 2-dim at least
+        inDimension, numExamples = data.shape
+        if inDimension != prod(self.inputSize):
+            raise Exception('Layer %s expects examples of shape %s = %s rows but got %s data matrix'
+                            % (self.name, self.inputSize, prod(self.inputSize), data.shape))
+        if len(dqda.shape) == 1:
+            dqda = reshape(dqda, dqda.shape + (1,))    # promote to 2-dim at least
+        outDimension, numExamples = dqda.shape
+        if outDimension != prod(self.outputSize):
+            raise Exception('Layer %s expects output examples of shape %s = %s rows but got %s dqda matrix'
+                            % (self.name, self.outputSize, prod(self.outputSize), dqda.shape))
+        self._checkDataArrangement(data, dataArrangement)
+
+        # TODO: Mabe add something in about output activation shape?
+        #self._checkDataArrangement(data, dataArrangement)
+
+        if activations == None or verifyActivations:
+            activationsFromData = self.forwardProp(data, dataArrangement, quiet = quiet)   # sublayer not supported yet
+            if verifyActivations:
+                print 'TODO: write code to compare activations to activationsFromData here.'
+                pdb.set_trace()
+        if activations == None:
+            activations = activationsFromData
+
+        dqdx, newDataArrangement = self._backProp(dqda, data, dataArrangement, activations)
+        
+        # TODO: probably add this back in somehow
+        #self._checkDataArrangement(representation, newDataArrangement)
+        if len(dataArrangement.sliceShape) != len(newDataArrangement.sliceShape):
+            raise Exception('Conversion from %s to %s is invalid (TODO: check this. unsure about backprop)'
+                            % (dataArrangement, newDataArrangement))
+        if dqdx.shape[0] != prod(self.inputSize):
+            raise Exception('Layer %s was supposed to outputdqdxs of shape %s = %s rows but got %s dqdx matrix'
+                            % (self.name, self.inputSize, prod(self.inputSize), dqdx.shape))
+        return dqdx, newDataArrangement
+    
+    def _backProp(self, dqda, data, dataArrangement, activations):
+        '''Default pass through version. Override in derived classes.'''
+        raise Exception('Implement in derived class')
+    
     def _checkDataArrangement(self, data, dataArrangement):
         if dataArrangement.totalPatches() != data.shape[1]:
             raise Exception('dataArrangement mismatched with data (data.shape is %s, dataArrangement is %s, %d != %d'
@@ -241,6 +319,39 @@ class DataLayer(Layer):
     def __init__(self, params):
         super(DataLayer, self).__init__(params)
 
+    def calculateSeesPatches(self):
+        raise Exception('must implement in derived class')
+
+    def getOutputSize(self):
+        raise Exception('must implement in derived class')
+
+    def getData(self):
+        raise Exception('must implement in derived class')
+
+
+
+class DummyDataLayer(DataLayer):
+    '''For when you just need to specify a data layer. Only requires an output size.'''
+    
+    def __init__(self, params):
+        super(DummyDataLayer, self).__init__(params)
+        self.outputSize = params['outputSize']
+        self.stride = (1,)   # Kind of fake...
+
+    def calculateSeesPatches(self):
+        '''For completeness. Always returns (1,)'''
+        return (1,)
+
+    def getOutputSize(self):
+        return self.outputSize
+
+
+
+class ImageDataLayer(DataLayer):
+
+    def __init__(self, params):
+        super(ImageDataLayer, self).__init__(params)
+
         self.imageSize = params['imageSize']
         self.patchSize = params['patchSize']
         self.stride = params['stride']
@@ -259,15 +370,9 @@ class DataLayer(Layer):
         '''How many patches fit within the data. Rounds down.'''
         return tuple([(ims-ps)/st+1 for ims,ps,st in zip(self.imageSize, self.patchSize, self.stride)])
 
-    def getOutputSize(self):
-        raise Exception('must implement in derived class')
-
-    def getData(self):
-        raise Exception('must implement in derived class')
 
 
-
-class UpsonData3(DataLayer):
+class UpsonData3(ImageDataLayer):
 
     def __init__(self, params):
         super(UpsonData3, self).__init__(params)
@@ -294,7 +399,7 @@ class UpsonData3(DataLayer):
 
 
 
-class NYU2_Labeled(DataLayer):
+class NYU2_Labeled(ImageDataLayer):
 
     def __init__(self, params):
         '''
@@ -339,7 +444,7 @@ class NYU2_Labeled(DataLayer):
 
 
 
-class CS294Images(DataLayer):
+class CS294Images(ImageDataLayer):
     '''
     Loads pre-whitened patches from this dataset: http://www.stanford.edu/class/cs294a/handouts.html
     Whitened range roughly -2.03 to 2.86.
@@ -427,7 +532,7 @@ class ScaleClipLayer(NormalizingLayer):
 ######################
 
 class StretchingLayer(TrainableLayer):
-    '''Stretches the data in each dimension to have a given min/max'''
+    '''Stretches the data values along each dimension to have a given min/max'''
 
     def __init__(self, params):
         super(StretchingLayer, self).__init__(params)
@@ -645,6 +750,10 @@ class SparseAELayer(TrainableLayer):
 
         a2 = autoencoderRepresentation(self.W1, self.b1, data)
         return a2, dataArrangement
+
+    def _backProp(self, dqda, data, dataArrangement, activations):
+        dqdx = autoencoderBackprop(self.W1, self.b1, dqda, data, activations)
+        return dqdx, dataArrangement
         
     @property
     def costLog(self):
@@ -884,33 +993,33 @@ class ConcatenationLayer(NonDataLayer):
         if withGradMatrix:
             raise Exception('not yet implemented')
 
-        newLayerShape = tuple([1+(layerShape - concat) / stride for layerShape,concat,stride
-                               in zip(dataArrangement.layerShape, self.concat, self.stride)])
-        remainders    = tuple([(layerShape - concat) % stride for layerShape,concat,stride
-                               in zip(dataArrangement.layerShape, self.concat, self.stride)])
+        newLayerShape = tuple([1+(sliceShape - concat) / stride for sliceShape,concat,stride
+                               in zip(dataArrangement.sliceShape, self.concat, self.stride)])
+        remainders    = tuple([(sliceShape - concat) % stride for sliceShape,concat,stride
+                               in zip(dataArrangement.sliceShape, self.concat, self.stride)])
         tooSmall = sum([nls < 1 for nls in newLayerShape])  # must be at least 1 in every dimension
         if tooSmall or any(remainders):
             raise Exception('%s cannot be evenly concatenated by concat %s and stride %s'
                             % (dataArrangement, self.concat, self.stride))
 
-        reshapedData = reshape(data, (data.shape[0], dataArrangement.nLayers,) + dataArrangement.layerShape)
+        reshapedData = reshape(data, (data.shape[0], dataArrangement.nSlices,) + dataArrangement.sliceShape)
 
-        newDataArrangement = DataArrangement(newLayerShape, dataArrangement.nLayers)
+        newDataArrangement = DataArrangement(newLayerShape, dataArrangement.nSlices)
 
         # BEGIN: 2D data assumption
         # Note: this only works for 2D data! Add other cases if needed.
 
         assert len(self.concat) == 2, 'Only works for 2D data for now!'
-        assert len(dataArrangement.layerShape) == 2, 'Only works for 2D data for now!'
+        assert len(dataArrangement.sliceShape) == 2, 'Only works for 2D data for now!'
 
         concatenatedData = zeros((prod(self.outputSize),
-                                  prod(newLayerShape) * dataArrangement.nLayers))
+                                  prod(newLayerShape) * dataArrangement.nSlices))
         
         oldPatchLength = prod(self.inputSize)
         newPatchCounter = 0
         # Note: this code assumes the default numpy flattening order:
         # C-order, or row-major order.
-        for layerIdx in xrange(dataArrangement.nLayers):
+        for layerIdx in xrange(dataArrangement.nSlices):
             for newPatchII in xrange(newLayerShape[0]):
                 for newPatchJJ in xrange(newLayerShape[1]):
                     oldPatchStartII = newPatchII * self.stride[0]
