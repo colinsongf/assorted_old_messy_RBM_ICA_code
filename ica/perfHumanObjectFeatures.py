@@ -17,14 +17,17 @@ from util.plotting import looser
 
 
 
-patterns = [
-    r'Micro avg pr = (?P<mean>[-.0-9]+) stdev: (?P<stddev>[-.0-9]+)',
-    r'Micro avg rc = (?P<mean>[-.0-9]+) stdev: (?P<stddev>[-.0-9]+)',
-    r'Macro avg pr = (?P<mean>[-.0-9]+) stdev: (?P<stddev>[-.0-9]+)',
-    r'Macro avg rc = (?P<mean>[-.0-9]+) stdev: (?P<stddev>[-.0-9]+)',
-    r'Micro Averaged Precision Recall:\n1.00\tprec: (?P<precision>[-.0-9]+)\trecall: (?P<recall>[-.0-9]+)',
-    r'Macro Averaged Precision Recall:\n1.00\tprec: (?P<precision>[-.0-9]+)\trecall: (?P<recall>[-.0-9]+)',
+fields = [
+    (r'Micro avg pr = (?P<mean>[-.0-9]+) stdev: (?P<stddev>[-.0-9]+)', 'Micro avg pr'),
+    (r'Micro avg rc = (?P<mean>[-.0-9]+) stdev: (?P<stddev>[-.0-9]+)', 'Micro avg rc'),
+    (r'Macro avg pr = (?P<mean>[-.0-9]+) stdev: (?P<stddev>[-.0-9]+)', 'Macro avg pr'),
+    (r'Macro avg rc = (?P<mean>[-.0-9]+) stdev: (?P<stddev>[-.0-9]+)', 'Macro avg rc'),
+    (r'Micro Averaged Precision Recall:\n1.00\tprec: (?P<precision>[-.0-9]+)\trecall: (?P<recall>[-.0-9]+)', 'Micro avg pr rc'),
+    (r'Macro Averaged Precision Recall:\n1.00\tprec: (?P<precision>[-.0-9]+)\trecall: (?P<recall>[-.0-9]+)', 'Macro avg pr rc'),
     ]
+
+patterns = [ff[0] for ff in fields]
+titles   = [ff[1] for ff in fields]
 
 
 
@@ -32,33 +35,37 @@ def visPerf(modelFiles, saveDir = None):
     fileData = parseFiles(modelFiles)
     shortNames = trimCommon([name for name,info in fileData])
 
-    print 'HERE'
-    print 'Next: save figure to file, do sub-activity as well as just affordance'
-
-    pyplot.figure()
-    #pyplot.hold(True)
-    for ii in range(6):
-        pyplot.subplot(3,2,ii+1)
-        if 'mean' in fileData[0][1]['affordance'][ii]:
-            for fileIdx in range(len(fileData)):
-                mn     = float(fileData[fileIdx][1]['affordance'][ii]['mean'])
-                stddev = float(fileData[fileIdx][1]['affordance'][ii]['stddev'])
-                pyplot.errorbar([fileIdx], mn, yerr=stddev, fmt='o', color='b')
-            axis(looser(axis()))
-        elif 'precision' in fileData[0][1]['affordance'][ii]:
-            minval = 9999
-            for fileIdx in range(len(fileData)):
-                prec = float(fileData[fileIdx][1]['affordance'][ii]['precision'])
-                rec  = float(fileData[fileIdx][1]['affordance'][ii]['recall'])
-                pyplot.bar(fileIdx, prec, color='r')
-                pyplot.bar(fileIdx+len(fileData)+1, rec, color='g')
-                if prec < minval: minval = prec
-                if rec  < minval: minval = rec
-            ax = list(axis())
-            ax[2] = minval - .1 * (ax[3]-minval)
-            axis(ax)
-    #pyplot.subplot(3,1,1)
-    pyplot.suptitle('\n'.join(shortNames))
+    for metric in ('affordance', 'sub-activity'):
+        pyplot.figure()
+        #pyplot.hold(True)
+        for ii in range(6):
+            pyplot.subplot(3,2,ii+1)
+            pyplot.title(titles[ii])
+            if 'mean' in fileData[0][1][metric][ii]:
+                for fileIdx in range(len(fileData)):
+                    mn     = float(fileData[fileIdx][1][metric][ii]['mean'])
+                    stddev = float(fileData[fileIdx][1][metric][ii]['stddev'])
+                    pyplot.errorbar([fileIdx], mn, yerr=stddev, fmt='o', color='b')
+                axis(looser(axis()))
+            elif 'precision' in fileData[0][1][metric][ii]:
+                minval = 9999
+                maxval = -9999
+                for fileIdx in range(len(fileData)):
+                    prec = float(fileData[fileIdx][1][metric][ii]['precision'])
+                    rec  = float(fileData[fileIdx][1][metric][ii]['recall'])
+                    pyplot.bar(fileIdx, prec, color='r')
+                    pyplot.bar(fileIdx+len(fileData)+1, rec, color='g')
+                    minval = min(minval, prec, rec)
+                    maxval = max(minval, prec, rec)
+                axis(looser(axis()))
+                ax = list(axis())
+                ax[2] = minval - .1 * (maxval-minval)
+                ax[3] = maxval + .1 * (maxval-minval)
+                axis(ax)
+        #pyplot.subplot(3,1,1)
+        pyplot.suptitle('%s: %s' % (metric, ', '.join(shortNames)))
+        pyplot.savefig(os.path.join(saveDir, 'metric_%s.png' % metric))
+        pyplot.savefig(os.path.join(saveDir, 'metric_%s.pdf' % metric))
     pdb.set_trace()
 
 
