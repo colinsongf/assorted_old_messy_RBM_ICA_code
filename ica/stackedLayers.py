@@ -402,7 +402,7 @@ class StackedLayers(object):
 
 
 
-def check_2AE_backprop():
+def check_2AE_backprop(checkHinting = False):
     random.seed(0)
 
     dimInput = 3
@@ -469,20 +469,30 @@ def check_2AE_backprop():
     print 'sl.forwardProp: act is', activationFunction(xx)
 
     def actAndGrad(xx):
-        reps = [xx]
+        reps = [(xx, None)]
         # Forward prop
         for ii in range(2):
-            rep,newDA = sl.layers[ii+1].forwardProp(reps[ii], singleExampleArrangement, quiet = True)
-            reps.append(rep)
+            if checkHinting:
+                rep,newDA,hint = sl.layers[ii+1].forwardProp(reps[ii][0], singleExampleArrangement, quiet = True, outputBpHint = True)
+                reps.append((rep, hint))
+            else:
+                rep,newDA = sl.layers[ii+1].forwardProp(reps[ii][0], singleExampleArrangement, quiet = True)
+                reps.append((rep, None))
 
         # Back prop to calculate gradient
         dqda_top = zeros(dimRep2)
         dqda_top[repUnit] = 1
         dqdas = [None, None, dqda_top]
         for ii in reversed(range(2)):
-            dqda,newDA = sl.layers[ii+1].backProp(dqdas[ii+1], reps[ii], singleExampleArrangement, quiet = True)
+            rep = reps[ii][0]
+            bpHint = reps[ii+1][1]
+            if checkHinting:
+                dqda,newDA = sl.layers[ii+1].backProp(dqdas[ii+1], rep, singleExampleArrangement, quiet = True,
+                                                      verifyBpHint = True, bpHint = bpHint)
+            else:
+                dqda,newDA = sl.layers[ii+1].backProp(dqdas[ii+1], rep, singleExampleArrangement, quiet = True)
             dqdas[ii] = dqda
-        return float(reps[-1][repUnit]), dqdas[0].flatten()
+        return float(reps[-1][0][repUnit]), dqdas[0].flatten()
 
     print 'manual forwardProp: act is', actAndGrad(xx)[0]
     
@@ -491,7 +501,8 @@ def check_2AE_backprop():
 
 
 def tests():
-    check_2AE_backprop()
+    check_2AE_backprop(checkHinting = False)
+    check_2AE_backprop(checkHinting = True)
 
 
 

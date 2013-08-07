@@ -14,22 +14,17 @@ import matplotlib.cm as cm
 from numpy import *
 from scipy.optimize import minimize
 
-from util.cache import cached, PersistentHasher
+from util.cache import cached, PersistentHasher, persistentHash
 from util.misc import invSigmoid01
 from GitResultsManager import resman, fmtSeconds
 from util.dataPrep import PCAWhiteningDataNormalizer
 from util.dataLoaders import loadNYU2Data, loadCS294Images
 from makeData import makeUpsonRovio3
 from tica import TICA, neighborMatrix
-from cost import autoencoderCost, autoencoderRepresentation, autoencoderBackprop
+from cost import autoencoderCost, autoencoderForwardprop, autoencoderBackprop
 from visualize import plotImageData
 
 
-
-'''
-Temporary notes:
- - ignore withGradMatrix for now.
-'''
 
 MAX_CACHE_SIZE_MB = 500
 
@@ -119,7 +114,7 @@ class NonDataLayer(Layer):
         tuple.'''
         return prevDistToNeighbor
 
-    def forwardProp(self, data, dataArrangement, sublayer = None, withGradMatrix = False, quiet = False):
+    def forwardProp(self, data, dataArrangement, sublayer = None, quiet = False, outputBpHint = False):
         '''
         Input:
         data - one example per column (if single dim: promoted to two)
@@ -127,12 +122,6 @@ class NonDataLayer(Layer):
         dataArrangement - specifies how the data should be interpreted.
         Many classes will not care about the arrangement
         of the data, in which case they can ignore dataArrangement
-
-        withGradMatrix - True to also return the matrix of partial
-        derivatives of the output w.r.t. the input. Note: for a single
-        input where data.shape = (N,1), this will return a matrix of
-        shape (inputSize,outputSize). For M inputs, the return will be
-        of shape (M, inputSize, outputSize).
 
         Returns:
         representation, newDataArrangement
@@ -153,16 +142,12 @@ class NonDataLayer(Layer):
                             % (self.name, self.inputSize, prod(self.inputSize), data.shape))
         self._checkDataArrangement(data, dataArrangement)
 
-        if withGradMatrix:
-            raise Exception('withGradMatrix is not really production ready yet. Do not use.')
+        output = self._forwardProp(data, dataArrangement, sublayer, outputBpHint = outputBpHint)
 
-        output = self._forwardProp(data, dataArrangement, sublayer, withGradMatrix)
-
-        if withGradMatrix:
-            representation, newDataArrangement, gradMatrix = output
+        if outputBpHint:
+            representation, newDataArrangement, bpHint = output
         else:
             representation, newDataArrangement = output
-
             
         self._checkDataArrangement(representation, newDataArrangement)
         if len(dataArrangement.sliceShape) != len(newDataArrangement.sliceShape):
@@ -171,17 +156,14 @@ class NonDataLayer(Layer):
         if representation.shape[0] != prod(self.outputSize):
             raise Exception('Layer %s was supposed to output examples of shape %s = %s rows but got %s output matrix'
                             % (self.name, self.outputSize, prod(self.outputSize), representation.shape))
-        return representation, newDataArrangement
+        return output
 
-    def _forwardProp(self, data, dataArrangement, sublayer, withGradMatrix):
+    def _forwardProp(self, data, dataArrangement, sublayer, outputBpHint):
         '''Default pass through version. Override in derived classes
         if desired.'''
-        if withGradMatrix:
-            return data, dataArrangement
-        else:
-            return data, dataArrangement, tile(eye(data.shape[0]), (data.shape[1],1,1))
+        return data, dataArrangement
 
-    def backProp(self, dqda, data, dataArrangement, sublayer = None, activations = None, verifyActivations = False, quiet = False):
+    def backProp(self, dqda, data, dataArrangement, sublayer = None, bpHint = None, verifyBpHint = False, quiet = False):
         '''
         Input:
 
@@ -191,9 +173,13 @@ class NonDataLayer(Layer):
 
         data, dataArrangement - as in forward prop
 
-        activations - activations produced by the given data
+        bpHint - the hint output by the layer on the forward pass,
+                 if any. This data is specific to the layer and
+                 should be considered to be an opaque token from the
+                 outside (for NN: this could be the pre-sigmoid activations)
 
-        distrustActivations - if True, forwardProp the given data and check that it produces the given activations
+        verifyBpHint - if True, forwardProp the given data and check
+                 that it produces the given hint
 
         Returns:
         dqdx - column vector (or matrix of column vectors) of
@@ -228,15 +214,15 @@ class NonDataLayer(Layer):
         # TODO: Mabe add something in about output activation shape?
         #self._checkDataArrangement(data, dataArrangement)
 
-        if activations == None or verifyActivations:
-            activationsFromData = self.forwardProp(data, dataArrangement, quiet = quiet)   # sublayer not supported yet
-            if verifyActivations:
-                print 'TODO: write code to compare activations to activationsFromData here.'
-                pdb.set_trace()
-        if activations == None:
-            activations = activationsFromData
+        if verifyBpHint:
+            output = self.forwardProp(data, dataArrangement, outputBpHint = True, quiet = quiet)   # sublayer not supported yet
+            representation, newDataArrangement, computedBpHint = output
+            if persistentHash(bpHint) == persistentHash(computedBpHint):
+                print 'layer:backProp: bpHint verified.'
+            else:
+                raise Exception('Given bpHint does not match computed bpHint.')
 
-        dqdx, newDataArrangement = self._backProp(dqda, data, dataArrangement, activations)
+        dqdx, newDataArrangement = self._backProp(dqda, data, dataArrangement, bpHint)
         
         # TODO: probably add this back in somehow
         #self._checkDataArrangement(representation, newDataArrangement)
@@ -248,7 +234,7 @@ class NonDataLayer(Layer):
                             % (self.name, self.inputSize, prod(self.inputSize), dqdx.shape))
         return dqdx, newDataArrangement
     
-    def _backProp(self, dqda, data, dataArrangement, activations):
+    def _backProp(self, dqda, data, dataArrangement, bpHint):
         '''Default pass through version. Override in derived classes.'''
         raise Exception('Implement in derived class')
     
@@ -488,9 +474,7 @@ class PCAWhiteningLayer(NormalizingLayer):
     def _train(self, data, dataArrangement, trainParams = None, quick = False):
         self.pcaWhiteningDataNormalizer = PCAWhiteningDataNormalizer(data)
 
-    def _forwardProp(self, data, dataArrangement, sublayer, withGradMatrix):
-        if withGradMatrix:
-            raise Exception('Not yet implemented')
+    def _forwardProp(self, data, dataArrangement, sublayer):
         dataWhite, junk = self.pcaWhiteningDataNormalizer.raw2normalized(data, unitNorm = True)
         return dataWhite, dataArrangement
 
@@ -517,9 +501,7 @@ class ScaleClipLayer(NormalizingLayer):
         dataNormed = data - data.mean(0)
         self.thresh = dataNormed.std() * self.clipStd
 
-    def _forwardProp(self, data, dataArrangement, sublayer, withGradMatrix):
-        if withGradMatrix:
-            raise Exception('Not yet implemented')
+    def _forwardProp(self, data, dataArrangement, sublayer):
         dataNormed = data - data.mean(0)
         dataNormed = maximum(minimum(dataNormed, self.thresh), -self.thresh) / self.thresh   # scale to -1 to 1
         dataNormed = (dataNormed + 1) * ((self.maxVal-self.minVal)/2.0) + self.minVal        # rescale to minVal to maxVal
@@ -543,7 +525,7 @@ class StretchingLayer(TrainableLayer):
         self.dataMin = data.min(1)
         self.dataMax = data.max(1)
 
-    def _forwardProp(self, data, dataArrangement, sublayer, withGradMatrix):
+    def _forwardProp(self, data, dataArrangement, sublayer):
         '''ret = mm * data + bb'''
         epsilon = 1e-8  # for dimensions with 0 variance
         mm = (self.maxVal - self.minVal) / (self.dataMax - self.dataMin + epsilon)
@@ -614,10 +596,7 @@ class TicaLayer(TrainableLayer):
         # Plot some results
         #plotImageRicaWW(tica.WW, imgShape, saveDir, tileShape = hiddenLayerShape, prefix = pc('WW_iterFinal'))
 
-    def _forwardProp(self, data, dataArrangement, sublayer, withGradMatrix):
-        if withGradMatrix:
-            raise Exception('not yet implemented')
-
+    def _forwardProp(self, data, dataArrangement, sublayer):
         hidden, absPooledActivations = self.tica.getRepresentation(data)
         
         if sublayer == 0:
@@ -741,18 +720,22 @@ class SparseAELayer(TrainableLayer):
 
         return cost, grad
         
-    def _forwardProp(self, data, dataArrangement, sublayer, withGradMatrix):
-        if withGradMatrix:
-            raise Exception('not yet implemented')
-
+    def _forwardProp(self, data, dataArrangement, sublayer, outputBpHint = False):
         if sublayer != 0:
             raise Exception('Unknown sublayer: %s' % sublayer)
 
-        a2 = autoencoderRepresentation(self.W1, self.b1, data)
-        return a2, dataArrangement
+        output = autoencoderForwardprop(self.W1, self.b1, data, outputSigmoidDeriv = outputBpHint)
+        if outputBpHint:
+            a2, sigmoidDeriv = output
+            bpHint = (sigmoidDeriv,)
+            return a2, dataArrangement, bpHint
+        else:
+            a2 = output
+            return a2, dataArrangement
 
-    def _backProp(self, dqda, data, dataArrangement, activations):
-        dqdx = autoencoderBackprop(self.W1, self.b1, dqda, data, activations)
+    def _backProp(self, dqda, data, dataArrangement, bpHint = None):
+        sigmoidDeriv = bpHint[0] if bpHint else None
+        dqdx = autoencoderBackprop(self.W1, self.b1, dqda, data, sigmoidDeriv = sigmoidDeriv)
         return dqdx, dataArrangement
         
     @property
@@ -851,7 +834,7 @@ class Fro1Layer(TrainableLayer):
     def _costAndLog(self, theta, data, hiddenSize, beta, rho, lambd):
         return cost, grad
         
-    def _forwardProp(self, data, dataArrangement, sublayer, withGradMatrix):
+    def _forwardProp(self, data, dataArrangement, sublayer):
         pass
         
     @property
@@ -892,9 +875,7 @@ class DownsampleLayer(NonDataLayer):
             else: # length 2
                 return (inputSize[0]/self.factor[0], inputSize[1]/self.factor[1])
 
-    def _forwardProp(self, data, dataArrangement, sublayer, withGradMatrix):
-        if withGradMatrix:
-            raise Exception('not yet implemented')
+    def _forwardProp(self, data, dataArrangement, sublayer):
         dimension, numExamples = data.shape
 
         patches = reshape(data, self.inputSize + (numExamples,))
@@ -922,9 +903,7 @@ class LcnLayer(NonDataLayer):
         super(LcnLayer, self).__init__(params)
         self.gaussWidth = params['gaussWidth']
 
-    def _forwardProp(self, data, dataArrangement, sublayer, withGradMatrix):
-        if withGradMatrix:
-            raise Exception('not yet implemented')
+    def _forwardProp(self, data, dataArrangement, sublayer):
         dimension, numExamples = data.shape
 
         gaussNeighbors = neighborMatrix(self.inputSize, self.gaussWidth, gaussian=True)
@@ -987,11 +966,8 @@ class ConcatenationLayer(NonDataLayer):
         else:
             raise Exception('logic error')
 
-    def _forwardProp(self, data, dataArrangement, sublayer, withGradMatrix):
+    def _forwardProp(self, data, dataArrangement, sublayer):
         '''This is where the concatenation actually takes place.'''
-
-        if withGradMatrix:
-            raise Exception('not yet implemented')
 
         newLayerShape = tuple([1+(sliceShape - concat) / stride for sliceShape,concat,stride
                                in zip(dataArrangement.sliceShape, self.concat, self.stride)])
@@ -1051,3 +1027,118 @@ layerClassNames = {'data':           'dataClass',       # load the class specifi
                    'lcn':             LcnLayer,
                    'concat':          ConcatenationLayer,
                    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def check_AE_backprop():
+    random.seed(0)
+
+    dimInput = 3
+    dimRep   = 2
+    numExamples = 5
+
+    layer = SparseAELayer({'name':         'ae1',
+                           'type':         'ae',
+                           'hiddenSize':   dimRep,
+                           'beta':         3.0,
+                           'rho':          .01,
+                           'lambd':        .0001,
+                           })
+
+    # random data
+    XX = random.normal(.5, .25, (dimInput, numExamples))
+
+    tp = {}
+    tp['ae1'] = {'examples': 0,
+                'initb1': 'zero',        # 'zero' for 0s, or 'approx' for an approx value to start at avg activation of rho
+                'initW2asW1_T': False,
+                'method': 'lbfgs',
+                'maxFuncCalls': 300,
+             }
+    tp['ae2'] = tp['ae1']
+
+    sl.train(tp, onlyInit = True)
+
+    # Make biases non-zero for more generality
+    sl.layers[1].b1 = random.normal(0, .1, sl.layers[1].b1.shape)
+    sl.layers[1].b2 = random.normal(0, .1, sl.layers[1].b2.shape)
+    sl.layers[2].b1 = random.normal(0, .1, sl.layers[2].b1.shape)
+    sl.layers[2].b2 = random.normal(0, .1, sl.layers[2].b2.shape)
+    
+    #sl.forwardProp(XX, DataArrangement((1,), numExamples))
+
+    singleExampleArrangement = DataArrangement((1,), 1)
+
+    repUnit = 1  # which highest level unit to consider
+    activationFunction = lambda xx : float(sl.forwardProp(xx, singleExampleArrangement, quiet = True)[0][repUnit])
+
+    xx = XX[:,0]
+
+    print 'sl.forwardProp: act is', activationFunction(xx)
+
+    def actAndGrad(xx):
+        reps = [xx]
+        # Forward prop
+        for ii in range(2):
+            rep,newDA = sl.layers[ii+1].forwardProp(reps[ii], singleExampleArrangement, quiet = True)
+            reps.append(rep)
+
+        # Back prop to calculate gradient
+        dqda_top = zeros(dimRep2)
+        dqda_top[repUnit] = 1
+        dqdas = [None, None, dqda_top]
+        for ii in reversed(range(2)):
+            dqda,newDA = sl.layers[ii+1].backProp(dqdas[ii+1], reps[ii], singleExampleArrangement, quiet = True)
+            dqdas[ii] = dqda
+        return float(reps[-1][repUnit]), dqdas[0].flatten()
+
+    print 'manual forwardProp: act is', actAndGrad(xx)[0]
+    
+    numericalCheckVectorGrad(actAndGrad, xx)
+
+
+
+def tests():
+    check_AE_backprop()
+
+
+
+if __name__ == '__main__':
+    tests()
+

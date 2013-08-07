@@ -90,7 +90,7 @@ def unflatWrapper(xflat, func, xshape, *args):
 
 
 
-def autoencoderRepresentation(W1, b1, XX):
+def autoencoderForwardprop(W1, b1, XX, outputSigmoidDeriv = False):
     '''Paired with autoencoderCost.
 
     Returns the hidden layer representation of XX given weights (W1, b1). Uses sigmoid activation with range 0 to 1.'''
@@ -99,22 +99,27 @@ def autoencoderRepresentation(W1, b1, XX):
     a1 = XX
     
     z2 = (dot(W1, a1).T + b1).T
-    a2 = sigmoid01(z2)
+    if outputSigmoidDeriv:
+        a2, da2dz2 = sigmoidAndDeriv01(z2)
+        return a2, da2dz2
+    else:
+        a2 = sigmoid01(z2)
+        return a2
 
-    return a2
-
-def autoencoderBackprop(W1, b1, dqda, XX, activations):
+def autoencoderBackprop(W1, b1, dqda, XX, sigmoidDeriv = None):
     '''Paired with autoencoderCost.
 
     Returns dqdx given dqda, XX, and the parameters W1 and b1. Uses sigmoid activation with range 0 to 1. Ignores activations.'''
 
     # TODO: verify that this works!
     
-    # Forward prop and back prop
-    a1 = XX
-    
-    z2 = (dot(W1, a1).T + b1).T
-    a2, da2dz2 = sigmoidAndDeriv01(z2)
+    if sigmoidDeriv is not None:
+        da2dz2 = sigmoidDeriv
+    else:
+        # Forward prop and compute deriv
+        a1 = XX
+        z2 = (dot(W1, a1).T + b1).T
+        a2, da2dz2 = sigmoidAndDeriv01(z2)
 
     dqdz2 = dqda * da2dz2
     dqdx = dot(W1.T, dqdz2)   # Can think of W1.T as dz2/dx
