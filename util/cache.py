@@ -115,6 +115,14 @@ class PersistentHasher(object):
 
 
 
+def persistentHash(object):
+    '''Convenience function to return hash of single object'''
+    ph = PersistentHasher()
+    ph.update(object)
+    return ph.hexdigest()
+
+
+
 def memoize(function):
     '''Decorator to memoize function'''
 
