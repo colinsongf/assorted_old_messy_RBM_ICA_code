@@ -48,6 +48,17 @@ class DataArrangement(object):
 
 
 
+def noHint(forwardPropFunction):
+    def wrapped(self, data, dataArrangement, sublayer, outputBpHint = False):
+        representation, newDataArrangement = forwardPropFunction(self, data, dataArrangement, sublayer)
+        if outputBpHint:
+            return representation, newDataArrangement, None
+        else:
+            return representation, newDataArrangement
+    return wrapped
+
+
+
 ######################
 # Base Layer classes
 ######################
@@ -474,6 +485,7 @@ class PCAWhiteningLayer(NormalizingLayer):
     def _train(self, data, dataArrangement, trainParams = None, quick = False):
         self.pcaWhiteningDataNormalizer = PCAWhiteningDataNormalizer(data)
 
+    @noHint
     def _forwardProp(self, data, dataArrangement, sublayer):
         dataWhite, junk = self.pcaWhiteningDataNormalizer.raw2normalized(data, unitNorm = True)
         return dataWhite, dataArrangement
@@ -501,6 +513,7 @@ class ScaleClipLayer(NormalizingLayer):
         dataNormed = data - data.mean(0)
         self.thresh = dataNormed.std() * self.clipStd
 
+    @noHint
     def _forwardProp(self, data, dataArrangement, sublayer):
         dataNormed = data - data.mean(0)
         dataNormed = maximum(minimum(dataNormed, self.thresh), -self.thresh) / self.thresh   # scale to -1 to 1
@@ -525,6 +538,7 @@ class StretchingLayer(TrainableLayer):
         self.dataMin = data.min(1)
         self.dataMax = data.max(1)
 
+    @noHint
     def _forwardProp(self, data, dataArrangement, sublayer):
         '''ret = mm * data + bb'''
         epsilon = 1e-8  # for dimensions with 0 variance
@@ -596,6 +610,7 @@ class TicaLayer(TrainableLayer):
         # Plot some results
         #plotImageRicaWW(tica.WW, imgShape, saveDir, tileShape = hiddenLayerShape, prefix = pc('WW_iterFinal'))
 
+    @noHint
     def _forwardProp(self, data, dataArrangement, sublayer):
         hidden, absPooledActivations = self.tica.getRepresentation(data)
         
@@ -834,6 +849,7 @@ class Fro1Layer(TrainableLayer):
     def _costAndLog(self, theta, data, hiddenSize, beta, rho, lambd):
         return cost, grad
         
+    @noHint
     def _forwardProp(self, data, dataArrangement, sublayer):
         pass
         
@@ -875,6 +891,7 @@ class DownsampleLayer(NonDataLayer):
             else: # length 2
                 return (inputSize[0]/self.factor[0], inputSize[1]/self.factor[1])
 
+    @noHint
     def _forwardProp(self, data, dataArrangement, sublayer):
         dimension, numExamples = data.shape
 
@@ -903,6 +920,7 @@ class LcnLayer(NonDataLayer):
         super(LcnLayer, self).__init__(params)
         self.gaussWidth = params['gaussWidth']
 
+    @noHint
     def _forwardProp(self, data, dataArrangement, sublayer):
         dimension, numExamples = data.shape
 
@@ -966,6 +984,7 @@ class ConcatenationLayer(NonDataLayer):
         else:
             raise Exception('logic error')
 
+    @noHint
     def _forwardProp(self, data, dataArrangement, sublayer):
         '''This is where the concatenation actually takes place.'''
 
