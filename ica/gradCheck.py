@@ -22,7 +22,7 @@ import pdb
 
 
 
-def numericalCheckVectorGrad(costGradFunction, xx, otherArgs):
+def numericalCheckVectorGrad(costGradFunction, xx, otherArgs = None):
     '''For costGradFunction of the form:
 
     cost, grad = costGradFunction(xx, *otherArgs)
@@ -32,8 +32,12 @@ def numericalCheckVectorGrad(costGradFunction, xx, otherArgs):
     the cost term.
     '''
 
-    cost,anaGrad = costGradFunction(xx, *otherArgs)
-    gradFn = Gradient(lambda x: costGradFunction(x, *otherArgs)[0])
+    if otherArgs is None:
+        cost,anaGrad = costGradFunction(xx)
+        gradFn = Gradient(lambda x: costGradFunction(x)[0])
+    else:
+        cost,anaGrad = costGradFunction(xx, *otherArgs)
+        gradFn = Gradient(lambda x: costGradFunction(x, *otherArgs)[0])
     numGrad = gradFn(xx)
 
     #if any(abs(anaGrad - numGrad) > 10 * gradFn.error_estimate) or gradFn.error_estimate.max() > 1e-10:

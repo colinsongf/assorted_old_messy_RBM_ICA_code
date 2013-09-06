@@ -2,6 +2,71 @@
 
 import os, errno
 import time
+from numpy import tanh, arctanh
+
+
+
+def sigmoid01(xx):
+    '''Compute the logistic/sigmoid in a numerically stable way (using tanh).
+
+    Domain: -inf to inf
+    Range: 0 to 1'''
+    #return 1. / (1 + exp(-xx))
+    #print 'returning', .5 * (1 + tanh(xx / 2.))
+    return .5 * (1 + tanh(xx / 2.))
+
+
+
+def invSigmoid01(ss):
+    '''Compute the inverse of the logistic/sigmoid.
+
+    Domain: 0 to 1
+    Range: -inf to inf'''
+    return 2 * arctanh(2*ss - 1)
+
+
+
+def sigmoidAndDeriv01(xx):
+    '''Compute the logistic/sigmoid in a numerically stable way (using tanh).
+    Returns the value and derivative at the given locations
+
+    Range: 0 to 1'''
+    
+    #return 1. / (1 + exp(-xx))
+    #print 'returning', .5 * (1 + tanh(xx / 2.))
+    val = .5 * (1 + tanh(xx / 2.))
+    deriv = val * (1-val)
+    return val, deriv
+
+
+
+def sigmoid11(xx):
+    '''Compute the logistic/sigmoid in a numerically stable way (using tanh).
+
+    Range: -1 to 1'''
+
+    return tanh(xx)
+
+
+
+def sigmoidAndDeriv11(xx):
+    '''Compute the logistic/sigmoid in a numerically stable way (using tanh).
+    Returns the value and derivative at the given locations
+
+    Range: -1 to 1'''
+    
+    val = tanh(xx)
+    deriv = 1 - val**2
+    return val, deriv
+
+
+
+def invSigmoid11(ss):
+    '''Compute the inverse of the logistic/sigmoid.
+
+    Domain: -1 to 1
+    Range: -inf to inf'''
+    return arctanh(ss)
 
 
 
@@ -140,3 +205,78 @@ class Tic(object):
 
     def __call__(self):
         print 'Time to %s: %.3fs (wall) %.3fs (cpu)' % (self._descrip, time.time()-self._startw, time.clock()-self._startc)
+
+
+
+def trimCommon(stringList):
+    '''Trims any common prefix / suffix from the given list of strings
+
+    >>> trimCommon([])
+    []
+    >>> trimCommon([''])
+    ['']
+    >>> trimCommon(['foo'])
+    ['']
+    >>> trimCommon(['foo', 'bar'])
+    ['foo', 'bar']
+    >>> trimCommon(['foo__', 'bar__'])
+    ['foo', 'bar']
+    >>> trimCommon(['__foo', '__bar'])
+    ['foo', 'bar']
+    >>> trimCommon(['__foo__', '__bar__'])
+    ['foo', 'bar']
+    >>> trimCommon(['foo', 'bar', 'baz'])
+    ['foo', 'bar', 'baz']
+    >>> trimCommon(['foo_', 'bar_', 'baz_'])
+    ['foo', 'bar', 'baz']
+    >>> trimCommon(['123foo', '123bar', '123baz'])
+    ['foo', 'bar', 'baz']
+    >>> trimCommon(['foo', 'foooo', 'foooooo'])
+    ['', 'oo', 'oooo']
+    '''
+    ret = stringList
+    ret = trimCommonBeginning(ret)
+    ret = [st[::-1] for st in ret]  # reverse
+    ret = trimCommonBeginning(ret)
+    ret = [st[::-1] for st in ret]  # un-reverse
+
+    return ret
+
+
+
+def trimCommonBeginning(stringList):
+    if len(stringList) < 1:
+        return []     # Empty list, just returnn it
+    if len(stringList) < 2:
+        return [stringList[0][:0]]   # Single string, so trim everything
+
+    if False:
+        mismatch = False
+        for idx in range(-1,len(stringList[0])):
+            for ii in range(1, len(stringList)):
+                if stringList[ii][:idx+1] != stringList[0][:idx+1]:
+                    mismatch = True
+                    break
+            if mismatch:
+                break
+            trimStart = idx
+
+    charsMatch = 0
+    foundMismatch = False
+    for sliceEnd in range(1, len(stringList[0])+1):
+        for stringIdx in range(1, len(stringList)):
+            if stringList[0][:sliceEnd] != stringList[stringIdx][:sliceEnd]:
+                foundMismatch = True
+                break
+        if foundMismatch:
+            break
+        charsMatch = sliceEnd
+    ret = [st[charsMatch:] for st in stringList]
+    return ret
+
+
+
+if __name__ == "__main__":
+    import doctest
+    doctest.testmod()
+            

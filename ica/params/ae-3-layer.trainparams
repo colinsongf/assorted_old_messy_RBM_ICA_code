@@ -1,0 +1,26 @@
+#! /usr/bin/env python
+#
+# This is a training parameters file. It must define one object: trainParams
+
+tp = {}
+
+tp['whitener'] = {'examples': 100000}
+
+tp['stretch'] = {'examples': 100000}
+
+tp['ae1'] = {'examples': 10000,
+             'method': 'lbfgs',
+             'maxFuncCalls': 300,
+             }
+
+tp['ae2'] = {'examples': 10000,
+             'method': 'lbfgs',
+             'maxFuncCalls': 300,
+             }
+
+tp['ae3'] = {'examples': 10000,
+             'method': 'lbfgs',
+             'maxFuncCalls': 300,
+             }
+
+trainParams = tp

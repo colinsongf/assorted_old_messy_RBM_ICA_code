@@ -28,7 +28,7 @@ class PCA(object):
 
           *mu* : a numdims array of means of xx
 
-          *sigma* : ?????????
+          *sigma* : the covariance matrix
 
           *var* : the average amount of variance of each of the principal components
 

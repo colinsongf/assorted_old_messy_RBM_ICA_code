@@ -14,6 +14,14 @@ from sandbox import *
 
 
 def main():
+    resman.start('junk', diary = False)
+    saveDir = resman.rundir
+
+    dirs = [name for name in os.listdir('results') if os.path.isdir(os.path.join('results', name))]
+    print 'last few results:'
+    for dir in sorted(dirs)[-10:]:
+        print '  ' + dir
+    
     notes = '''Notes:
     raw = dl.getData((10,10), 10000, 0)
     cent = (raw.T - raw.mean(1)).T
@@ -22,6 +30,8 @@ def main():
     print notes
     
     embed()
+
+    resman.stop()
 
 
 

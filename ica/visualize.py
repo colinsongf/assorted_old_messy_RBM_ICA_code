@@ -136,7 +136,7 @@ def plotReshapedActivations(act, tileShape, embeddingShape, prefix, saveDir = No
     number = prod(tileShape)
     dat = act[:,:number].copy()
     dat -= dat.min()
-    dat /- dat.max()
+    dat /= dat.max()
     plotImageData(dat, imgShape = embeddingShape, prefix = prefix, saveDir = saveDir, show = show)
 
 
@@ -146,6 +146,38 @@ def plotActHist(act, bins = 50, prefix = 'acthist', saveDir = None, show = False
     pyplot.hist(act.flatten(), bins = bins)
     if saveDir:
         pyplot.savefig(os.path.join(saveDir, '%s.png' % prefix))
+    if show:
+        pyplot.show()
+
+
+
+def plotActLines(act, prefix = 'actlines', nUnits = (3,4), saveDir = None, show = False):
+    pyplot.clf()
+    minVal = 9999
+    maxVal = -9999
+
+    for counter,iijj in enumerate(((ii,jj) for ii in range(nUnits[0]) for jj in range(nUnits[1]))):
+        ii,jj = iijj
+        pyplot.subplot(nUnits[0], nUnits[1], counter+1)
+        pyplot.hold(True)
+        pyplot.vlines(arange(act.shape[0]), 0, act[:,counter], 'b')
+        pyplot.plot(act[:,counter], 'bo')
+        minVal = min(minVal, pyplot.ylim()[0])
+        maxVal = max(maxVal, pyplot.ylim()[1])
+        #pyplot.xlabel('unit'); pyplot.ylabel('activation')
+
+    if saveDir:
+        pyplot.savefig(os.path.join(saveDir, '%s.png' % prefix))
+        pyplot.savefig(os.path.join(saveDir, '%s.pdf' % prefix))
+
+    for counter,iijj in enumerate(((ii,jj) for ii in range(nUnits[0]) for jj in range(nUnits[1]))):
+        pyplot.subplot(nUnits[0], nUnits[1], counter+1)
+        pyplot.ylim((minVal, maxVal))
+
+    if saveDir:
+        pyplot.savefig(os.path.join(saveDir, '%s_samerange.png' % prefix))
+        pyplot.savefig(os.path.join(saveDir, '%s_samerange.pdf' % prefix))
+
     if show:
         pyplot.show()
 
@@ -250,6 +282,8 @@ def plotTopActivations(activations, data, imgShape, saveDir = None, nActivations
     '''Plots top and bottom few activations for the first number activations.'''
 
     sortIdx = argsort(activations, 1)
+
+    nActivations = min(nActivations, activations.shape[0])
 
     plotData = zeros((prod(imgShape), nActivations*nSamples))
 

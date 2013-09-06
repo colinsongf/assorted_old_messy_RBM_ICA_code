@@ -20,7 +20,6 @@ from matplotlib import pyplot
 
 from util.plotting import tile_raster_images, pil_imagesc, scale_some_rows_to_unit_interval
 from util.dataLoaders import loadFromPklGz, saveToFile
-from util.math import sigmoid
 from util.cache import cached
 
 
@@ -184,14 +183,14 @@ class RICA(object):
         #                                 maxfun = maxFun)
         results = minimize(lambda ww : self.costAndLog(ww, data, plotEvery),
                            self.WW.flatten(),
-                           jac = True,    # const function retuns both value and gradient
+                           jac = True,    # cost function retuns both value and gradient
                            method = 'L-BFGS-B',
                            options = {'maxiter': maxFun, 'disp': True})
         #results = cached(minimize,
         #                 self.costAndLog,
         #                 WW,
         #                 (data, plotEvery),
-        #                 jac = True,    # const function retuns both value and gradient
+        #                 jac = True,    # cost function retuns both value and gradient
         #                 method = 'L-BFGS-B',
         #                 options = {'maxiter': maxFun, 'disp': True})
         

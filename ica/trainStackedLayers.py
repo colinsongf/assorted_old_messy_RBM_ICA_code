@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/env ipythonpl
 
 import sys
 import os
@@ -12,7 +12,7 @@ from GitResultsManager import resman
 from util.misc import dictPrettyPrint, importFromFile, relhack
 from util.dataPrep import PCAWhiteningDataNormalizer
 from util.dataLoaders import loadFromPklGz, saveToFile
-from layers import layerClassNames, DataArrangement, Layer, DataLayer, UpsonData3, WhiteningLayer, PCAWhiteningLayer, TicaLayer, DownsampleLayer, LcnLayer, ConcatenationLayer
+from layers import layerClassNames, DataArrangement, Layer, DataLayer, UpsonData3, NormalizingLayer, PCAWhiteningLayer, TicaLayer, DownsampleLayer, LcnLayer, ConcatenationLayer
 from stackedLayers import StackedLayers
 
 

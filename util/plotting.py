@@ -313,3 +313,39 @@ def imagesc(arr, shape = None, epsilon = 1e-8, saveto = None, cmap = None, show 
 
 
 pil_imagesc = imagesc
+
+
+
+#########################
+#
+# General
+#
+#########################
+
+def looser(ax, frac = .05, semilogx = False, semilogy = False, loglog = False):
+    '''Returns a loosened version of the axies specified in ax'''
+
+    ax = list(ax)
+
+    if loglog:
+        semilogx = True
+        semilogy = True
+
+    if semilogx:
+        ax[0] = log(ax[0])
+        ax[1] = log(ax[1])
+    if semilogy:
+        ax[2] = log(ax[2])
+        ax[3] = log(ax[3])
+        
+    ax = [(1+frac) * ax[0] - frac * ax[1], (1+frac) * ax[1] - frac * ax[0],
+          (1+frac) * ax[2] - frac * ax[3], (1+frac) * ax[3] - frac * ax[2]]
+
+    if semilogx:
+        ax[0] = exp(ax[0])
+        ax[1] = exp(ax[1])
+    if semilogy:
+        ax[2] = exp(ax[2])
+        ax[3] = exp(ax[3])
+    
+    return tuple(ax)
