@@ -12,7 +12,7 @@ https://github.com/lisa-lab/DeepLearningTutorials/blob/master/code/utils.py
 import ipdb as pdb
 import numpy
 from matplotlib import cm
-from numpy import mgrid, array, ones, zeros, linspace, random, reshape
+from numpy import mgrid, array, ones, zeros, linspace, random, reshape, prod
 from PIL import Image
 
 
@@ -77,7 +77,19 @@ def scale_rows_together_to_unit_interval(arr, rowIdx, eps = 1e-8, anchor0 = True
 
 
 
-def tile_raster_images(X, img_shape, tile_shape, tile_spacing = (0,0), 
+def tile_raster_images_tensor(tensor, tile_spacing = (0,0),
+                              scale_rows_to_unit_interval = True, scale_colors_together = False,
+                              output_pixel_vals = True, hilights = None, onlyHilights = False):
+    tile_shape = tensor.shape[0:2]
+    img_shape  = tensor.shape[2:4]
+    reshaped = reshape(tensor, (prod(tile_shape), prod(img_shape)))
+    return tile_raster_images(reshaped, img_shape, tile_shape, tile_spacing,
+                              scale_rows_to_unit_interval, scale_colors_together,
+                              output_pixel_vals, hilights, onlyHilights)
+
+
+
+def tile_raster_images(X, img_shape, tile_shape, tile_spacing = (0,0),
                        scale_rows_to_unit_interval = True, scale_colors_together = False,
                        output_pixel_vals = True, hilights = None, onlyHilights = False):
     '''

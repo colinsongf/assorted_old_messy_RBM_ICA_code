@@ -2,10 +2,10 @@
 
 import cPickle as pickle
 import numpy
-from numpy import array, zeros, reshape, random, vstack, concatenate, copy, dot, minimum, maximum
+from numpy import array, zeros, reshape, random, vstack, concatenate, copy, dot, minimum, maximum, asarray
+import os
 import gzip
 import cPickle as pickle
-import h5py
 import pdb
 import sys
 import scipy
@@ -140,6 +140,8 @@ def loadNYU2Data(patchSize, number, rgbColors = 3, depthChannels = 1, seed = Non
           For RGBD images, data  flattens to [ii_r ii_g ii_b ii_d ii+1_r ii+1_g ii+1_b ii+1_d ...]
 
     '''
+    
+    import h5py
 
     assert rgbColors in (0, 1, 3)
     assert depthChannels in (0, 1)
@@ -313,3 +315,61 @@ def approxNormalizeCS294(patches, thresh):
     ret = maximum(minimum(ret, thresh), -thresh) / thresh   # scale to -1 to 1
     ret = (ret + 1) * 0.4 + 0.1   #rescale to .1 to .9
     return ret
+
+
+
+class DataLoader(object):
+    pass
+
+
+
+class SaxeVideo(DataLoader):
+    '''Loads all Saxe video into memory'''
+
+    def __init__(self, dataDir = '../data/saxe', quick = False, seed = 0):
+        self.rng = random.RandomState(seed)
+        self.segmentsInt = []
+        self.names  = []
+        self._loadData(dataDir, quick)
+        self.nFrames = array([len(frames) for frames in self.segmentsInt])
+        self._normalizeData()
+        
+    def _loadData(self, dataDir, quick):
+        ii = 0
+        while True:
+            if quick and ii > 0:
+                print 'WARNING: quick mode, just loading 1 batch'
+                break
+            try:
+                with gzip.open(os.path.join(dataDir, 'batch_%02d.pkl.gz' % ii), 'rb') as ff:
+                    batchFrames, batchNames = pickle.load(ff)
+            except IOError:
+                if ii == 0:
+                    raise
+                else:
+                    break
+            self.segmentsInt.extend(batchFrames)
+            self.names.extend(batchNames)
+            print 'loaded', batchNames
+            ii += 1
+        print 'Done loading'
+
+    def _normalizeData(self):
+        datApproxMean = 117.0
+        self.segments = []
+        for ii in range(len(self.segmentsInt)):
+            normalized = asarray(self.segmentsInt[ii], dtype = 'float')
+            normalized -= datApproxMean
+            normalized /= max(datApproxMean, 255-datApproxMean)
+            self.segments.append(normalized)
+        print 'Done norming'
+
+    def getRandomBlock(self, length = 60):
+        maxStart = self.nFrames - length   # negative implies the window doesn't fit
+        prob = maximum(0.0, maxStart)
+        prob /= prob.sum()
+        segId = self.rng.choice(len(self.nFrames), 1, p = prob)[0]
+        frameId = self.rng.choice(maxStart[segId])
+        #print 'Sampled: segment %d, frames %d:%d (%s)' % (segId, frameId, frameId+length, self.names[segId])
+        return self.segments[segId][frameId:frameId+length, :, :]
+        
