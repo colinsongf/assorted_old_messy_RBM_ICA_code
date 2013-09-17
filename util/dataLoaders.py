@@ -6,7 +6,7 @@ from numpy import array, zeros, reshape, random, vstack, concatenate, copy, dot,
 import os
 import gzip
 import cPickle as pickle
-import pdb
+import ipdb as pdb
 import sys
 import scipy
 import scipy.io
@@ -364,12 +364,37 @@ class SaxeVideo(DataLoader):
             self.segments.append(normalized)
         print 'Done norming'
 
-    def getRandomBlock(self, length = 60):
+    def getRandomBlock(self, length = 60, randomCropShape = None):
         maxStart = self.nFrames - length   # negative implies the window doesn't fit
         prob = maximum(0.0, maxStart)
         prob /= prob.sum()
         segId = self.rng.choice(len(self.nFrames), 1, p = prob)[0]
         frameId = self.rng.choice(maxStart[segId])
         #print 'Sampled: segment %d, frames %d:%d (%s)' % (segId, frameId, frameId+length, self.names[segId])
-        return self.segments[segId][frameId:frameId+length, :, :]
-        
+        imgShape = self.segments[segId][frameId:frameId+length, :, :].shape[1:]
+        if randomCropShape is None:
+            randomCropShape = imgShape
+        try:
+            startCropII = random.choice(imgShape[0] - randomCropShape[0] + 1)
+            startCropJJ = random.choice(imgShape[1] - randomCropShape[1] + 1)
+        except ValueError:
+            print 'Probably error: Cropping %s img to %s probably failed.' % (repr(imgShape), repr(randomCropShape))
+            raise
+            
+        #pdb.set_trace()
+        return self.segments[segId][frameId:frameId+length,
+                                    startCropII:startCropII+randomCropShape[0],
+                                    startCropJJ:startCropJJ+randomCropShape[1]]
+            
+    def getRandomBlocks(self, number, length = 60, randomCropShape = None):
+        if number < 1:
+            raise Exception('Must get at least one block')
+        for ii in range(number):
+            if ii == 0:
+                block = self.getRandomBlock(length = length, randomCropShape = randomCropShape)
+                # Initialize return matrix
+                ret = zeros((number,) + block.shape)
+                ret[ii,:,:,:] = block
+            else:
+                ret[ii,:,:,:] = self.getRandomBlock(length = length, randomCropShape = randomCropShape)
+        return ret

@@ -11,7 +11,9 @@ https://github.com/lisa-lab/DeepLearningTutorials/blob/master/code/utils.py
 
 import ipdb as pdb
 import numpy
+from numpy import sqrt
 from matplotlib import cm
+from matplotlib.pyplot import hist, title
 from numpy import mgrid, array, ones, zeros, linspace, random, reshape, prod
 from PIL import Image
 
@@ -361,3 +363,19 @@ def looser(ax, frac = .05, semilogx = False, semilogy = False, loglog = False):
         ax[3] = exp(ax[3])
     
     return tuple(ax)
+
+
+
+def histPlus(data):
+    '''Hist with reasonable default options and magnitude in title. Automatically flattens data before hist.'''
+
+    flat = data.flatten()
+    sumsquares = (flat**2).sum()
+    mag = sqrt(sumsquares)
+    rms = sqrt(sumsquares / len(flat))
+
+    hist(flat, bins = 20, normed = True)
+    #title('rms: %g, mag: %g' % (rms, mag), fontdict = {'fontsize': 'small'})
+    title('rms: %g, mag: %g' % (rms, mag))
+
+    
