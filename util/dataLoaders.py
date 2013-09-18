@@ -391,7 +391,10 @@ class SaxeVideo(DataLoader):
     def _normalizeData(self, src, dst):
         datApproxMean = 117.0
         for ii in range(len(src)):
-            normalized = asarray(src[ii], dtype = 'float')
+            normalized = array(src[ii], copy = True, dtype = 'float16')
+            todel = src[ii]
+            src[ii] = None
+            del todel
             normalized -= datApproxMean
             normalized /= (max(datApproxMean, 255-datApproxMean) / .8)   # crop to (-.8 to .8)
             dst.append(normalized)
