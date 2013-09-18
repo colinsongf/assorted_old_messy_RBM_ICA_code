@@ -326,19 +326,34 @@ class DataLoader(object):
 class SaxeVideo(DataLoader):
     '''Loads all Saxe video into memory'''
 
-    def __init__(self, dataDir = '../data/saxe', quick = False, seed = 0):
+    def __init__(self, dataDir = '../data/saxe', quick = False, seed = 0, fold = 0):
         self.rng = random.RandomState(seed)
-        self.segmentsInt = []
-        self.names  = []
-        self._loadData(dataDir, quick)
-        self.nFrames = array([len(frames) for frames in self.segmentsInt])
-        self._normalizeData()
+        self.trainSegmentsInt = []
+        self.trainSegments = []
+        self.trainNames  = []
+        self.validSegmentsInt = []
+        self.validSegments = []
+        self.validNames  = []
+        self.testSegmentsInt = []
+        self.testSegments = []
+        self.testNames  = []
+        self._loadData(dataDir, quick, fold)
+        #self.nFrames = array([len(frames) for frames in self.segmentsInt])
+        self._normalizeData(self.trainSegmentsInt, self.trainSegments)
+        self._normalizeData(self.validSegmentsInt, self.validSegments)
+        self._normalizeData(self.testSegmentsInt,  self.testSegments)
+        del self.trainSegmentsInt, self.validSegmentsInt, self.testSegmentsInt
+        self.segments = {'train': self.trainSegments, 'valid': self.validSegments, 'test': self.testSegments}
+        self.names = {'train': self.trainNames, 'valid': self.validNames, 'test': self.testNames}
+        print 'Done norming'
         
-    def _loadData(self, dataDir, quick):
+    def _loadData(self, dataDir, quick, fold):
         ii = 0
+        allSegments = []
+        allNames    = []
         while True:
-            if quick and ii > 0:
-                print 'WARNING: quick mode, just loading 1 batch'
+            if quick and ii >= 2:
+                print 'WARNING: quick mode, just loading 2 batches'
                 break
             try:
                 with gzip.open(os.path.join(dataDir, 'batch_%02d.pkl.gz' % ii), 'rb') as ff:
@@ -348,53 +363,75 @@ class SaxeVideo(DataLoader):
                     raise
                 else:
                     break
-            self.segmentsInt.extend(batchFrames)
-            self.names.extend(batchNames)
-            print 'loaded', batchNames
+            allSegments.append(batchFrames)
+            allNames.append(batchNames)
+            print 'loaded batch %d: %s' % (ii, repr(batchNames))
             ii += 1
+
+        if fold < 0 or fold >= len(allSegments):
+            raise Exception('fold is %s but we only have %d batches' % (repr(fold), len(allSegments)))
+        allSegments = allSegments[fold:] + allSegments[:fold]
+        allNames = allNames[fold:] + allNames[:fold]
+        if quick:
+            self.trainSegmentsInt = allSegments[0]
+            self.trainNames = allNames[0]
+            self.validSegmentsInt = allSegments[1]
+            self.validNames = allNames[1]
+        else:
+            nBatches = len(allSegments)
+            self.trainSegmentsInt = [item for sublist in allSegments[0:nBatches-2] for item in sublist]
+            self.validSegmentsInt = [item for sublist in allSegments[nBatches-2:nBatches-1] for item in sublist]
+            self.testSegmentsInt  = [item for sublist in allSegments[nBatches-1:nBatches] for item in sublist]
+            self.trainNames = [item for sublist in allNames[0:nBatches-2] for item in sublist]
+            self.validNames = [item for sublist in allNames[nBatches-2:nBatches-1] for item in sublist]
+            self.testNames  = [item for sublist in allNames[nBatches-1:nBatches] for item in sublist]
+
         print 'Done loading'
 
-    def _normalizeData(self):
+    def _normalizeData(self, src, dst):
         datApproxMean = 117.0
-        self.segments = []
-        for ii in range(len(self.segmentsInt)):
-            normalized = asarray(self.segmentsInt[ii], dtype = 'float')
+        for ii in range(len(src)):
+            normalized = asarray(src[ii], dtype = 'float')
             normalized -= datApproxMean
-            normalized /= max(datApproxMean, 255-datApproxMean)
-            self.segments.append(normalized)
-        print 'Done norming'
+            normalized /= (max(datApproxMean, 255-datApproxMean) / .8)   # crop to (-.8 to .8)
+            dst.append(normalized)
 
-    def getRandomBlock(self, length = 60, randomCropShape = None):
-        maxStart = self.nFrames - length   # negative implies the window doesn't fit
+    def getRandomBlock(self, length = 60, randomCropShape = None, group = 'train'):
+        if group not in ('train', 'valid', 'test'):
+            raise Exception('group must be train, valid, or test')
+        segments = self.segments[group]
+        names    = self.names[group]
+        nFrames = array([len(frames) for frames in segments])
+        maxStart = nFrames - length   # negative implies the window doesn't fit
         prob = maximum(0.0, maxStart)
         prob /= prob.sum()
-        segId = self.rng.choice(len(self.nFrames), 1, p = prob)[0]
+        segId = self.rng.choice(len(nFrames), 1, p = prob)[0]
         frameId = self.rng.choice(maxStart[segId])
-        #print 'Sampled: segment %d, frames %d:%d (%s)' % (segId, frameId, frameId+length, self.names[segId])
-        imgShape = self.segments[segId][frameId:frameId+length, :, :].shape[1:]
+        #print 'Sampled: %s segment %d, frames %d:%d (%s)' % (group, segId, frameId, frameId+length, names[segId])
+        imgShape = segments[segId][frameId:frameId+length, :, :].shape[1:]
         if randomCropShape is None:
             randomCropShape = imgShape
         try:
-            startCropII = random.choice(imgShape[0] - randomCropShape[0] + 1)
-            startCropJJ = random.choice(imgShape[1] - randomCropShape[1] + 1)
+            startCropII = self.rng.choice(imgShape[0] - randomCropShape[0] + 1)
+            startCropJJ = self.rng.choice(imgShape[1] - randomCropShape[1] + 1)
         except ValueError:
             print 'Probably error: Cropping %s img to %s probably failed.' % (repr(imgShape), repr(randomCropShape))
             raise
             
         #pdb.set_trace()
-        return self.segments[segId][frameId:frameId+length,
-                                    startCropII:startCropII+randomCropShape[0],
-                                    startCropJJ:startCropJJ+randomCropShape[1]]
-            
-    def getRandomBlocks(self, number, length = 60, randomCropShape = None):
+        return segments[segId][frameId:frameId+length,
+                               startCropII:startCropII+randomCropShape[0],
+                               startCropJJ:startCropJJ+randomCropShape[1]]
+        
+    def getRandomBlocks(self, number, length = 60, randomCropShape = None, group = 'train'):
         if number < 1:
             raise Exception('Must get at least one block')
         for ii in range(number):
             if ii == 0:
-                block = self.getRandomBlock(length = length, randomCropShape = randomCropShape)
+                block = self.getRandomBlock(length = length, randomCropShape = randomCropShape, group = group)
                 # Initialize return matrix
                 ret = zeros((number,) + block.shape)
                 ret[ii,:,:,:] = block
             else:
-                ret[ii,:,:,:] = self.getRandomBlock(length = length, randomCropShape = randomCropShape)
+                ret[ii,:,:,:] = self.getRandomBlock(length = length, randomCropShape = randomCropShape, group = group)
         return ret

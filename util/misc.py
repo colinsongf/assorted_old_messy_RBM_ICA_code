@@ -2,7 +2,7 @@
 
 import os, errno
 import time
-from numpy import tanh, arctanh
+from numpy import tanh, arctanh, sqrt, mean, absolute
 
 
 
@@ -67,6 +67,13 @@ def invSigmoid11(ss):
     Domain: -1 to 1
     Range: -inf to inf'''
     return arctanh(ss)
+
+
+
+def rms(data):
+    '''Computes the root-mean-square of the flattened data.'''
+
+    return sqrt(mean(absolute(data.flatten())**2))
 
 
 
@@ -198,13 +205,47 @@ pc = lambda st : makePc(st)
 
 
 class Tic(object):
+    '''Tic object which can be used in either of two ways:
+    
+    toc = Tic('description')
+    # do some stuff here
+    tic()
+
+    Or:
+
+    with Tic('description'):
+        # do some stuff here
+
+    '''
     def __init__(self, descrip = ''):
         self._descrip = descrip
         self._startw = time.time()
         self._startc = time.clock()
 
+    def _printStatus(self, startw, startc):
+        #print 'Time to %s: %.3fs (wall) %.3fs (cpu)' % (self._descrip, time.time()-startw, time.clock()-startc)
+        print '[%s: %.3fs (wall) %.3fs (cpu)]' % (self._descrip, time.time()-startw, time.clock()-startc)
+        
     def __call__(self):
-        print 'Time to %s: %.3fs (wall) %.3fs (cpu)' % (self._descrip, time.time()-self._startw, time.clock()-self._startc)
+        self._printStatus(self._startw, self._startc)
+    
+    def __enter__(self):
+        self._startwWith = time.time()
+        self._startcWith = time.clock()
+
+    def __exit__(self, typ, value, traceback):
+        self._printStatus(self._startwWith, self._startcWith)
+
+
+
+class Ticno(object):
+    '''Like a Tic object, but does nothing'''
+    def __init__(self, descrip = ''):
+        pass
+    def __enter__(self):
+        pass
+    def __exit__(self, typ, value, traceback):
+        pass
 
 
 
@@ -234,6 +275,7 @@ def trimCommon(stringList):
     >>> trimCommon(['foo', 'foooo', 'foooooo'])
     ['', 'oo', 'oooo']
     '''
+
     ret = stringList
     ret = trimCommonBeginning(ret)
     ret = [st[::-1] for st in ret]  # reverse
