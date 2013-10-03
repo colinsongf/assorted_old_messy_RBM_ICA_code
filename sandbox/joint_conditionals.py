@@ -2,7 +2,8 @@
 
 
 import ipdb as pdb
-
+from pylab import *
+from numpy import *
 
 
 NN = 10
@@ -15,17 +16,17 @@ def p_x1_x2(x2):
     
 def p_x2_x1(x1):
     ret = array([1.] * NN)
-    ret[(x1+1)%NN] += 10
+    ret[(2*x1)%NN] += 10
     return ret / ret.sum()
     
 def main():
     x1, x2 = [0, 0]
     states = []
 
-    for ii in xrange(100000):
+    for ii in xrange(50000):
         states.append([x1, x2])
-        #if rand() > .1:
-        if ii % 2 == 0:
+        if rand() > .5:
+        #if ii % 2 == 0:
             x1 = random.choice(vals, p = p_x1_x2(x2))
         else:
             x2 = random.choice(vals, p = p_x2_x1(x1))
@@ -42,12 +43,12 @@ def main():
     imshow(stationary, interpolation='nearest', origin='lower')
     title('stationary')
     savefig('stationary.png')
-    figure()
-    imshow(log(stationary), interpolation='nearest', origin='lower')
-    title('log(stationary)')
-    savefig('log_stationary.png')
+    #figure()
+    #imshow(log(stationary), interpolation='nearest', origin='lower')
+    #title('log(stationary)')
+    #savefig('log_stationary.png')
 
-    pdb.set_trace()
+    #pdb.set_trace()
 
 
 
