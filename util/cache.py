@@ -46,6 +46,7 @@ class PersistentHasher(object):
         if self.verbose >= 3:
             self._printStatus()
         self.salt = '3.14159265358979323'
+        self.classHashWarningPrinted = False
 
 
     def update(self, obj, level = 0):
@@ -70,7 +71,14 @@ class PersistentHasher(object):
                 self.hashAlg.update(str(hash(key)))
                 self.update(val, level = level + 1)  # recursive call
         elif inspect.isclass(obj):
-            raise Exception('Hashing whole classes not supported yet (have not implemented reliable way to hash all methods)')
+            if not self.classHashWarningPrinted:
+                print 'WARNING: hashing classes in util.cache is experimental, proceed with caution!'
+                self.classHashWarningPrinted = True
+            #raise Exception('Hashing whole classes not supported yet (have not implemented reliable way to hash all methods)')
+            self.hashAlg.update(self.salt + 'object')
+            for key,val in sorted(obj.__dict__.items()):
+                self.hashAlg.update(str(hash(key)))
+                self.update(val, level = level + 1)  # recursive call
         else:
             # Just try to hash it
             try:
