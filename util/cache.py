@@ -31,7 +31,7 @@ globalDisableCache = False              # Set to True to disable all caching
 
 
 
-__all__ = ['globalCacheDir', 'globalCacheVerbose', 'globalDisableCache', 'memoize', 'cached']
+__all__ = ['globalCacheDir', 'globalCacheVerbose', 'globalDisableCache', 'memoize', 'cached', 'betacached']
 
 
 
@@ -206,6 +206,49 @@ def cached(function, *args, **kwargs):
 
     memoizedFunction = memoize(function)
     return memoizedFunction(*args, **kwargs)
+
+
+
+def cached2(cacheobj, function, *args, **kwargs):
+    '''Return cached answer or compute and cache. Uses two layers of caching (local object for use with ipython %run and standard caching).'''
+
+    return _cached2(cacheobj, True, function, *args, **kwargs)
+
+
+
+def cached2jm(cacheobj, function, *args, **kwargs):
+    '''Return cached answer or compute and cache. Uses "Just the Memory" layer of caching (no on-disk caching)'''
+
+    return _cached2(cacheobj, False, function, *args, **kwargs)
+
+
+
+def _cached2(cacheobj, cacheFallback, function, *args, **kwargs):
+    '''Return cached answer or compute and cache. Uses two layers of caching (local object for use with ipython %run and standard caching).'''
+
+    # Hash the function, its args, and its kwargs
+    hasher = PersistentHasher()
+    hasher.update(function)
+    hasher.update(args)
+    hasher.update(kwargs)
+
+    # Check cache for previous result
+    functionName = function.__name__    # a little more reliable than func_name
+    digest = hasher.hexdigest()
+
+    cacheKey = '%s:%s' % (functionName, digest[:16])
+
+    try:
+        ret = cacheobj[cacheKey]
+        #print 'hit'
+    except KeyError:
+        #print 'miss'
+        if cacheFallback:
+            ret = cached(function, *args, **kwargs)
+        else:
+            ret = function(*args, **kwargs)
+        cacheobj[cacheKey] = ret
+    return ret
 
 
 

@@ -327,7 +327,8 @@ class SaxeVideo(DataLoader):
     '''Loads all Saxe video into memory'''
 
     def __init__(self, dataDir = '../data/saxe', quick = False, seed = 0, fold = 0):
-        self.rng = random.RandomState(seed)
+        self.seed = seed
+        self.resetRng()
         self.trainSegmentsInt = []
         self.trainSegments = []
         self.trainNames  = []
@@ -346,7 +347,10 @@ class SaxeVideo(DataLoader):
         self.segments = {'train': self.trainSegments, 'valid': self.validSegments, 'test': self.testSegments}
         self.names = {'train': self.trainNames, 'valid': self.validNames, 'test': self.testNames}
         print 'Done norming'
-        
+
+    def resetRng(self):
+        self.rng = random.RandomState(self.seed)
+
     def _loadData(self, dataDir, quick, fold):
         ii = 0
         allSegments = []
