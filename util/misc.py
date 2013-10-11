@@ -224,7 +224,10 @@ class Tic(object):
 
     def _printStatus(self, startw, startc):
         #print 'Time to %s: %.3fs (wall) %.3fs (cpu)' % (self._descrip, time.time()-startw, time.clock()-startc)
-        print '[%s: %.3fs (wall) %.3fs (cpu)]' % (self._descrip, time.time()-startw, time.clock()-startc)
+        if self._descrip:
+            print '[%s: %.3fs (wall) %.3fs (cpu)]' % (self._descrip, time.time()-startw, time.clock()-startc)
+        else:
+            print '[%.3fs (wall) %.3fs (cpu)]' % (time.time()-startw, time.clock()-startc)
         
     def __call__(self):
         self._printStatus(self._startw, self._startc)

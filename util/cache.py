@@ -165,6 +165,9 @@ def memoize(function):
 
             try:
                 start = time.time()
+                if globalCacheVerbose >= 3:
+                    print (' -> cache.py: %s: trying to load file %s'
+                           % (functionName, cachePath))
                 (stats,result) = loadFromPklGz(cachePath)
                 elapsedWall = time.time() - start
                 if globalCacheVerbose >= 1:
@@ -173,6 +176,9 @@ def memoize(function):
                     if globalCacheVerbose >= 2:
                         print '   -> loaded %s' % cachePath
             except IOError:
+                if globalCacheVerbose >= 3:
+                    print (' -> cache.py: %s: cache miss, computing function'
+                           % (functionName))
                 startWall = time.time()
                 startCPU  = time.clock()
                 result = function(*args, **kwargs)
@@ -187,6 +193,9 @@ def memoize(function):
 
                 startSave = time.time()
                 mkdir_p(os.path.dirname(cachePath))
+                if globalCacheVerbose >= 3:
+                    print (' -> cache.py: %s: function execution finished, saving result to file %s'
+                           % (functionName, cachePath))
                 saveToFile(cacheTmpPath, (stats,result), quiet = True)
                 os.rename(cacheTmpPath, cachePath)
                 if globalCacheVerbose >= 1:
