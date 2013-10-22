@@ -2,8 +2,11 @@
 
 from pylab import *
 from numpy import *
+import os
 
 from numdifftools import Gradient
+
+from GitResultsManager import resman
 
 
 
@@ -98,19 +101,26 @@ def descend(adadelta = False, lr = None, decayRho = None, epsilon = None, color 
 
 
 
-def main():
+def main(savedir = None):
     clf()
     descend(adadelta = False, lr = 1e-4, color = 'g', dashes = [2,2])
     descend(adadelta = False, lr = 1e-3, color = 'g', dashes = [4,4])
     descend(adadelta = False, lr = 1e-2, color = 'g', dashes = [6,6])
     descend(adadelta = False, lr = 1e-1, color = 'g', dashes = [8,8])
     descend(adadelta = True, epsilon = 1e-8, color = 'b', dashes = [2,2])
-    descend(adadelta = True, epsilon = 1e-6, color = 'b', dashes = [4,4])
-    descend(adadelta = True, epsilon = 1e-4, color = 'b', dashes = [6,6])
-    descend(adadelta = True, epsilon = 1e-2, color = 'b', dashes = [8,8])
-    legend(('GD 1-e4', 'GD 1-e3', 'GD 1-e2', 'GD 1-e1', 'AD 1e-8', 'AD 1e-6', 'AD 1e-4', 'AD 1e-2'))
+    descend(adadelta = True, epsilon = 1e-7, color = 'b', dashes = [4,4])
+    descend(adadelta = True, epsilon = 1e-6, color = 'b', dashes = [6,6])
+    descend(adadelta = True, epsilon = 1e-4, color = 'b', dashes = [8,8])
+    descend(adadelta = True, epsilon = 1e-2, color = 'b', dashes = [10,10])
+    legend(('GD 1-e4', 'GD 1-e3', 'GD 1-e2', 'GD 1-e1', 'AD 1e-8', 'AD 1e-7', 'AD 1e-6', 'AD 1e-4', 'AD 1e-2'))
+
+    if savedir:
+        savefig(os.path.join(savedir, 'gd_vs_adagrad.png'))
+        savefig(os.path.join(savedir, 'gd_vs_adagrad.pdf'))
     
 
 
 if __name__ == '__main__':
-    main()
+    resman.start('junk', diary = False)
+    main(savedir = resman.rundir)
+    resman.stop()
