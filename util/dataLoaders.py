@@ -400,11 +400,12 @@ class SaxeVideo(DataLoader):
             print 'Probably error: Cropping %s img to %s probably failed.' % (repr(imgShape), repr(randomCropShape))
             raise
             
-        #pdb.set_trace()
-        return segments[segId][frameId:frameId+length,
-                               startCropII:startCropII+randomCropShape[0],
-                               startCropJJ:startCropJJ+randomCropShape[1]]
-        
+        ret = segments[segId][frameId:frameId+length,
+                              startCropII:startCropII+randomCropShape[0],
+                              startCropJJ:startCropJJ+randomCropShape[1]]
+        return ret
+
+    
     def getRandomBlocks(self, number, length = 60, randomCropShape = None, group = 'train'):
         if number < 1:
             raise Exception('Must get at least one block')
@@ -412,7 +413,7 @@ class SaxeVideo(DataLoader):
             if ii == 0:
                 block = self.getRandomBlock(length = length, randomCropShape = randomCropShape, group = group)
                 # Initialize return matrix
-                ret = zeros((number,) + block.shape)
+                ret = zeros((number,) + block.shape, dtype = self.dtype)
                 ret[ii,:,:,:] = block
             else:
                 ret[ii,:,:,:] = self.getRandomBlock(length = length, randomCropShape = randomCropShape, group = group)
