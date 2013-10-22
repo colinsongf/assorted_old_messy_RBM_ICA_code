@@ -17,6 +17,11 @@ dtype = 'uint8'
 minBatchSize = 800
 outputName = os.path.join(dataDir, 'batch_%02d.pkl.gz')
 
+# Normalized output
+normalizationOutputDtype = 'float16'
+normalizationApproxMean = 117.0
+normalizationMinMax = .8    # crop to, e.g.,-.8 to .8
+
 dirNames = [
     'hummingbird',
     'illum_pan_tripod_flowers',
@@ -77,7 +82,7 @@ def loadImgs(dirname):
 
 
 
-def main():
+def makeDataset():
     random.seed(123)
     random.shuffle(dirNames)
     
@@ -107,4 +112,47 @@ def main():
 
 
 
-main()
+def normalizeSaxeData(inputInt):
+    ret = []
+    for ii in range(len(inputInt)):
+        normalized = array(inputInt[ii], copy = True, dtype = normalizationOutputDtype)
+        normalized -= normalizationApproxMean
+        normalized /= (max(normalizationApproxMean, 255-normalizationApproxMean) / normalizationMinMax)
+        ret.append(normalized)
+    return ret
+
+
+
+def saveNormalizedDataset():
+    ii = 0
+    while True:
+        try:
+            with gzip.open(os.path.join(dataDir, 'batch_%02d.pkl.gz' % ii), 'rb') as ff:
+                batchFramesInt, batchNames = pickle.load(ff)
+        except IOError:
+            if ii == 0:
+                raise
+            else:
+                break
+        print 'loaded batch %d: %s' % (ii, repr(batchNames))
+
+        batchFrames = normalizeSaxeData(batchFramesInt)
+
+        with gzip.open(os.path.join(dataDir, 'batch_%02d.normalized.pkl.gz' % ii), 'wb') as ff:
+            pickle.dump((batchFrames, batchNames), ff, pickle.HIGHEST_PROTOCOL)
+        with open(os.path.join(dataDir, 'batch_%02d.normalized.pkl' % ii), 'wb') as ff:
+            pickle.dump((batchFrames, batchNames), ff, pickle.HIGHEST_PROTOCOL)
+        print '  saved normalized version'
+
+        ii += 1
+
+
+
+def main():
+    #makeDataset()
+    saveNormalizedDataset()
+
+
+
+if __name__ == '__main__':
+    main()

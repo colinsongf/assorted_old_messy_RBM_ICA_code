@@ -309,28 +309,11 @@ class DataLoader(object):
 
 
 
-def loadAndNormSaxeVideo(dataDir, quick, fold):
-    trainSegmentsInt, trainSegments, trainNames = [], [], []
-    validSegmentsInt, validSegments, validNames = [], [], []
-    testSegmentsInt,  testSegments,  testNames  = [], [], []
+def loadNormalizedSaxeData(dataDir, quick, fold):
+    trainSegments, trainNames = [], []
+    validSegments, validNames = [], []
+    testSegments,  testNames  = [], []
 
-    output = loadSaxeData(dataDir, quick, fold)
-    trainSegmentsInt, validSegmentsInt, testSegmentsInt, trainNames, validNames, testNames = output
-    print 'Done loading'
-
-    #_loadData(dataDir, quick, fold)
-    #nFrames = array([len(frames) for frames in segmentsInt])
-    trainSegments = normalizeSaxeData(trainSegmentsInt)
-    validSegments = normalizeSaxeData(validSegmentsInt)
-    testSegments  = [] if quick else normalizeSaxeData(testSegmentsInt)
-    del trainSegmentsInt, validSegmentsInt, testSegmentsInt
-    print 'Done norming'
-
-    return trainSegments, validSegments, testSegments, trainNames, validNames, testNames
-
-
-
-def loadSaxeData(dataDir, quick, fold):
     ii = 0
     allSegments = []
     allNames    = []
@@ -339,7 +322,7 @@ def loadSaxeData(dataDir, quick, fold):
             print 'WARNING: quick mode, just loading 2 batches'
             break
         try:
-            with gzip.open(os.path.join(dataDir, 'batch_%02d.pkl.gz' % ii), 'rb') as ff:
+            with open(os.path.join(dataDir, 'batch_%02d.normalized.pkl' % ii), 'rb') as ff:
                 batchFrames, batchNames = pickle.load(ff)
         except IOError:
             if ii == 0:
@@ -356,39 +339,22 @@ def loadSaxeData(dataDir, quick, fold):
     allSegments = allSegments[fold:] + allSegments[:fold]
     allNames = allNames[fold:] + allNames[:fold]
     if quick:
-        trainSegmentsInt = allSegments[0]
+        trainSegments = allSegments[0]
         trainNames = allNames[0]
-        validSegmentsInt = allSegments[1]
+        validSegments = allSegments[1]
         validNames = allNames[1]
-        testSegmentsInt = None
+        testSegments = None
         testNames = []
     else:
         nBatches = len(allSegments)
-        trainSegmentsInt = [item for sublist in allSegments[0:nBatches-2] for item in sublist]
-        validSegmentsInt = [item for sublist in allSegments[nBatches-2:nBatches-1] for item in sublist]
-        testSegmentsInt  = [item for sublist in allSegments[nBatches-1:nBatches] for item in sublist]
+        trainSegments = [item for sublist in allSegments[0:nBatches-2] for item in sublist]
+        validSegments = [item for sublist in allSegments[nBatches-2:nBatches-1] for item in sublist]
+        testSegments  = [item for sublist in allSegments[nBatches-1:nBatches] for item in sublist]
         trainNames = [item for sublist in allNames[0:nBatches-2] for item in sublist]
         validNames = [item for sublist in allNames[nBatches-2:nBatches-1] for item in sublist]
         testNames  = [item for sublist in allNames[nBatches-1:nBatches] for item in sublist]
 
-    return trainSegmentsInt, validSegmentsInt, testSegmentsInt, trainNames, validNames, testNames
-
-
-
-def normalizeSaxeData(inputInt, deleteInputInt = True):
-    internalDtype = 'float16'
-    datApproxMean = 117.0
-    ret = []
-    for ii in range(len(inputInt)):
-        normalized = array(inputInt[ii], copy = True, dtype = internalDtype)
-        todel = inputInt[ii]
-        inputInt[ii] = None
-        if deleteInputInt:
-            del todel
-        normalized -= datApproxMean
-        normalized /= (max(datApproxMean, 255-datApproxMean) / .8)   # crop to (-.8 to .8)
-        ret.append(normalized)
-    return ret
+    return trainSegments, validSegments, testSegments, trainNames, validNames, testNames
 
 
 
@@ -398,12 +364,10 @@ class SaxeVideo(DataLoader):
     def __init__(self, dataDir = '../data/saxe', quick = False, seed = 0, fold = 0, dtype = 'float16'):
         self.seed = seed
         self.fold = fold
-        self.dtype = dtype
+        self.dtype = dtype    # Data is always read in as float16 (as saved by makeSaxeVideo.py). This is the dtype used for output.
         self.resetRng()
 
-        # Very slow :(
-        #output = cached(loadAndNormSaxeVideo, dataDir, quick, self.fold, self.dtype)
-        output = loadAndNormSaxeVideo(dataDir, quick, self.fold)
+        output = loadNormalizedSaxeData(dataDir, quick, self.fold)
         self.trainSegments, self.validSegments, self.testSegments, self.trainNames, self.validNames, self.testNames = output
         
         self.segments = {'train': self.trainSegments, 'valid': self.validSegments, 'test': self.testSegments}
