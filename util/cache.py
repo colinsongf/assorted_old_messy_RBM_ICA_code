@@ -17,7 +17,7 @@ import cPickle as pickle
 import types
 import inspect
 
-from dataLoaders import loadFromPklGz, saveToFile
+from fileIO import loadFromPklGz, saveToFile
 from misc import mkdir_p
 
 

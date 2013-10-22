@@ -5,11 +5,13 @@ import numpy
 from numpy import array, zeros, reshape, random, vstack, concatenate, copy, dot, minimum, maximum, asarray
 import os
 import gzip
-import cPickle as pickle
 import ipdb as pdb
 import sys
 import scipy
 import scipy.io
+
+from fileIO import loadFromPklGz, saveToFile
+from cache import cached, cached2, cached2jm
 
 
 
@@ -71,22 +73,6 @@ def loadCifarDataSubsets(cifarDirectory, size, topLeftCoords):
     datasets, classNames = loadCifarData(cifarDirectory)
 
     print 'Abandoned for now... pick up later, maybe'
-
-
-
-def saveToFile(filename, obj, quiet = False):
-    ff = gzip.open(filename, 'wb')
-    pickle.dump(obj, ff, protocol = -1)
-    if not quiet:
-        print 'saved to', filename
-    ff.close()
-
-
-
-def loadFromPklGz(filename):
-    with gzip.open(filename, 'rb') as ff:
-        ret = pickle.load(ff)
-    return ret
 
 
 
@@ -323,85 +309,111 @@ class DataLoader(object):
 
 
 
+def loadAndNormSaxeVideo(dataDir, quick, fold):
+    trainSegmentsInt, trainSegments, trainNames = [], [], []
+    validSegmentsInt, validSegments, validNames = [], [], []
+    testSegmentsInt,  testSegments,  testNames  = [], [], []
+
+    output = loadSaxeData(dataDir, quick, fold)
+    trainSegmentsInt, validSegmentsInt, testSegmentsInt, trainNames, validNames, testNames = output
+    print 'Done loading'
+
+    #_loadData(dataDir, quick, fold)
+    #nFrames = array([len(frames) for frames in segmentsInt])
+    pdb.set_trace()
+    trainSegments = normalizeSaxeData(trainSegmentsInt)
+    validSegments = normalizeSaxeData(validSegmentsInt)
+    testSegments  = [] if quick else normalizeSaxeData(testSegmentsInt)
+    del trainSegmentsInt, validSegmentsInt, testSegmentsInt
+    print 'Done norming'
+
+    return trainSegments, validSegments, testSegments, trainNames, validNames, testNames
+
+
+
+def loadSaxeData(dataDir, quick, fold):
+    ii = 0
+    allSegments = []
+    allNames    = []
+    while True:
+        if quick and ii >= 2:
+            print 'WARNING: quick mode, just loading 2 batches'
+            break
+        try:
+            with gzip.open(os.path.join(dataDir, 'batch_%02d.pkl.gz' % ii), 'rb') as ff:
+                batchFrames, batchNames = pickle.load(ff)
+        except IOError:
+            if ii == 0:
+                raise
+            else:
+                break
+        allSegments.append(batchFrames)
+        allNames.append(batchNames)
+        print 'loaded batch %d: %s' % (ii, repr(batchNames))
+        ii += 1
+
+    if fold < 0 or fold >= len(allSegments):
+        raise Exception('fold is %s but we only have %d batches' % (repr(fold), len(allSegments)))
+    allSegments = allSegments[fold:] + allSegments[:fold]
+    allNames = allNames[fold:] + allNames[:fold]
+    if quick:
+        trainSegmentsInt = allSegments[0]
+        trainNames = allNames[0]
+        validSegmentsInt = allSegments[1]
+        validNames = allNames[1]
+        testSegmentsInt = None
+        testNames = []
+    else:
+        nBatches = len(allSegments)
+        trainSegmentsInt = [item for sublist in allSegments[0:nBatches-2] for item in sublist]
+        validSegmentsInt = [item for sublist in allSegments[nBatches-2:nBatches-1] for item in sublist]
+        testSegmentsInt  = [item for sublist in allSegments[nBatches-1:nBatches] for item in sublist]
+        trainNames = [item for sublist in allNames[0:nBatches-2] for item in sublist]
+        validNames = [item for sublist in allNames[nBatches-2:nBatches-1] for item in sublist]
+        testNames  = [item for sublist in allNames[nBatches-1:nBatches] for item in sublist]
+
+    return trainSegmentsInt, validSegmentsInt, testSegmentsInt, trainNames, validNames, testNames
+
+
+
+def normalizeSaxeData(inputInt, deleteInputInt = True):
+    internalDtype = 'float16'
+    datApproxMean = 117.0
+    ret = []
+    for ii in range(len(inputInt)):
+        normalized = array(inputInt[ii], copy = True, dtype = internalDtype)
+        todel = inputInt[ii]
+        inputInt[ii] = None
+        if deleteInputInt:
+            del todel
+        normalized -= datApproxMean
+        normalized /= (max(datApproxMean, 255-datApproxMean) / .8)   # crop to (-.8 to .8)
+        ret.append(normalized)
+    return ret
+
+
+
 class SaxeVideo(DataLoader):
     '''Loads all Saxe video into memory'''
 
-    def __init__(self, dataDir = '../data/saxe', quick = False, seed = 0, fold = 0):
+    def __init__(self, dataDir = '../data/saxe', quick = False, seed = 0, fold = 0, dtype = 'float16'):
         self.seed = seed
+        self.fold = fold
+        self.dtype = dtype
         self.resetRng()
-        self.trainSegmentsInt = []
-        self.trainSegments = []
-        self.trainNames  = []
-        self.validSegmentsInt = []
-        self.validSegments = []
-        self.validNames  = []
-        self.testSegmentsInt = []
-        self.testSegments = []
-        self.testNames  = []
-        self._loadData(dataDir, quick, fold)
-        #self.nFrames = array([len(frames) for frames in self.segmentsInt])
-        self._normalizeData(self.trainSegmentsInt, self.trainSegments)
-        self._normalizeData(self.validSegmentsInt, self.validSegments)
-        self._normalizeData(self.testSegmentsInt,  self.testSegments)
-        del self.trainSegmentsInt, self.validSegmentsInt, self.testSegmentsInt
+
+        # Very slow :(
+        #output = cached(loadAndNormSaxeVideo, dataDir, quick, self.fold, self.dtype)
+        output = loadAndNormSaxeVideo(dataDir, quick, self.fold)
+        self.trainSegments, self.validSegments, self.testSegments, self.trainNames, self.validNames, self.testNames = output
+        
         self.segments = {'train': self.trainSegments, 'valid': self.validSegments, 'test': self.testSegments}
         self.names = {'train': self.trainNames, 'valid': self.validNames, 'test': self.testNames}
-        print 'Done norming'
+
 
     def resetRng(self):
         self.rng = random.RandomState(self.seed)
 
-    def _loadData(self, dataDir, quick, fold):
-        ii = 0
-        allSegments = []
-        allNames    = []
-        while True:
-            if quick and ii >= 2:
-                print 'WARNING: quick mode, just loading 2 batches'
-                break
-            try:
-                with gzip.open(os.path.join(dataDir, 'batch_%02d.pkl.gz' % ii), 'rb') as ff:
-                    batchFrames, batchNames = pickle.load(ff)
-            except IOError:
-                if ii == 0:
-                    raise
-                else:
-                    break
-            allSegments.append(batchFrames)
-            allNames.append(batchNames)
-            print 'loaded batch %d: %s' % (ii, repr(batchNames))
-            ii += 1
-
-        if fold < 0 or fold >= len(allSegments):
-            raise Exception('fold is %s but we only have %d batches' % (repr(fold), len(allSegments)))
-        allSegments = allSegments[fold:] + allSegments[:fold]
-        allNames = allNames[fold:] + allNames[:fold]
-        if quick:
-            self.trainSegmentsInt = allSegments[0]
-            self.trainNames = allNames[0]
-            self.validSegmentsInt = allSegments[1]
-            self.validNames = allNames[1]
-        else:
-            nBatches = len(allSegments)
-            self.trainSegmentsInt = [item for sublist in allSegments[0:nBatches-2] for item in sublist]
-            self.validSegmentsInt = [item for sublist in allSegments[nBatches-2:nBatches-1] for item in sublist]
-            self.testSegmentsInt  = [item for sublist in allSegments[nBatches-1:nBatches] for item in sublist]
-            self.trainNames = [item for sublist in allNames[0:nBatches-2] for item in sublist]
-            self.validNames = [item for sublist in allNames[nBatches-2:nBatches-1] for item in sublist]
-            self.testNames  = [item for sublist in allNames[nBatches-1:nBatches] for item in sublist]
-
-        print 'Done loading'
-
-    def _normalizeData(self, src, dst):
-        datApproxMean = 117.0
-        for ii in range(len(src)):
-            normalized = array(src[ii], copy = True, dtype = 'float16')
-            todel = src[ii]
-            src[ii] = None
-            del todel
-            normalized -= datApproxMean
-            normalized /= (max(datApproxMean, 255-datApproxMean) / .8)   # crop to (-.8 to .8)
-            dst.append(normalized)
 
     def getRandomBlock(self, length = 60, randomCropShape = None, group = 'train'):
         if group not in ('train', 'valid', 'test'):
