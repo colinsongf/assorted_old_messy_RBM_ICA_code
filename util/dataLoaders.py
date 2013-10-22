@@ -320,7 +320,6 @@ def loadAndNormSaxeVideo(dataDir, quick, fold):
 
     #_loadData(dataDir, quick, fold)
     #nFrames = array([len(frames) for frames in segmentsInt])
-    pdb.set_trace()
     trainSegments = normalizeSaxeData(trainSegmentsInt)
     validSegments = normalizeSaxeData(validSegmentsInt)
     testSegments  = [] if quick else normalizeSaxeData(testSegmentsInt)
