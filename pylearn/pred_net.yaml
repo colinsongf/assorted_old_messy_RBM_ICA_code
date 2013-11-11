@@ -1,3 +1,9 @@
+###########
+# JBY: edit
+#
+
+
+
 # pylearn2 tutorial example: cifar_grbm_smd.yaml by Ian Goodfellow
 #
 # Read the README file before reading this file
@@ -24,7 +30,7 @@
         height: 10,
         width: 10,
         num_frames: 3,
-        ball_diameter: 15, #error here...
+        ball_diameter: 5,
 
         # Physics params
         vel_multiplier: 4.0,
@@ -33,10 +39,44 @@
     },
 
     #Next we make the model to be trained. It is a Binary Gaussian RBM
-    model: !obj:pylearn2.models.pred_convnet.PredConvNet {
+    model: !obj:pylearn2.models.prednet.PredNet {
+        # 
+        past_space: &past_space !obj:pylearn2.space.Conv3DSpace {
+            shape: [2, 10, 10],
+            num_channels: 1
+        },
+        # 
+        future_space: !obj:pylearn2.space.Conv3DSpace {
+            shape : [1, 10, 10],
+            num_channels: 1
+        },
 
-        # Number of filters
-        num_filters : 25,
+        rep_space: &rep_space !obj:pylearn2.space.VectorSpace {
+            dim: &rep_dim 25,
+        },
+
+        layers_up : !obj:pylearn2.models.mlp.MLP {
+            input_space: *past_space,
+            layers: [
+                     !obj:pylearn2.models.mlp.Sigmoid {
+                         dim: *rep_dim,
+                         layer_name: 'up_1',
+                         irange: .005
+                     }
+                    ]
+        },
+
+        layers_down : !obj:pylearn2.models.mlp.MLP {
+            input_space: *rep_space,
+            layers: [
+                     !obj:pylearn2.models.mlp.Linear {
+                         dim: 25,      # must = prod(output_space.shape)
+                         layer_name: 'down_1',
+                         irange: .005
+                     }
+                    ]
+        },
+
 
         # The RBM needs 192 visible units (its inputs are 8x8 patches with 3
         # color channels)
@@ -121,6 +161,10 @@
         #    },
         #},
 
+        cost : !obj:pylearn2.costs.prednet.PredNetCost {
+                
+        },
+
         # We'll use the monitoring dataset to figure out when to stop training.
         #
         # In this case, we stop if there is less than a 1% decrease in the
@@ -130,9 +174,8 @@
         # (setting N to 10 should make the weights prettier, but will make it
         # run a lot longer)
 
-        termination_criterion : !obj:pylearn2.termination_criteria.MonitorBased {
-            prop_decrease : 0.01,
-            N : 1,
+        termination_criterion : !obj:pylearn2.termination_criteria.EpochCounter {
+            max_epochs: 3,
         },
 
         # Let's throw a learning rate adjuster into the training algorithm.
@@ -145,7 +188,7 @@
         # This is not a very mathematically principled approach, but it works
         # well in practice.
         },
-    extensions : [!obj:pylearn2.training_algorithms.sgd.MonitorBasedLRAdjuster {}],
+    #extensions : [!obj:pylearn2.training_algorithms.sgd.MonitorBasedLRAdjuster {}],
     #Finally, request that the model be saved after each epoch
     save_freq : 1
 }
