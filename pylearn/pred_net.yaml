@@ -47,7 +47,7 @@
             num_channels: 1
         },
         # 
-        future_space: !obj:pylearn2.space.Conv3DSpace {
+        future_space: &future_space !obj:pylearn2.space.Conv3DSpace {
             shape : [1, 10, 10],
             num_channels: 1
         },
@@ -71,7 +71,8 @@
             input_space: *rep_space,
             layers: [
                      !obj:pylearn2.models.mlp.Linear {
-                         dim: 25,      # must = prod(output_space.shape)
+                         #output_space: *future_space,   # nope
+                         dim: 100,      # Note: you must manuall make this = prod(future_space.shape)  !!!!!!!!
                          layer_name: 'down_1',
                          irange: .005
                      }
